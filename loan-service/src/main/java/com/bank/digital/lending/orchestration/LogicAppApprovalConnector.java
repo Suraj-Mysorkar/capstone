@@ -79,20 +79,20 @@ public class LogicAppApprovalConnector {
     private void triggerAzureLogicApp(LoanApplication app, String callbackUrl) {
         // Payload posted to the Logic App HTTP trigger.
         // The Logic App uses these fields to populate the manager's approval card.
-        Map<String, Object> triggerPayload = Map.of(
-                "applicationId", app.getApplicationId(),
-                "callbackUrl", callbackUrl,
-                "applicantName", app.getCustomerName(),
-                "applicantEmail", app.getCustomerEmail(),
-                "loanAmount", app.getLoanAmount(),
-                "tenureMonths", app.getTenureMonths(),
-                "interestRate", app.getInterestRate(),
-                "calculatedEMI", app.getCalculatedEMI(),
-                "riskScore", app.getRiskScore(),
-                "dtiRatio", app.getDtiRatio(),
-                "employmentType", app.getEmploymentType().name(),
-                "monthlyIncome", app.getMonthlyIncome(),
-                "decisionRemarks", app.getDecisionRemarks()
+        Map<String, Object> triggerPayload = Map.ofEntries(
+                Map.entry("applicationId", app.getApplicationId()),
+                Map.entry("callbackUrl", callbackUrl),
+                Map.entry("applicantName", app.getCustomerName()),
+                Map.entry("applicantEmail", app.getCustomerEmail()),
+                Map.entry("loanAmount", app.getLoanAmount()),
+                Map.entry("tenureMonths", app.getTenureMonths()),
+                Map.entry("interestRate", app.getInterestRate()),
+                Map.entry("calculatedEMI", app.getCalculatedEMI()),
+                Map.entry("riskScore", app.getRiskScore()),
+                Map.entry("dtiRatio", app.getDtiRatio()),
+                Map.entry("employmentType", app.getEmploymentType().name()),
+                Map.entry("monthlyIncome", app.getMonthlyIncome()),
+                Map.entry("decisionRemarks", app.getDecisionRemarks() != null ? app.getDecisionRemarks() : "")
         );
 
         try {
