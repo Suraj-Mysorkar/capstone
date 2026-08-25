@@ -1,0 +1,228 @@
+package com.bank.digital.lending.service;
+
+import com.bank.digital.lending.model.dto.*;
+import com.bank.digital.lending.model.entity.LoanApplication;
+import com.bank.digital.lending.model.entity.LoanAuditLog;
+import com.bank.digital.lending.model.entity.LoanScheme;
+import com.bank.digital.lending.model.enums.LoanStatus;
+import com.bank.digital.lending.orchestration.LoanDurableOrchestrator;
+import com.bank.digital.lending.repository.LoanApplicationRepository;
+import com.bank.digital.lending.repository.LoanAuditLogRepository;
+import com.bank.digital.lending.repository.LoanSchemeRepository;
+import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.beans.factory.annotation.Value;
+
+import java.math.BigDecimal;
+import java.util.List;
+import java.util.Optional;
+import java.util.UUID;
+
+@Service
+public class LoanApplicationService {
+
+    @Value("${azure.callback-base-url:}")
+    private String callbackBaseUrl;
+
+    private final LoanApplicationRepository applicationRepository;
+    private final LoanSchemeRepository schemeRepository;
+    private final LoanAuditLogRepository auditLogRepository;
+    private final EMICalculatorProxyService emiCalculatorProxy;
+    private final DocumentStorageProxyService documentStorageProxy;
+    private final LoanDurableOrchestrator durableOrchestrator;
+    private final AzureEventBusPublisherService eventBusPublisher;
+
+    public LoanApplicationService(LoanApplicationRepository applicationRepository,
+                                  LoanSchemeRepository schemeRepository,
+                                  LoanAuditLogRepository auditLogRepository,
+                                  EMICalculatorProxyService emiCalculatorProxy,
+                                  DocumentStorageProxyService documentStorageProxy,
+                                  LoanDurableOrchestrator durableOrchestrator,
+                                  AzureEventBusPublisherService eventBusPublisher) {
+        this.applicationRepository = applicationRepository;
+        this.schemeRepository = schemeRepository;
+        this.auditLogRepository = auditLogRepository;
+        this.emiCalculatorProxy = emiCalculatorProxy;
+        this.documentStorageProxy = documentStorageProxy;
+        this.durableOrchestrator = durableOrchestrator;
+        this.eventBusPublisher = eventBusPublisher;
+    }
+
+    @Transactional
+    public LoanApplicationResponse applyForLoan(LoanApplicationRequest request) {
+        LoanScheme scheme = schemeRepository.findById(request.schemeId())
+                .orElseThrow(() -> new IllegalArgumentException("Invalid Scheme ID: " + request.schemeId()));
+
+        String applicationId = "APP-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+
+        // 1. Calculate EMI via Azure Function Proxy
+        BigDecimal emi = emiCalculatorProxy.computeMonthlyEMI(
+                request.loanAmount(),
+                scheme.getBaseInterestRate(),
+                request.tenureMonths()
+        );
+
+        // 2. Initialize Application Entity
+        LoanApplication app = new LoanApplication();
+        app.setApplicationId(applicationId);
+        app.setCustomerId(request.customerId());
+        app.setCustomerName(request.customerName());
+        app.setCustomerEmail(request.customerEmail());
+        app.setCustomerPhone(request.customerPhone());
+        app.setMonthlyIncome(request.monthlyIncome());
+        app.setExistingLiabilities(request.existingLiabilities() != null ? request.existingLiabilities() : BigDecimal.ZERO);
+        app.setEmploymentType(request.employmentType());
+        app.setScheme(scheme);
+        app.setLoanType(scheme.getLoanType());
+        app.setLoanAmount(request.loanAmount());
+        app.setTenureMonths(request.tenureMonths());
+        app.setInterestRate(scheme.getBaseInterestRate());
+        app.setCalculatedEMI(emi);
+        app.setStatus(LoanStatus.SUBMITTED);
+
+        LoanApplication savedApp = applicationRepository.save(app);
+        recordAuditLog(applicationId, null, LoanStatus.SUBMITTED, "APPLICANT", "Initial loan application submitted.");
+
+        // 3. Link uploaded documents
+        if (request.documentIds() != null && !request.documentIds().isEmpty()) {
+            documentStorageProxy.linkDocumentsToApplication(request.documentIds(), applicationId);
+        }
+
+        // 4. Trigger Azure Durable Function Orchestrator
+        String callbackUrl = callbackUrlFor(applicationId);
+        durableOrchestrator.runOrchestrationWorkflow(savedApp, callbackUrl);
+
+        // 5. Persist State Changes & Record Audit Logs
+        LoanApplication updatedApp = applicationRepository.save(savedApp);
+        recordAuditLog(applicationId, LoanStatus.SUBMITTED, updatedApp.getStatus(),
+                "DURABLE_ORCHESTRATOR", updatedApp.getDecisionRemarks());
+
+        // 6. If Completed (Auto-Approved / Auto-Rejected), Publish Event to Azure Service Bus
+        if (updatedApp.getStatus() == LoanStatus.APPROVED || updatedApp.getStatus() == LoanStatus.REJECTED) {
+            eventBusPublisher.publishLoanCompletedEvent(updatedApp);
+        }
+
+        return mapToResponse(updatedApp);
+    }
+
+    @Transactional
+    public LoanApplicationResponse processManagerDecision(String applicationId, ManagerDecisionRequest request) {
+        LoanApplication app = applicationRepository.findById(applicationId)
+                .orElseThrow(() -> new IllegalArgumentException("Loan application not found with ID: " + applicationId));
+
+        if (app.getStatus() != LoanStatus.MANUAL_REVIEW_REQUIRED) {
+            throw new IllegalStateException("Application is not in MANUAL_REVIEW_REQUIRED status. Current status: " + app.getStatus());
+        }
+
+        LoanStatus previousStatus = app.getStatus();
+
+        // Resume Durable Orchestration with Manager Decision
+        durableOrchestrator.processManagerApprovalEvent(app, request.decision(), request.remarks(), request.managerId());
+
+        LoanApplication finalizedApp = applicationRepository.save(app);
+        recordAuditLog(applicationId, previousStatus, finalizedApp.getStatus(),
+                "MANAGER:" + request.managerId(), request.remarks());
+
+        // Publish Completion Event to Azure Service Bus
+        eventBusPublisher.publishLoanCompletedEvent(finalizedApp);
+
+        return mapToResponse(finalizedApp);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<LoanApplicationResponse> getApplicationById(String applicationId) {
+        return applicationRepository.findById(applicationId).map(this::mapToResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<LoanStatusResponse> getApplicationStatus(String applicationId) {
+        return applicationRepository.findById(applicationId).map(app -> {
+            String stageDescription = switch (app.getStatus()) {
+                case SUBMITTED -> "Application submitted and queued for processing.";
+                case VALIDATING -> "Validating applicant demographic and eligibility details.";
+                case CREDIT_ASSESSMENT -> "Performing automated risk assessment and credit scoring.";
+                case MANUAL_REVIEW_REQUIRED -> "Under review by Senior Underwriting Manager.";
+                case APPROVED -> "Loan approved! Ready for sanction letter generation and disbursement.";
+                case REJECTED -> "Loan application rejected based on underwriting criteria.";
+            };
+
+            return new LoanStatusResponse(
+                    app.getApplicationId(),
+                    app.getCustomerName(),
+                    app.getStatus(),
+                    stageDescription,
+                    app.getRiskScore(),
+                    app.getDecisionRemarks(),
+                    app.getUpdatedAt()
+            );
+        });
+    }
+
+    @Transactional(readOnly = true)
+    public List<LoanApplicationResponse> listApplications(LoanStatus status) {
+        List<LoanApplication> apps = (status != null) ?
+                applicationRepository.findByStatus(status) :
+                applicationRepository.findAllByOrderByCreatedAtDesc();
+
+        return apps.stream().map(this::mapToResponse).toList();
+    }
+
+    @Transactional(readOnly = true)
+    public List<LoanAuditLogResponse> getAuditLogs(String applicationId) {
+        return auditLogRepository.findByApplicationIdOrderByTimestampAsc(applicationId)
+                .stream()
+                .map(log -> new LoanAuditLogResponse(
+                        log.getLogId(),
+                        log.getApplicationId(),
+                        log.getPreviousStatus(),
+                        log.getNewStatus(),
+                        log.getChangedBy(),
+                        log.getComments(),
+                        log.getTimestamp()
+                ))
+                .toList();
+    }
+
+    private void recordAuditLog(String applicationId, LoanStatus prev, LoanStatus next, String changedBy, String comments) {
+        LoanAuditLog log = new LoanAuditLog(applicationId, prev, next, changedBy, comments);
+        auditLogRepository.save(log);
+    }
+
+    private String callbackUrlFor(String applicationId) {
+        String path = "/api/v1/loans/applications/" + applicationId + "/manager-callback";
+        return callbackBaseUrl == null || callbackBaseUrl.isBlank()
+                ? path
+                : callbackBaseUrl.replaceAll("/+$", "") + path;
+    }
+
+    private LoanApplicationResponse mapToResponse(LoanApplication app) {
+        List<DocumentUploadResponse> docs = documentStorageProxy.getDocumentsByApplicationId(app.getApplicationId());
+
+        return new LoanApplicationResponse(
+                app.getApplicationId(),
+                app.getCustomerId(),
+                app.getCustomerName(),
+                app.getCustomerEmail(),
+                app.getCustomerPhone(),
+                app.getMonthlyIncome(),
+                app.getExistingLiabilities(),
+                app.getEmploymentType(),
+                app.getScheme().getSchemeId(),
+                app.getScheme().getSchemeName(),
+                app.getLoanType(),
+                app.getLoanAmount(),
+                app.getTenureMonths(),
+                app.getInterestRate(),
+                app.getCalculatedEMI(),
+                app.getStatus(),
+                app.getRiskScore(),
+                app.getDtiRatio(),
+                app.getOrchestrationInstanceId(),
+                app.getAssignedManager(),
+                app.getDecisionRemarks(),
+                app.getCreatedAt(),
+                app.getUpdatedAt(),
+                docs
+        );
+    }
+}
