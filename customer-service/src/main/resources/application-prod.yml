@@ -1,0 +1,20 @@
+spring:
+  datasource:
+    url: ${DB_URL}
+    username: ${DB_USERNAME}
+    password: ${DB_PASSWORD}
+    driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+    hikari:
+      maximum-pool-size: ${DB_POOL_SIZE:20}
+      minimum-idle: 5
+
+  jpa:
+    show-sql: false
+
+logging:
+  level:
+    root: INFO
+    com.bank.customerservice: INFO
+
+# In production, prefer omitting EVENTGRID_TOPIC_KEY and relying on
+# DefaultAzureCredential (Managed Identity) — see EventGridConfig.

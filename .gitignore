@@ -1,1 +1,78 @@
+# =========================================================================
+# Spring Boot Standard .gitignore
+# =========================================================================
+
+# --- Compiled Java Files ---
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+*.jmod
+
+# --- Build Tool Directories ---
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+# Avoid ignoring Maven wrapper jar if you want to keep the wrapper self-contained
+# !.mvn/wrapper/maven-wrapper.jar
+
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# --- Spring Boot specific ---
+*.log
+logs/
+.sts4-cache/
+.springBeans/
+HELP.md
+
+# --- Secrets and Environment Configurations ---
+.env
+.env.local
+*.properties.local
+*.yml.local
+
+# =========================================================================
+# IDE Specific Files
+# =========================================================================
+
+# --- IntelliJ IDEA ---
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+
+# --- Eclipse / Spring Tool Suite (STS) ---
+.metadata/
+.classpath
+.project
+.settings/
+.factorypath
+.springBeans
+.apt_generated/
+
+# --- Visual Studio Code ---
 .vscode/
+
+# =========================================================================
+# Operating System Files
+# =========================================================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini
