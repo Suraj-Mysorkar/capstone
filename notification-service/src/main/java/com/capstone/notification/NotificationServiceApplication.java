@@ -28,6 +28,7 @@ public class NotificationServiceApplication {
 				  }
 				]
 				""";
+		funciton.processCustomerRegistration(custNotificationEventContent, null);
 		
 	}
 

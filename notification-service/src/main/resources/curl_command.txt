@@ -1,0 +1,32 @@
+curl -X POST POST http://localhost:7071/runtime/webhooks/eventgrid?functionName=NotifyCustomerRegistration -H "Content-Type: application/json" -H "aeg-event-type: Notification" -d '[
+  {
+    "id": "1001",
+    "subject": "/banking/customers",
+    "eventType": "Bank.CustomerRegistered",
+    "eventTime": "2026-08-25T12:00:00Z",
+    "data": {
+      "customerName": "Jane Doe",
+      "email": "janedoe@example.com"
+    },
+    "dataVersion": "1.0"
+  }
+]'
+
+
+curl -X POST http://localhost:7071/runtime/webhooks/eventgrid?functionName=NotifyLoanStatus \
+-H "Content-Type: application/json" \
+-H "aeg-event-type: Notification" \
+-d '[
+  {
+    "id": "1002",
+    "subject": "/banking/loans",
+    "eventType": "Bank.LoanStatusChanged",
+    "eventTime": "2026-08-25T12:05:00Z",
+    "data": {
+      "loanId": "LOAN-55443",
+      "status": "APPROVED",
+      "amount": 50000.00
+    },
+    "dataVersion": "1.0"
+  }
+]'

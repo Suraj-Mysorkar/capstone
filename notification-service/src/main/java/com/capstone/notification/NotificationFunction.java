@@ -23,21 +23,22 @@ public class NotificationFunction {
         context.getLogger().info("Processing Customer Registration Event...");
 
         try {
-            // Event Grid sends events inside a JSON array, so we read the first element [0]
             JsonNode rootArray = objectMapper.readTree(eventContent);
-            JsonNode eventNode = rootArray.get(0);
+            context.getLogger().info(rootArray.toString());
+//            JsonNode eventNode = rootArray.get(0);
 
-            // Extract core event fields
-            String eventType = eventNode.get("eventType").asText();
-            String subject = eventNode.get("subject").asText();
+            String eventType = rootArray.get("eventType").asText();
+            String subject = rootArray.get("subject").asText();
             
-            // Extract custom data object
-            String dataNode = eventNode.get("data").asText();
-            CustomerRegisterNotificationDTO custRegNotification = objectMapper.readValue(dataNode, CustomerRegisterNotificationDTO.class);
+            // FIX: Use treeToValue instead of .asText() to read the inner JSON object data safely
+            CustomerRegisterNotificationDTO custRegNotification = objectMapper.treeToValue(
+            		rootArray.get("data"), 
+                CustomerRegisterNotificationDTO.class
+            );
+            
             String customerName = custRegNotification.getCustomerName();
             String email = custRegNotification.getEmail();
 
-            // Your Business Logic (e.g., sending a welcome email)
             context.getLogger().info("Successfully registered customer: " + customerName + " (" + email + ")");
             context.getLogger().info("Event Subject: " + subject + " | Type: " + eventType);
 
@@ -57,18 +58,19 @@ public class NotificationFunction {
         context.getLogger().info("Processing Loan Application Status Update...");
 
         try {
-            // Read the first element from the Event Grid array
             JsonNode rootArray = objectMapper.readTree(eventContent);
-            JsonNode eventNode = rootArray.get(0);
+//            JsonNode eventNode = rootArray.get(0);
 
-            // Extract custom data object
-            String dataNode = eventNode.get("data").asText();
-            LoanStatusNotificationDTO loanNotificationDto = objectMapper.readValue(dataNode, LoanStatusNotificationDTO.class);
+            // FIX: Use treeToValue instead of .asText() to read the inner JSON object data safely
+            LoanStatusNotificationDTO loanNotificationDto = objectMapper.treeToValue(
+            		rootArray.get("data"), 
+                LoanStatusNotificationDTO.class
+            );
+            
             String loanId = loanNotificationDto.getLoanId();
-            String status = loanNotificationDto.getStatus(); // e.g., "APPROVED", "REJECTED"
+            String status = loanNotificationDto.getStatus(); 
             double amount = loanNotificationDto.getAmount();
 
-            // Your Business Logic (e.g., updating a core banking system or notifying the customer)
             context.getLogger().info("Loan ID " + loanId + " status updated to: " + status + " for amount: $" + amount);
 
         } catch (Exception e) {

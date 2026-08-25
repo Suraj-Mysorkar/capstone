@@ -55,10 +55,14 @@
 	</dependencies>
 
 	<build>
+		<finalName>capstone-notification-function-app</finalName>
 		<plugins>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
 				<artifactId>spring-boot-maven-plugin</artifactId>
+				<configuration>
+					<skip>true</skip>
+				</configuration>
 			</plugin>
 			<!-- Azure Functions Maven Plugin configured for Java 17 -->
 			<plugin>
@@ -66,31 +70,31 @@
 				<artifactId>azure-functions-maven-plugin</artifactId>
 				<version>${azure.functions.maven.plugin.version}</version>
 				<configuration>
-                    <!-- App name must be globally unique across Azure -->
-                    <appName>capstone-notification-function-app</appName> 
-                    <resourceGroup>SurajM-RG</resourceGroup>
-                    <region>westus</region>
-                    <!-- Pricing Plan: Consumption is pay-as-you-go -->
-                    <pricingTier>Y1</pricingTier>
-                    <runtime>
-                        <os>linux</os>
-                        <javaVersion>17</javaVersion>
-                    </runtime>
-                    <appSettings>
-                        <property>
-                            <name>FUNCTIONS_EXTENSION_VERSION</name>
-                            <value>~4</value>
-                        </property>
-                    </appSettings>
-                </configuration>
-                <executions>
-                    <execution>
-                        <id>package-functions</id>
-                        <goals>
-                            <goal>package</goal>
-                        </goals>
-                    </execution>
-                </executions>
+					<!-- App name must be globally unique across Azure -->
+					<appName>capstone-notification-function-app</appName>
+					<resourceGroup>SurajM-RG</resourceGroup>
+					<region>westus</region>
+					<!-- Pricing Plan: Consumption is pay-as-you-go -->
+					<pricingTier>Y1</pricingTier>
+					<runtime>
+						<os>linux</os>
+						<javaVersion>17</javaVersion>
+					</runtime>
+					<appSettings>
+						<property>
+							<name>FUNCTIONS_EXTENSION_VERSION</name>
+							<value>~4</value>
+						</property>
+					</appSettings>
+				</configuration>
+				<executions>
+					<execution>
+						<id>package-functions</id>
+						<goals>
+							<goal>package</goal>
+						</goals>
+					</execution>
+				</executions>
 			</plugin>
 		</plugins>
 	</build>
