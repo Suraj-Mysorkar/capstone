@@ -1,15 +1,25 @@
 package com.capstone.model;
 
-import jakarta.persistence.*;
 import java.time.LocalDateTime;
+
+import jakarta.persistence.Column;
+import jakarta.persistence.Entity;
+import jakarta.persistence.FetchType;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
+import jakarta.persistence.Id;
+import jakarta.persistence.JoinColumn;
+import jakarta.persistence.ManyToOne;
+import jakarta.persistence.Table;
 
 @Entity
 @Table(name = "Documents")
 public class Document {
 
 	@Id
-	@Column(name = "Document_ID", length = 36)
-	private String documentId;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+	@Column(name = "Document_ID")
+	private Long documentId;
 
 	// Many documents can belong to one single loan application
 	@ManyToOne(fetch = FetchType.LAZY)
@@ -33,11 +43,11 @@ public class Document {
 	}
 
 	// --- Getters and Setters ---
-	public String getDocumentId() {
+	public Long getDocumentId() {
 		return documentId;
 	}
 
-	public void setDocumentId(String documentId) {
+	public void setDocumentId(Long documentId) {
 		this.documentId = documentId;
 	}
 

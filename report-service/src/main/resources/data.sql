@@ -8,7 +8,7 @@ INSERT INTO Customers (
     Customer_ID, Full_Name, DOB, National_ID, Mobile_Number, 
     Email, Address, Employment_Details, Income_Details, Onboarding_Status, Created_At
 ) VALUES (
-    'c8f3a1b2-1111-4aaa-bbbb-cccccccccccc', 
+    '1', 
     'Alice Smith', 
     '1990-04-12', 
     'ENC_AKV_NID_8837192', 
@@ -25,7 +25,7 @@ INSERT INTO Customers (
     Customer_ID, Full_Name, DOB, National_ID, Mobile_Number, 
     Email, Address, Employment_Details, Income_Details, Onboarding_Status, Created_At
 ) VALUES (
-    'a4e2d9f8-2222-4aaa-bbbb-cccccccccccc', 
+    '2', 
     'Bob Jones', 
     '1983-11-23', 
     'ENC_AKV_NID_2948103', 
@@ -45,8 +45,8 @@ INSERT INTO Loan_Applications (
     Application_ID, Customer_ID, Loan_Type, Loan_Amount, 
     Tenure_Months, Interest_Rate, Status, Assigned_To_Manager, Created_At
 ) VALUES (
-    'l9e8d7c6-3333-4aaa-bbbb-cccccccccccc', 
-    'c8f3a1b2-1111-4aaa-bbbb-cccccccccccc', 
+    '1', 
+    '2', 
     'Home', 
     320000.00, 
     240, 
@@ -61,8 +61,8 @@ INSERT INTO Loan_Applications (
     Application_ID, Customer_ID, Loan_Type, Loan_Amount, 
     Tenure_Months, Interest_Rate, Status, Assigned_To_Manager, Created_At
 ) VALUES (
-    'b1c2d3e4-4444-4aaa-bbbb-cccccccccccc', 
-    'a4e2d9f8-2222-4aaa-bbbb-cccccccccccc', 
+    '2', 
+    '1', 
     'Personal', 
     15000.00, 
     36, 
@@ -78,8 +78,8 @@ INSERT INTO Loan_Applications (
 INSERT INTO Documents (
     Document_ID, Application_ID, Doc_Type, Blob_Storage_Path, Version, Uploaded_At
 ) VALUES (
-    'd1a2b3c4-5555-4aaa-bbbb-cccccccccccc', 
-    'l9e8d7c6-3333-4aaa-bbbb-cccccccccccc', 
+    '1', 
+    '1', 
     'Identity Proof', 
     'https://windows.net', 
     1, 
@@ -89,8 +89,8 @@ INSERT INTO Documents (
 INSERT INTO Documents (
     Document_ID, Application_ID, Doc_Type, Blob_Storage_Path, Version, Uploaded_At
 ) VALUES (
-    'd5f6e7d8-6666-4aaa-bbbb-cccccccccccc', 
-    'l9e8d7c6-3333-4aaa-bbbb-cccccccccccc', 
+    '2', 
+    '2', 
     'Income Proof', 
     'https://windows.net', 
     2, 
@@ -101,8 +101,8 @@ INSERT INTO Documents (
 INSERT INTO Documents (
     Document_ID, Application_ID, Doc_Type, Blob_Storage_Path, Version, Uploaded_At
 ) VALUES (
-    'd9c8b7a6-7777-4aaa-bbbb-cccccccccccc', 
-    'b1c2d3e4-4444-4aaa-bbbb-cccccccccccc', 
+    '3', 
+    '1', 
     'Address Proof', 
     'https://windows.net', 
     1, 

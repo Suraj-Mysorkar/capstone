@@ -10,8 +10,9 @@ import java.util.List;
 public class LoanApplication {
 
 	@Id
-	@Column(name = "Application_ID", length = 36)
-	private String applicationId;
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+	@Column(name = "Application_ID")
+	private Long applicationId;
 
 	// Many loan applications can belong to one single customer
 	@ManyToOne(fetch = FetchType.LAZY)
@@ -48,11 +49,11 @@ public class LoanApplication {
 	}
 
 	// --- Getters and Setters ---
-	public String getApplicationId() {
+	public Long getApplicationId() {
 		return applicationId;
 	}
 
-	public void setApplicationId(String applicationId) {
+	public void setApplicationId(Long applicationId) {
 		this.applicationId = applicationId;
 	}
 

@@ -16,10 +16,10 @@ public interface LoanApplicationRepository extends JpaRepository<LoanApplication
     List<Object[]> countApplicationsByStatus();
 
     // Aggregates monthly application counts and financial totals using H2 compatible date formatting
-    @Query(value = "SELECT FORMATDATETIME(Created_At, 'yyyy-MM') AS month_str, " +
+    @Query(value = "SELECT SUBSTRING(CONVERT(VARCHAR, Created_At, 120), 1, 7) AS month_str, " +
                    "COUNT(Application_ID) AS app_count, " +
                    "SUM(Loan_Amount) AS total_vol " +
-                   "FROM Loan_Applications GROUP BY FORMATDATETIME(Created_At, 'yyyy-MM')", 
+                   "FROM Loan_Applications GROUP BY SUBSTRING(CONVERT(VARCHAR, Created_At, 120), 1, 7)", 
            nativeQuery = true)
     List<Object[]> getMonthlyLoanMetrics();
 }

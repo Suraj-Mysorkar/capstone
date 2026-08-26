@@ -8,6 +8,8 @@ import java.util.List;
 import jakarta.persistence.CascadeType;
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
+import jakarta.persistence.GeneratedValue;
+import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.Lob;
 import jakarta.persistence.OneToMany;
@@ -17,9 +19,10 @@ import jakarta.persistence.Table;
 @Table(name = "Customers")
 public class Customer {
 
-    @Id
-    @Column(name = "Customer_ID", length = 36)
-    private String customerId;
+	@Id
+    @GeneratedValue(strategy = GenerationType.IDENTITY)
+    @Column(name = "Customer_ID")
+    private Long customerId;
 
     @Column(name = "Full_Name", length = 100, nullable = false)
     private String fullName;

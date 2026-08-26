@@ -12,8 +12,8 @@ import com.capstone.model.Customer;
 public interface CustomerRepository extends JpaRepository<Customer, Long> {
 	
 	 // Tracks customer signups grouped by year and month
-    @Query(value = "SELECT FORMATDATETIME(Created_At, 'yyyy-MM') AS month_str, COUNT(Customer_ID) " +
-                   "FROM Customers GROUP BY FORMATDATETIME(Created_At, 'yyyy-MM')", 
+    @Query(value = "SELECT SUBSTRING(CONVERT(VARCHAR, Created_At, 120), 1, 7) AS month_str, COUNT(Customer_ID) " +
+                   "FROM Customers GROUP BY SUBSTRING(CONVERT(VARCHAR, Created_At, 120), 1, 7)", 
            nativeQuery = true)
     List<Object[]> getMonthlyCustomerAcquisitions();
 }
