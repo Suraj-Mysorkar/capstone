@@ -88,7 +88,7 @@ export default function ApplyPage() {
           </div>
           <div className="detail-grid">
             {[
-              ['Application ID',    result.id],
+              ['Application ID',    result.applicationId],
               ['Status',           result.status],
               ['Risk Score',       result.riskScore ?? '—'],
               ['Decision Remarks', result.decisionRemarks],
@@ -101,7 +101,7 @@ export default function ApplyPage() {
             ))}
           </div>
           <div className="mt-4">
-            <button className="btn btn-primary" onClick={() => navigate(`/applications/${result.id}`)}>
+            <button className="btn btn-primary" onClick={() => navigate(`/applications/${result.applicationId}`)}>
               View Full Details →
             </button>
           </div>

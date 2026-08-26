@@ -84,8 +84,8 @@ export default function EmiPage() {
                 ['Principal',      fmt(result.principalAmount)],
                 ['Interest Rate',  result.annualInterestRate + '% p.a.'],
                 ['Tenure',         result.tenureMonths + ' months'],
-                ['Total Interest', fmt(result.totalInterest)],
-                ['Total Payment',  fmt(result.totalPayment)],
+                ['Total Interest', fmt(result.totalInterestPayable)],
+                ['Total Payment',  fmt(result.totalAmountPayable)],
               ].map(([l, v]) => (
                 <div key={l} className="emi-box">
                   <div className="emi-box-label">{l}</div>
@@ -112,11 +112,11 @@ export default function EmiPage() {
                       </linearGradient>
                     </defs>
                     <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.05)" vertical={false}/>
-                    <XAxis dataKey="month" tick={{ fill:'#7b7f9e', fontSize:11 }} stroke="transparent"/>
+                    <XAxis dataKey="monthNumber" tick={{ fill:'#7b7f9e', fontSize:11 }} stroke="transparent"/>
                     <YAxis tick={{ fill:'#7b7f9e', fontSize:11 }} stroke="transparent"/>
                     <Tooltip contentStyle={{ background:'#13182e', border:'1px solid rgba(255,255,255,.1)', borderRadius:8 }} formatter={v => fmt(v)}/>
-                    <Area type="monotone" dataKey="principalComponent" stroke="#2ecc71" strokeWidth={2} fill="url(#gp)" name="Principal"/>
-                    <Area type="monotone" dataKey="interestComponent"  stroke="#e74c3c" strokeWidth={2} fill="url(#gi)" name="Interest"/>
+                    <Area type="monotone" dataKey="principalPaid" stroke="#2ecc71" strokeWidth={2} fill="url(#gp)" name="Principal"/>
+                    <Area type="monotone" dataKey="interestPaid"  stroke="#e74c3c" strokeWidth={2} fill="url(#gi)" name="Interest"/>
                   </AreaChart>
                 </ResponsiveContainer>
               </div>
@@ -130,11 +130,11 @@ export default function EmiPage() {
                   <tbody>
                     {result.amortizationSchedule.map(r => (
                       <tr key={r.month}>
-                        <td>{r.month}</td>
+                        <td>{r.monthNumber}</td>
                         <td>{fmt(r.emiAmount)}</td>
-                        <td style={{ color:'var(--green)' }}>{fmt(r.principalComponent)}</td>
-                        <td style={{ color:'var(--red)' }}>{fmt(r.interestComponent)}</td>
-                        <td>{fmt(r.closingBalance)}</td>
+                        <td style={{ color:'var(--green)' }}>{fmt(r.principalPaid)}</td>
+                        <td style={{ color:'var(--red)' }}>{fmt(r.interestPaid)}</td>
+                        <td>{fmt(r.endingBalance)}</td>
                       </tr>
                     ))}
                   </tbody>

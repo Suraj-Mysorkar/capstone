@@ -55,12 +55,19 @@ export default function ApplicationDetailPage() {
 
   useEffect(() => { load(); }, [id]);
 
-  const doCallback = async () => {
+  const doCallback = async (decisionOverride = decision, remarksOverride = remarks) => {
     setCbLoading(true); setCbResult(null); setCbError('');
     try {
-      const res = await submitManagerCallback(id, { decision, remarks, managerId });
+      const res = await submitManagerCallback(id, {
+        decision: decisionOverride,
+        remarks: remarksOverride,
+        managerId,
+      });
       setCbResult(res);
-      await load(); // refresh
+      if (res?.status) {
+        setApp(currentApp => currentApp ? { ...currentApp, ...res } : currentApp);
+      }
+      await load();
     } catch(e) { setCbError(e.message); }
     finally { setCbLoading(false); }
   };
@@ -114,7 +121,7 @@ export default function ApplicationDetailPage() {
             </div>
             <div className="card" style={{ flex:1, minWidth:200, padding:'20px 24px' }}>
               <div className="stat-label">Monthly EMI</div>
-              <div style={{ fontSize:'1.8rem', fontWeight:800, color:'var(--accent)' }}>{fmt(app.calculatedEmi)}</div>
+              <div style={{ fontSize:'1.8rem', fontWeight:800, color:'var(--accent)' }}>{fmt(app.calculatedEMI)}</div>
               <div className="text-muted">DTI Ratio: {app.dtiRatio ?? '—'}%</div>
             </div>
           </div>
@@ -252,7 +259,7 @@ export default function ApplicationDetailPage() {
             onDecision={(newStatus) => {
               setDecision(newStatus);
               setRemarks('Decision made via diagram');
-              doCallback();
+              doCallback(newStatus, 'Decision made via diagram');
             }}
           />
         </div>

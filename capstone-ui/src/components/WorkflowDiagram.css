@@ -1,27 +1,105 @@
 .workflow-diagram {
   display: flex;
   align-items: center;
-  justify-content: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
+  gap: 0;
+  padding: 18px 4px 8px;
+  overflow-x: auto;
 }
 
 .workflow-step {
-  background: var(--background);
-  border: 2px solid var(--muted);
-  padding: 0.4rem 0.8rem;
-  border-radius: 0.4rem;
-  cursor: pointer;
-  font-weight: 500;
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  min-width: 142px;
+  padding: 12px 13px;
+  border: 1px solid rgba(255,255,255,.12);
+  border-radius: 10px;
+  background: rgba(255,255,255,.035);
+  color: var(--muted);
+  flex: 1;
+}
+
+.workflow-step-icon {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  flex: 0 0 26px;
+  border-radius: 50%;
+  color: var(--muted);
+  border: 1px solid currentColor;
+}
+
+.workflow-step-label {
+  color: var(--text);
+  font-size: .78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.workflow-step-note {
+  margin-top: 3px;
+  font-size: .66rem;
+  white-space: nowrap;
 }
 
 .workflow-step.active {
-  background: var(--accent);
-  color: white;
-  border-color: var(--accent-dark);
+  background: rgba(80, 190, 255, .12);
+  border-color: var(--accent);
+  color: var(--accent);
 }
 
-.workflow-arrow {
-  font-size: 1.2rem;
-  margin: 0 0.2rem;
+.workflow-step.active .workflow-step-icon,
+.workflow-step.complete .workflow-step-icon {
+  color: var(--accent);
+}
+
+.workflow-step.rejected {
+  border-color: var(--red);
+  background: rgba(231, 76, 60, .12);
+}
+
+.workflow-step.rejected .workflow-step-icon {
+  color: var(--red);
+}
+
+.workflow-connector {
+  width: 28px;
+  height: 2px;
+  flex: 0 0 28px;
+  background: rgba(255,255,255,.14);
+}
+
+.workflow-connector.complete {
+  background: var(--accent);
+}
+
+.workflow-actions {
+  display: flex;
+  gap: 10px;
+  margin-left: 16px;
+  flex: 0 0 auto;
+}
+
+@media (max-width: 900px) {
+  .workflow-diagram {
+    align-items: stretch;
+    flex-direction: column;
+    overflow-x: visible;
+  }
+
+  .workflow-step {
+    min-width: 0;
+  }
+
+  .workflow-connector {
+    width: 2px;
+    height: 18px;
+    margin-left: 25px;
+  }
+
+  .workflow-actions {
+    margin: 10px 0 0;
+    flex-wrap: wrap;
+  }
 }
