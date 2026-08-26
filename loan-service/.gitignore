@@ -1,0 +1,7 @@
+target/
+*.md
+*.docs
+*.docx
+*.png
+.vscode/
+.gitignore
