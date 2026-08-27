@@ -3,6 +3,9 @@ package com.bank.digital.lending.model.entity;
 import com.bank.digital.lending.model.enums.EmploymentType;
 import com.bank.digital.lending.model.enums.LoanStatus;
 import com.bank.digital.lending.model.enums.LoanType;
+import com.bank.digital.lending.model.entity.BaseAuditable;
+import org.hibernate.envers.Audited;
+import org.hibernate.envers.RelationTargetAuditMode;
 import jakarta.persistence.*;
 import java.math.BigDecimal;
 import java.time.LocalDateTime;
@@ -11,7 +14,8 @@ import java.util.List;
 
 @Entity
 @Table(name = "LOAN_APPLICATIONS")
-public class LoanApplication {
+@Audited
+public class LoanApplication extends BaseAuditable {
 
     @Id
     @Column(name = "APPLICATION_ID", length = 36)
@@ -40,7 +44,8 @@ public class LoanApplication {
     private EmploymentType employmentType;
 
     @ManyToOne(fetch = FetchType.EAGER)
-    @JoinColumn(name = "SCHEME_ID", nullable = false)
+    @Audited(targetAuditMode = RelationTargetAuditMode.NOT_AUDITED)
+    @JoinColumn(name = "SCHEME_ID", referencedColumnName = "SCHEME_ID", nullable = false)
     private LoanScheme scheme;
 
     @Enumerated(EnumType.STRING)
@@ -49,6 +54,9 @@ public class LoanApplication {
 
     @Column(name = "LOAN_AMOUNT", nullable = false, precision = 18, scale = 2)
     private BigDecimal loanAmount;
+
+    @Column(name = "DOCUMENT_PROVIDED", nullable = false)
+    private boolean documentProvided = false;
 
     @Column(name = "TENURE_MONTHS", nullable = false)
     private Integer tenureMonths;
@@ -259,6 +267,15 @@ public class LoanApplication {
 
     public void setDecisionRemarks(String decisionRemarks) {
         this.decisionRemarks = decisionRemarks;
+    }
+
+    // ----- Document Provided flag -----
+    public boolean isDocumentProvided() {
+        return documentProvided;
+    }
+
+    public void setDocumentProvided(boolean documentProvided) {
+        this.documentProvided = documentProvided;
     }
 
     public LocalDateTime getCreatedAt() {

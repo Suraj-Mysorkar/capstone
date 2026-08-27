@@ -28,6 +28,16 @@ public class LoanApplicationController {
         this.emiCalculatorProxy = emiCalculatorProxy;
     }
 
+    // Endpoint to receive document upload notification and advance workflow
+    @PostMapping("/applications/{id}/document-uploaded")
+    @Operation(summary = "Notify service that documents have been uploaded",
+               description = "Sets the documentProvided flag, links documents, and advances workflow (Auto-Approves if low risk, or routes to Manager if moderate risk)")
+    public ResponseEntity<LoanApplicationResponse> documentUploaded(@PathVariable("id") String applicationId,
+                                                                    @Valid @RequestBody com.bank.digital.lending.model.dto.DocumentUploadedRequest request) {
+        LoanApplicationResponse response = applicationService.handleDocumentUploaded(applicationId, request);
+        return ResponseEntity.ok(response);
+    }
+
     @PostMapping("/calculate-emi")
     @Operation(summary = "Calculate Loan EMI & Amortization Schedule",
                description = "Invokes Azure Function (with mock fallback) to calculate monthly EMI and breakdown")
@@ -42,6 +52,21 @@ public class LoanApplicationController {
         LoanApplicationResponse response = applicationService.applyForLoan(request);
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
+
+    @PostMapping("/applications/{id}/decision")
+    @Operation(summary = "Process Manager Decision", description = "Records manual approval or rejection by credit manager")
+    public ResponseEntity<LoanApplicationResponse> processManagerDecision(@PathVariable("id") String applicationId,
+                                                                         @Valid @RequestBody ManagerDecisionRequest request) {
+        return ResponseEntity.ok(applicationService.processManagerDecision(applicationId, request));
+    }
+@PostMapping("/applications/{id}/manager-callback")
+@Operation(summary = "Manager decision webhook callback",
+          description = "Endpoint for Logic App / tests to submit manager decision after manual review")
+public ResponseEntity<Void> managerCallback(@PathVariable("id") String applicationId,
+                                            @Valid @RequestBody ManagerDecisionRequest request) {
+    applicationService.processManagerDecision(applicationId, request);
+    return ResponseEntity.ok().build();
+}
 
     @GetMapping("/applications")
     @Operation(summary = "List Loan Applications",

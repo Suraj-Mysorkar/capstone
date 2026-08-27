@@ -2,9 +2,11 @@ package com.bank.digital.lending.model.entity;
 
 import com.bank.digital.lending.model.enums.DocType;
 import jakarta.persistence.*;
+import org.hibernate.envers.Audited;
 import java.time.LocalDateTime;
 
 @Entity
+@Audited
 @Table(name = "LOAN_DOCUMENTS")
 public class LoanDocument {
 

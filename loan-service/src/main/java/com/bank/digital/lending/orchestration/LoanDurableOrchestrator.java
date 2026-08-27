@@ -124,15 +124,42 @@ public class LoanDurableOrchestrator {
         if (decision == ApprovalDecision.APPROVE) {
             app.setStatus(LoanStatus.APPROVED);
             app.setAssignedManager(managerId);
-            app.setDecisionRemarks("Approved by Operations Manager: " + remarks);
+            app.setDecisionRemarks("✅ Approved by Operations Manager (Level 2 of 2 — Underwriting Review). "
+                    + "Manager: " + managerId + ". "
+                    + "Justification: " + remarks);
+            log.info("[MOCK AZURE DURABLE FUNCTION] Level 2 (Underwriter Review) APPROVED by Manager: {}", managerId);
             log.info("[MOCK AZURE DURABLE FUNCTION] Final Status updated to: APPROVED");
         } else {
             app.setStatus(LoanStatus.REJECTED);
             app.setAssignedManager(managerId);
-            app.setDecisionRemarks("Rejected by Operations Manager: " + remarks);
+            app.setDecisionRemarks("❌ Rejected by Operations Manager (Level 2 of 2 — Underwriting Review). "
+                    + "Manager: " + managerId + ". "
+                    + "Reason: " + remarks);
+            log.info("[MOCK AZURE DURABLE FUNCTION] Level 2 (Underwriter Review) REJECTED by Manager: {}", managerId);
             log.info("[MOCK AZURE DURABLE FUNCTION] Final Status updated to: REJECTED");
         }
         log.info("[MOCK AZURE DURABLE FUNCTION] Orchestration Instance '{}' Completed.", instanceId);
+        log.info("================================================================================");
+    }
+
+    /**
+     * Triggers the Logic App workflow to notify the Operations Manager for Level 2 Underwriter Review.
+     * Called after documents have been verified (Level 1 complete) for medium-risk applications.
+     */
+    public void triggerManagerReviewWorkflow(LoanApplication app, String callbackUrl) {
+        String instanceId = app.getOrchestrationInstanceId();
+        if (instanceId == null || instanceId.isBlank()) {
+            instanceId = "ORCH-" + app.getApplicationId();
+            app.setOrchestrationInstanceId(instanceId);
+        }
+        log.info("================================================================================");
+        log.info("[MOCK AZURE DURABLE FUNCTION] >>> LEVEL 2: TRIGGERING UNDERWRITER REVIEW WORKFLOW <<<");
+        log.info("[MOCK AZURE DURABLE FUNCTION] Application: {} | Instance: {}", app.getApplicationId(), instanceId);
+        log.info("[MOCK AZURE DURABLE FUNCTION] Level 1 (Document Review) is COMPLETE. Initiating Level 2 (Underwriter Review)...");
+        logicAppConnector.triggerHumanReviewWorkflow(app, callbackUrl);
+        log.info("[MOCK AZURE DURABLE FUNCTION] Azure Logic Apps dispatched Manager Approval Card to Operations Manager inbox.");
+        log.info("[MOCK AZURE DURABLE FUNCTION] Instance '{}' waiting: context.waitForExternalEvent('ManagerDecisionEvent', 7 Days).", instanceId);
+        log.info("[MOCK AZURE DURABLE FUNCTION] Zero CPU billed during idle checkpoint wait.");
         log.info("================================================================================");
     }
 
@@ -258,23 +285,39 @@ public class LoanDurableOrchestrator {
 
         // Step 3: DecisionGatewayActivity
         log.info("[MOCK AZURE DURABLE FUNCTION] [Step 3/3] Executing Activity: 'DecisionGatewayActivity'...");
-        if (result.initialStatus() == LoanStatus.APPROVED) {
-            app.setStatus(LoanStatus.APPROVED);
-            app.setDecisionRemarks(result.assessmentReason());
-            log.info("[MOCK AZURE DURABLE FUNCTION] Decision Gateway: Direct Auto-Approval. Status -> APPROVED");
-        } else if (result.initialStatus() == LoanStatus.REJECTED) {
+
+        if (result.initialStatus() == LoanStatus.REJECTED) {
+            // ── BRANCH C: High Risk (Score ≥ 70) ── Direct Auto-Rejection ──────────────────────
             app.setStatus(LoanStatus.REJECTED);
-            app.setDecisionRemarks(result.assessmentReason());
-            log.info("[MOCK AZURE DURABLE FUNCTION] Decision Gateway: Direct Auto-Rejection. Status -> REJECTED");
+            app.setDecisionRemarks("Auto-Rejected by Credit Engine: High debt burden or excessive leverage detected. "
+                    + "(Risk Score: " + result.riskScore() + "/100, DTI: " + result.dtiRatio() + "%). "
+                    + "Application ineligible for further review.");
+            log.info("[MOCK AZURE DURABLE FUNCTION] Decision Gateway: High Risk → Auto-Rejection. Score={}/100, DTI={}%",
+                    result.riskScore(), result.dtiRatio());
+
+        } else if (result.initialStatus() == LoanStatus.APPROVED) {
+            // ── BRANCH A: Low Risk (Score ≤ 30) ── Document Review Required FIRST ──────────────
+            // Documents are ALWAYS mandatory. Auto-Approval happens ONLY after docs are verified.
+            app.setStatus(LoanStatus.DOCUMENT_REVIEW_PENDING);
+            app.setDecisionRemarks("Auto-Approval Eligible (Low Risk — Score: " + result.riskScore() + "/100, DTI: "
+                    + result.dtiRatio() + "%). "
+                    + "STEP 1 OF 2: Mandatory KYC and Income verification documents must be submitted for document review. "
+                    + "Once documents are verified, this application will be auto-approved immediately.");
+            log.info("[MOCK AZURE DURABLE FUNCTION] Decision Gateway: Low Risk → DOCUMENT_REVIEW_PENDING (Level 1: Document Review). "
+                    + "Auto-Approval will trigger upon document verification.");
+
         } else {
-            // Human Review Branch — trigger Logic App escalation
-            app.setStatus(LoanStatus.MANUAL_REVIEW_REQUIRED);
-            app.setDecisionRemarks(result.assessmentReason());
-            log.info("[MOCK AZURE DURABLE FUNCTION] Decision Gateway: Score {} requires Human Review.", result.riskScore());
-            log.info("[MOCK AZURE DURABLE FUNCTION] Invoking Azure Logic Apps to dispatch Manager Approval Card...");
-            logicAppConnector.triggerHumanReviewWorkflow(app, callbackUrl);
-            log.info("[MOCK AZURE DURABLE FUNCTION] Instance '{}' entered stateful checkpoint: context.waitForExternalEvent('ManagerDecisionEvent', 7 Days).", instanceId);
-            log.info("[MOCK AZURE DURABLE FUNCTION] Zero CPU billed during idle wait for manager action.");
+            // ── BRANCH B: Medium Risk (31 ≤ Score < 70) ── Two-Level Approval Required ─────────
+            // Level 1: Document Review (KYC/Income documents)
+            // Level 2: Underwriter Review (loan amount, terms, risk profile)
+            app.setStatus(LoanStatus.DOCUMENT_REVIEW_PENDING);
+            app.setDecisionRemarks("Moderate Risk Profile — Requires Two-Level Approval (Score: " + result.riskScore()
+                    + "/100, DTI: " + result.dtiRatio() + "%). "
+                    + "STEP 1 OF 2: Please submit KYC and Income verification documents for document review. "
+                    + "STEP 2 OF 2: After document verification, an Operations Manager will review the loan amount, "
+                    + "tenure, and overall risk profile before final decision.");
+            log.info("[MOCK AZURE DURABLE FUNCTION] Decision Gateway: Moderate Risk → DOCUMENT_REVIEW_PENDING "
+                    + "(Level 1 of 2-Level Approval: Document Review). Manager underwriting review follows.");
         }
         log.info("================================================================================");
     }

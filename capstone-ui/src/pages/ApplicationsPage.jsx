@@ -3,12 +3,13 @@ import { useNavigate } from 'react-router-dom';
 
 const API_BASE_URL = 'http://localhost:8080/api/v1/loans';
 
-const STATUSES = ['ALL', 'APPROVED', 'REJECTED', 'MANUAL_REVIEW_REQUIRED', 'SUBMITTED', 'VALIDATING', 'CREDIT_ASSESSMENT'];
+const STATUSES = ['ALL', 'APPROVED', 'REJECTED', 'MANUAL_REVIEW_REQUIRED', 'DOCUMENT_REVIEW_PENDING', 'SUBMITTED', 'VALIDATING', 'CREDIT_ASSESSMENT'];
 
 function statusBadge(s) {
   if (s === 'APPROVED') return <span className="badge badge-approved">Approved</span>;
   if (s === 'REJECTED') return <span className="badge badge-rejected">Rejected</span>;
   if (s === 'MANUAL_REVIEW_REQUIRED') return <span className="badge badge-review">Manual Review</span>;
+  if (s === 'DOCUMENT_REVIEW_PENDING') return <span className="badge badge-warning" style={{ background: '#f59e0b20', color: '#d97706', border: '1px solid #d97706' }}>Awaiting Documents</span>;
   return <span className="badge badge-default">{s}</span>;
 }
 

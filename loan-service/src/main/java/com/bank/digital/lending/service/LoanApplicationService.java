@@ -80,11 +80,14 @@ public class LoanApplicationService {
         app.setCalculatedEMI(emi);
         app.setStatus(LoanStatus.SUBMITTED);
 
+        boolean hasDocs = request.documentIds() != null && !request.documentIds().isEmpty();
+        app.setDocumentProvided(hasDocs);
+
         LoanApplication savedApp = applicationRepository.save(app);
         recordAuditLog(applicationId, null, LoanStatus.SUBMITTED, "APPLICANT", "Initial loan application submitted.");
 
         // 3. Link uploaded documents
-        if (request.documentIds() != null && !request.documentIds().isEmpty()) {
+        if (hasDocs) {
             documentStorageProxy.linkDocumentsToApplication(request.documentIds(), applicationId);
         }
 
@@ -110,8 +113,12 @@ public class LoanApplicationService {
         LoanApplication app = applicationRepository.findById(applicationId)
                 .orElseThrow(() -> new IllegalArgumentException("Loan application not found with ID: " + applicationId));
 
-        if (app.getStatus() != LoanStatus.MANUAL_REVIEW_REQUIRED) {
-            throw new IllegalStateException("Application is not in MANUAL_REVIEW_REQUIRED status. Current status: " + app.getStatus());
+        if (app.getStatus() != LoanStatus.MANUAL_REVIEW_REQUIRED && app.getStatus() != LoanStatus.DOCUMENT_REVIEW_PENDING) {
+            throw new IllegalStateException("Application is not in a reviewable status. Current status: " + app.getStatus());
+        }
+
+        if (request.decision() == com.bank.digital.lending.model.enums.ApprovalDecision.APPROVE && !app.isDocumentProvided()) {
+            throw new IllegalStateException("Cannot approve application: Mandatory KYC/Income verification documents must be provided first.");
         }
 
         LoanStatus previousStatus = app.getStatus();
@@ -142,6 +149,7 @@ public class LoanApplicationService {
                 case VALIDATING -> "Validating applicant demographic and eligibility details.";
                 case CREDIT_ASSESSMENT -> "Performing automated risk assessment and credit scoring.";
                 case MANUAL_REVIEW_REQUIRED -> "Under review by Senior Underwriting Manager.";
+                case DOCUMENT_REVIEW_PENDING -> "Document review pending; awaiting manager decision.";
                 case APPROVED -> "Loan approved! Ready for sanction letter generation and disbursement.";
                 case REJECTED -> "Loan application rejected based on underwriting criteria.";
             };
@@ -225,4 +233,65 @@ public class LoanApplicationService {
                 docs
         );
     }
+    
+    /**
+     * Handles document uploaded callback (Level 1: Document Verification).
+     *
+     * Workflow transitions after successful document submission:
+     *  - Low Risk (Score ≤ 30):  DOCUMENT_REVIEW_PENDING → APPROVED (Auto-Approved by Credit Engine)
+     *  - Medium Risk (31–69):    DOCUMENT_REVIEW_PENDING → MANUAL_REVIEW_REQUIRED (Level 2: Underwriter review)
+     *  - High Risk (≥ 70):       Already REJECTED — document upload has no effect
+     */
+    @Transactional
+    public LoanApplicationResponse handleDocumentUploaded(String applicationId, DocumentUploadedRequest request) {
+        LoanApplication app = applicationRepository.findById(applicationId)
+                .orElseThrow(() -> new IllegalArgumentException("Loan application not found with ID: " + applicationId));
+
+        if (request.documentIds() != null && !request.documentIds().isEmpty()) {
+            documentStorageProxy.linkDocumentsToApplication(request.documentIds(), applicationId);
+        }
+        app.setDocumentProvided(true);
+
+        LoanStatus previousStatus = app.getStatus();
+
+        if (app.getStatus() == LoanStatus.DOCUMENT_REVIEW_PENDING) {
+            int score = app.getRiskScore() != null ? app.getRiskScore() : 50;
+            String dti  = app.getDtiRatio() != null ? app.getDtiRatio().toString() : "—";
+
+            if (score <= 30) {
+                // ── BRANCH A: Low Risk → Level 1 complete → Auto-Approved ────────────────────────
+                app.setStatus(LoanStatus.APPROVED);
+                app.setDecisionRemarks(
+                        "✅ Document Review Passed (Level 1 of 1). "
+                        + "Auto-Approved by Credit Engine: KYC and income verification documents received and verified. "
+                        + "Low risk profile confirmed (Score: " + score + "/100, DTI: " + dti + "%). "
+                        + "No further review required.");
+                recordAuditLog(applicationId, previousStatus, LoanStatus.APPROVED,
+                        "SYSTEM_CREDIT_ENGINE",
+                        "Level 1 (Document Review) passed. Low-risk auto-approval triggered.");
+                eventBusPublisher.publishLoanCompletedEvent(app);
+
+            } else {
+                // ── BRANCH B: Medium Risk → Level 1 complete → Escalate to Level 2 ───────────────
+                app.setStatus(LoanStatus.MANUAL_REVIEW_REQUIRED);
+                app.setDecisionRemarks(
+                        "✅ Document Review Passed (Level 1 of 2). "
+                        + "KYC and income verification documents received and verified (Score: " + score + "/100, DTI: " + dti + "%). "
+                        + "Now awaiting Level 2: Operations Manager must review loan amount, tenure, and overall risk profile before final decision.");
+                recordAuditLog(applicationId, previousStatus, LoanStatus.MANUAL_REVIEW_REQUIRED,
+                        "DOC_VERIFICATION_SERVICE",
+                        "Level 1 (Document Review) passed. Escalated to Level 2 (Underwriter Review).");
+                String callbackUrl = callbackUrlFor(applicationId);
+                durableOrchestrator.triggerManagerReviewWorkflow(app, callbackUrl);
+            }
+        } else {
+            // Additional documents on an already-processed application
+            recordAuditLog(applicationId, app.getStatus(), app.getStatus(),
+                    "DOC_UPLOAD_SERVICE", "Supplementary documents uploaded and linked.");
+        }
+
+        LoanApplication saved = applicationRepository.save(app);
+        return mapToResponse(saved);
+    }
 }
+
