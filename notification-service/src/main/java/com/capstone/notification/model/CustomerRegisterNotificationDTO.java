@@ -5,6 +5,8 @@ public class CustomerRegisterNotificationDTO {
 	private String customerName;
 	
 	private String email;
+	
+	private String status;
 
 	public String getCustomerName() {
 		return customerName;
@@ -21,4 +23,14 @@ public class CustomerRegisterNotificationDTO {
 	public void setEmail(String email) {
 		this.email = email;
 	}
+
+	public String getStatus() {
+		return status;
+	}
+
+	public void setStatus(String status) {
+		this.status = status;
+	}
+	
+	
 }

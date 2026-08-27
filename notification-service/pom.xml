@@ -28,9 +28,10 @@
 	<properties>
 		<maven.compiler.source>17</maven.compiler.source>
 		<maven.compiler.target>17</maven.compiler.target>
-		<azure.functions.maven.plugin.version>1.36.0</azure.functions.maven.plugin.version>
+		<azure.functions.maven.plugin.version>1.34.0</azure.functions.maven.plugin.version>
 		<azure.functions.java.library.version>3.1.0</azure.functions.java.library.version>
 	</properties>
+
 	<dependencies>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -45,7 +46,12 @@
 		<dependency>
 			<groupId>com.fasterxml.jackson.core</groupId>
 			<artifactId>jackson-databind</artifactId>
-			<version>2.17.2</version>
+		</dependency>
+		<!-- Source: https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-restclient -->
+		<dependency>
+			<groupId>org.springframework.boot</groupId>
+			<artifactId>spring-boot-restclient</artifactId>
+			<scope>compile</scope>
 		</dependency>
 		<dependency>
 			<groupId>org.springframework.boot</groupId>
@@ -55,7 +61,7 @@
 	</dependencies>
 
 	<build>
-		<finalName>capstone-notification-function-app</finalName>
+		<finalName>team6-notification-service-function-app</finalName>
 		<plugins>
 			<plugin>
 				<groupId>org.springframework.boot</groupId>
@@ -71,11 +77,11 @@
 				<version>${azure.functions.maven.plugin.version}</version>
 				<configuration>
 					<!-- App name must be globally unique across Azure -->
-					<appName>capstone-notification-function-app</appName>
+					<appName>team6-notification-service-function-app</appName>
 					<resourceGroup>SurajM-RG</resourceGroup>
-					<region>westus</region>
+					<region>southindia</region>
 					<!-- Pricing Plan: Consumption is pay-as-you-go -->
-					<pricingTier>Y1</pricingTier>
+					<pricingTier>Flex Consumption</pricingTier>
 					<runtime>
 						<os>linux</os>
 						<javaVersion>17</javaVersion>

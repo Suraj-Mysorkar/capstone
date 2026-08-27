@@ -2,6 +2,7 @@ package com.capstone.notification;
 
 import com.capstone.notification.model.CustomerRegisterNotificationDTO;
 import com.capstone.notification.model.LoanStatusNotificationDTO;
+import com.capstone.notification.service.NotificationService;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.microsoft.azure.functions.ExecutionContext;
@@ -41,6 +42,9 @@ public class NotificationFunction {
 
             context.getLogger().info("Successfully registered customer: " + customerName + " (" + email + ")");
             context.getLogger().info("Event Subject: " + subject + " | Type: " + eventType);
+            
+            NotificationService notificationService = new NotificationService();
+            notificationService.sendCustomerRegistrationNotification(custRegNotification, context);
 
         } catch (Exception e) {
             context.getLogger().severe("Failed to process customer registration: " + e.getMessage());

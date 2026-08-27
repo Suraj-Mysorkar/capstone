@@ -3,7 +3,6 @@
   "Values": {
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
     "AzureWebJobsSecretStorageType": "Files",
-    "JAVA_HOME": "C:\\Program Files\\Java\\jdk-17",
     "FUNCTIONS_WORKER_RUNTIME": "java",
     "FUNCTIONS_WORKER_JAVA_LOAD_APP_LIBS": "1"
   }

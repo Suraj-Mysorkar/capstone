@@ -5,8 +5,9 @@ curl -X POST POST http://localhost:7071/runtime/webhooks/eventgrid?functionName=
     "eventType": "Bank.CustomerRegistered",
     "eventTime": "2026-08-25T12:00:00Z",
     "data": {
-      "customerName": "Jane Doe",
-      "email": "janedoe@example.com"
+      "customerName": "Suraj",
+      "email": "suraj.mysorkar@gmail.com",
+      "status": "In Review"
     },
     "dataVersion": "1.0"
   }
