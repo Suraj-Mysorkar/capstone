@@ -57,7 +57,7 @@ public class CustomerServiceImpl implements CustomerService {
         log.info("Registered new customer id={}", saved.getId());
 
         eventPublisher.publishCustomerRegistered(
-                CustomerRegisteredEvent.of(saved.getId(), saved.getEmail(), saved.getFirstName(), saved.getLastName()));
+                CustomerRegisteredEvent.of(saved.getId(), saved.getEmail(), saved.getFirstName() + " " +  saved.getLastName(), "Register"));
 
         return CustomerResponse.from(saved);
     }

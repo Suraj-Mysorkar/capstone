@@ -11,11 +11,11 @@ import java.util.UUID;
 public record CustomerRegisteredEvent(
         UUID customerId,
         String email,
-        String firstName,
-        String lastName,
+        String customerName,
+        String status,
         Instant occurredAt
 ) {
-    public static CustomerRegisteredEvent of(UUID customerId, String email, String firstName, String lastName) {
-        return new CustomerRegisteredEvent(customerId, email, firstName, lastName, Instant.now());
+    public static CustomerRegisteredEvent of(UUID customerId, String email, String customerName, String status) {
+        return new CustomerRegisteredEvent(customerId, email, customerName, status, Instant.now());
     }
 }
