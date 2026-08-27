@@ -76,6 +76,9 @@ public class NotificationFunction {
             double amount = loanNotificationDto.getAmount();
 
             context.getLogger().info("Loan ID " + loanId + " status updated to: " + status + " for amount: $" + amount);
+            
+            NotificationService notificationService = new NotificationService();
+            notificationService.sendLoanApplicationNotification(loanNotificationDto, context);
 
         } catch (Exception e) {
             context.getLogger().severe("Failed to process loan status update: " + e.getMessage());

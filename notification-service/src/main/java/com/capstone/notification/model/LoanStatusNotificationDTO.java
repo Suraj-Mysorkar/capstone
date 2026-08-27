@@ -4,6 +4,10 @@ public class LoanStatusNotificationDTO {
 	
 	private String loanId;
 	
+	private String customerName;
+	
+	private String email;
+	
 	private String status;
 	
 	private double amount;
@@ -30,5 +34,21 @@ public class LoanStatusNotificationDTO {
 
 	public void setAmount(double amount) {
 		this.amount = amount;
+	}
+
+	public String getCustomerName() {
+		return customerName;
+	}
+
+	public void setCustomerName(String customerName) {
+		this.customerName = customerName;
+	}
+
+	public String getEmail() {
+		return email;
+	}
+
+	public void setEmail(String email) {
+		this.email = email;
 	}
 }

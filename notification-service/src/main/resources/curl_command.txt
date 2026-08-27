@@ -26,7 +26,9 @@ curl -X POST http://localhost:7071/runtime/webhooks/eventgrid?functionName=Notif
     "data": {
       "loanId": "LOAN-55443",
       "status": "APPROVED",
-      "amount": 50000.00
+      "amount": 50000.00,
+      "customerName": "Suraj",
+      "email": "suraj.mysorkar@gmail.com"
     },
     "dataVersion": "1.0"
   }
