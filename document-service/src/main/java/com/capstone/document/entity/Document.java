@@ -8,7 +8,7 @@ import com.capstone.document.enums.DocumentType;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "documents")
+@Table(name = "managed_documents")
 public class Document {
 
     @Id

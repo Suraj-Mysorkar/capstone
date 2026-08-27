@@ -5,7 +5,7 @@ import java.time.LocalDateTime;
 import jakarta.persistence.*;
 
 @Entity
-@Table(name = "document_versions")
+@Table(name = "managed_document_versions")
 public class DocumentVersion {
     
     @Id
