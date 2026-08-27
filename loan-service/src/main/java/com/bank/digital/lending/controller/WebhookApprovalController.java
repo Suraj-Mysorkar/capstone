@@ -21,14 +21,5 @@ public class WebhookApprovalController {
         this.applicationService = applicationService;
     }
 
-    @PostMapping("/{id}/manager-callback")
-    @Operation(summary = "Process Operations Manager Approval Decision (Logic App Webhook)",
-               description = "Receives approval/rejection decision from Logic App actionable card, resumes Durable Function instance, and publishes completion event")
-    public ResponseEntity<LoanApplicationResponse> processManagerCallback(
-            @PathVariable("id") String id,
-            @Valid @RequestBody ManagerDecisionRequest request) {
-
-        LoanApplicationResponse response = applicationService.processManagerDecision(id, request);
-        return ResponseEntity.ok(response);
-    }
+    // Duplicate manager-callback endpoint removed to resolve ambiguous mapping
 }

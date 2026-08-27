@@ -54,3 +54,12 @@ export const submitManagerCallback = (id, body) =>
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(body),
   }).then(r => r.json());
+
+// ── Document Uploaded Notification ───────────────────────────────────
+export const notifyDocumentUploaded = (id, body) =>
+  fetch(`${BASE}/applications/${id}/document-uploaded`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  }).then(r => r.json());
+

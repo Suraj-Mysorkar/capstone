@@ -16,21 +16,29 @@ const DEFAULTS = {
   schemeId: 'SCHEME-PL-01',
   loanAmount: 150000,
   tenureMonths: 24,
-  documentIds: '',
+  documentIds: 'DOC-KYC-1001, DOC-INCOME-1001',
 };
 
 const SCENARIOS = [
   {
-    label: '✅ Low Risk – Auto Approval',
-    data: { ...DEFAULTS },
+    label: '⚡ Low Risk + Docs Provided (Auto-Approval)',
+    data: { customerId: 'CUST-1001', customerName: 'Alice Johnson', customerEmail: 'alice.johnson@example.com', customerPhone: '+14155552671', monthlyIncome: 180000, existingLiabilities: 3000, employmentType: 'SALARIED', schemeId: 'SCHEME-PL-01', loanAmount: 150000, tenureMonths: 24, documentIds: 'DOC-KYC-1001, DOC-INCOME-1001' },
   },
   {
-    label: '⚠️ Medium Risk – Manual Review',
-    data: { customerId:'CUST-3003', customerName:'Elena Rostova', customerEmail:'elena.rostova@example.com', customerPhone:'+14155557766', monthlyIncome:75000, existingLiabilities:15000, employmentType:'SELF_EMPLOYED', schemeId:'SCHEME-PL-01', loanAmount:400000, tenureMonths:24, documentIds:'' },
+    label: '📄 Low Risk + Missing Docs (Awaiting Documents)',
+    data: { customerId: 'CUST-1002', customerName: 'David Miller', customerEmail: 'david.miller@example.com', customerPhone: '+14155553344', monthlyIncome: 150000, existingLiabilities: 2000, employmentType: 'SALARIED', schemeId: 'SCHEME-PL-01', loanAmount: 100000, tenureMonths: 12, documentIds: '' },
   },
   {
-    label: '❌ High Risk – Auto Rejection',
-    data: { customerId:'CUST-2002', customerName:'Bob Overleveraged', customerEmail:'bob.debt@example.com', customerPhone:'+14155559988', monthlyIncome:30000, existingLiabilities:25000, employmentType:'STUDENT', schemeId:'SCHEME-PL-01', loanAmount:800000, tenureMonths:60, documentIds:'' },
+    label: '👔 Medium Risk + Docs Provided (Manual Review)',
+    data: { customerId: 'CUST-3003', customerName: 'Elena Rostova', customerEmail: 'elena.rostova@example.com', customerPhone: '+14155557766', monthlyIncome: 75000, existingLiabilities: 15000, employmentType: 'SELF_EMPLOYED', schemeId: 'SCHEME-PL-01', loanAmount: 400000, tenureMonths: 24, documentIds: 'DOC-GST-3003' },
+  },
+  {
+    label: '⚠️ Medium Risk + Missing Docs (Awaiting Documents)',
+    data: { customerId: 'CUST-3004', customerName: 'Carlos Gomez', customerEmail: 'carlos.gomez@example.com', customerPhone: '+14155558899', monthlyIncome: 65000, existingLiabilities: 12000, employmentType: 'SELF_EMPLOYED', schemeId: 'SCHEME-PL-01', loanAmount: 350000, tenureMonths: 24, documentIds: '' },
+  },
+  {
+    label: '❌ High Risk (Direct Auto-Rejection)',
+    data: { customerId: 'CUST-2002', customerName: 'Bob Overleveraged', customerEmail: 'bob.debt@example.com', customerPhone: '+14155559988', monthlyIncome: 30000, existingLiabilities: 25000, employmentType: 'STUDENT', schemeId: 'SCHEME-PL-01', loanAmount: 800000, tenureMonths: 60, documentIds: '' },
   },
 ];
 

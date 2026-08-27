@@ -1,105 +1,453 @@
-.workflow-diagram {
+/* ── Workflow Diagram — Full Pipeline View ──────────────────────────────── */
+
+.wf-container {
   display: flex;
-  align-items: center;
-  gap: 0;
-  padding: 18px 4px 8px;
-  overflow-x: auto;
+  flex-direction: column;
+  gap: 18px;
+  font-family: 'Inter', sans-serif;
+  color: var(--text);
 }
 
-.workflow-step {
+/* ── Header ─────────────────────────────────────────────────────────────── */
+.wf-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding-bottom: 16px;
+  border-bottom: 1px solid rgba(255,255,255,.08);
+}
+
+.wf-header-title {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.wf-header-sub {
+  font-size: .78rem;
+  color: var(--muted);
+  margin-top: 3px;
+}
+
+.wf-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.wf-status-chip {
+  padding: 5px 14px;
+  border-radius: 20px;
+  font-size: .75rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: .5px;
+  border: 1px solid rgba(255,255,255,.15);
+  background: rgba(255,255,255,.06);
+  color: var(--text);
+}
+.wf-status-chip.wf-chip-approved           { background: rgba(46,204,113,.15); border-color: var(--green); color: var(--green); }
+.wf-status-chip.wf-chip-rejected           { background: rgba(231,76,60,.15); border-color: var(--red); color: var(--red); }
+.wf-status-chip.wf-chip-manual_review_required { background: rgba(0,210,255,.12); border-color: var(--accent); color: var(--accent); }
+.wf-status-chip.wf-chip-document_review_pending { background: rgba(241,196,15,.15); border-color: var(--yellow); color: var(--yellow); }
+
+.wf-risk-chip {
+  padding: 5px 12px;
+  border-radius: 20px;
+  font-size: .75rem;
+  background: rgba(255,255,255,.05);
+  border: 1px solid rgba(255,255,255,.1);
+  color: var(--muted);
+}
+
+/* ── Phase container ─────────────────────────────────────────────────────── */
+.wf-phase {
+  background: rgba(255,255,255,.025);
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 12px;
+  padding: 16px 18px;
+}
+
+.wf-phase-label {
+  font-size: .67rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  color: var(--muted);
+  text-transform: uppercase;
+  margin-bottom: 14px;
+}
+
+/* ── Linear row for Phase 1 nodes ───────────────────────────────────────── */
+.wf-linear-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+/* ── Nodes ──────────────────────────────────────────────────────────────── */
+.wf-node {
+  flex: 1;
+  min-width: 180px;
   display: flex;
   align-items: flex-start;
-  gap: 9px;
-  min-width: 142px;
-  padding: 12px 13px;
-  border: 1px solid rgba(255,255,255,.12);
+  gap: 10px;
+  padding: 12px 14px;
   border-radius: 10px;
-  background: rgba(255,255,255,.035);
+  border: 1px solid rgba(255,255,255,.08);
+  background: rgba(16,22,44,.5);
+  transition: all .2s ease;
+}
+
+.wf-node-idle   { opacity: .55; }
+.wf-node-active { border-color: var(--accent); background: rgba(0,210,255,.07); }
+.wf-node-done   { border-color: rgba(46,204,113,.3); background: rgba(46,204,113,.04); }
+
+.wf-node-icon {
+  width: 32px;
+  height: 32px;
+  border-radius: 8px;
+  background: rgba(255,255,255,.05);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
   color: var(--muted);
+}
+
+.wf-icon-done   { color: var(--green) !important; }
+.wf-icon-active { color: var(--accent) !important; }
+.wf-icon-green  { color: var(--green) !important; }
+.wf-icon-red    { color: var(--red) !important; }
+.wf-icon-green-active { color: var(--green) !important; }
+.wf-icon-red-active   { color: var(--red) !important; }
+
+.wf-node-body { flex: 1; }
+
+.wf-node-title {
+  font-size: .84rem;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.wf-node-desc {
+  font-size: .72rem;
+  color: var(--muted);
+  margin-top: 2px;
+  line-height: 1.4;
+}
+
+.wf-badge {
+  display: inline-block;
+  font-size: .6rem;
+  font-weight: 700;
+  padding: 1px 6px;
+  border-radius: 4px;
+  margin-bottom: 4px;
+  text-transform: uppercase;
+  letter-spacing: .4px;
+}
+
+/* ── Arrows ─────────────────────────────────────────────────────────────── */
+.wf-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--muted);
+  opacity: .7;
+  flex-shrink: 0;
+}
+
+.wf-arrow-down {
+  margin: -4px auto;
+}
+
+.wf-arrow-right {
+  padding: 0 4px;
+}
+
+/* ── Decision Gateway ────────────────────────────────────────────────────── */
+.wf-gateway {
+  text-align: center;
+  padding: 18px 24px;
+  background: linear-gradient(135deg, rgba(0,210,255,.08), rgba(157,78,221,.08));
+  border: 1.5px solid rgba(0,210,255,.35);
+  border-radius: 14px;
+  box-shadow: 0 4px 24px rgba(0,0,0,.25);
+}
+
+.wf-gateway-badge {
+  display: inline-block;
+  font-size: .65rem;
+  font-weight: 800;
+  letter-spacing: 1px;
+  padding: 3px 12px;
+  background: rgba(0,210,255,.15);
+  color: var(--accent);
+  border-radius: 20px;
+  margin-bottom: 8px;
+}
+
+.wf-gateway-title {
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.wf-gateway-desc {
+  font-size: .78rem;
+  color: var(--muted);
+  margin-top: 4px;
+}
+
+.wf-gateway-score {
+  margin-top: 10px;
+  display: inline-block;
+  padding: 5px 16px;
+  background: rgba(255,255,255,.06);
+  border-radius: 20px;
+  font-size: .82rem;
+  border: 1px solid rgba(255,255,255,.1);
+  color: var(--text);
+}
+
+.score-low  { color: var(--green); font-weight: 700; }
+.score-med  { color: var(--yellow); font-weight: 700; }
+.score-high { color: var(--red); font-weight: 700; }
+
+/* ── Branches Grid ───────────────────────────────────────────────────────── */
+.wf-branches-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+
+.wf-branch {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px;
+  border-radius: 14px;
+  border: 1.5px solid rgba(255,255,255,.08);
+  background: rgba(16,22,44,.4);
+  transition: all .25s ease;
+}
+
+.wf-branch-green.wf-branch-active { border-color: rgba(46,204,113,.45); background: rgba(46,204,113,.03); }
+.wf-branch-yellow.wf-branch-active { border-color: rgba(241,196,15,.45); background: rgba(241,196,15,.03); }
+.wf-branch-red.wf-branch-active   { border-color: rgba(231,76,60,.45); background: rgba(231,76,60,.03); }
+.wf-branch-dim { opacity: .6; }
+
+.wf-branch-label {
+  display: inline-block;
+  font-size: .65rem;
+  font-weight: 800;
+  letter-spacing: .8px;
+  padding: 3px 10px;
+  border-radius: 4px;
+  text-transform: uppercase;
+}
+
+.wf-branch-label-green  { background: rgba(46,204,113,.15); color: var(--green); }
+.wf-branch-label-yellow { background: rgba(241,196,15,.15); color: var(--yellow); }
+.wf-branch-label-red    { background: rgba(231,76,60,.15); color: var(--red); }
+
+.wf-branch-subtitle {
+  font-size: .75rem;
+  font-weight: 600;
+  color: var(--muted);
+  margin-top: -6px;
+}
+
+/* ── Level Cards ─────────────────────────────────────────────────────────── */
+.wf-level-card {
+  background: rgba(255,255,255,.03);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 10px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  transition: all .2s ease;
+}
+
+.wf-level-card-active {
+  box-shadow: 0 0 18px rgba(241,196,15,.18);
+}
+
+.wf-level-card-amber { border-left: 3px solid var(--yellow); }
+.wf-level-card-blue  { border-left: 3px solid var(--accent); }
+.wf-level-card-red   { border-left: 3px solid var(--red); }
+
+.wf-level-badge {
+  display: inline-block;
+  font-size: .6rem;
+  font-weight: 800;
+  letter-spacing: .5px;
+  padding: 2px 8px;
+  border-radius: 20px;
+  text-transform: uppercase;
+  width: fit-content;
+}
+
+.wf-level-amber { background: rgba(241,196,15,.18); color: var(--yellow); }
+.wf-level-blue  { background: rgba(0,210,255,.15); color: var(--accent); }
+
+.wf-level-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: .85rem;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.wf-level-desc {
+  font-size: .73rem;
+  color: var(--muted);
+  line-height: 1.45;
+}
+
+/* ── Action Cards (inline CTAs) ─────────────────────────────────────────── */
+.wf-action-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: .76rem;
+  font-weight: 600;
+}
+
+.wf-action-amber {
+  background: rgba(245,158,11,.12);
+  border: 1px solid rgba(245,158,11,.35);
+  color: #f59e0b;
+}
+
+.wf-action-blue {
+  background: rgba(0,210,255,.1);
+  border: 1px solid rgba(0,210,255,.3);
+  color: var(--accent);
+}
+
+.wf-action-buttons {
+  display: flex;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.wf-btn {
+  flex: 1;
+  padding: 7px 12px;
+  border-radius: 6px;
+  font-size: .75rem;
+  font-weight: 700;
+  cursor: pointer;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  transition: all .15s ease;
+}
+
+.wf-btn:hover { filter: brightness(1.12); transform: translateY(-1px); }
+
+.wf-btn-amber { background: #f59e0b; color: #000; }
+.wf-btn-green { background: var(--green); color: #000; }
+.wf-btn-red   { background: var(--red);   color: #fff; }
+
+/* ── Outcome Nodes ───────────────────────────────────────────────────────── */
+.wf-outcome {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 6px;
+  padding: 14px;
+  border-radius: 10px;
+  border: 1.5px solid rgba(255,255,255,.1);
+  background: rgba(255,255,255,.025);
+  transition: all .2s ease;
+}
+
+.wf-outcome-green       { border-color: rgba(46,204,113,.25); }
+.wf-outcome-green-active{ border-color: var(--green); background: rgba(46,204,113,.1); box-shadow: 0 0 16px rgba(46,204,113,.25); }
+.wf-outcome-red         { border-color: rgba(231,76,60,.25); }
+.wf-outcome-red-active  { border-color: var(--red); background: rgba(231,76,60,.1); box-shadow: 0 0 16px rgba(231,76,60,.25); }
+
+.wf-outcome-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.wf-icon-green        { color: var(--green); }
+.wf-icon-green-active { color: var(--green); }
+.wf-icon-red          { color: var(--red); }
+.wf-icon-red-active   { color: var(--red); }
+
+.wf-outcome-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.wf-outcome-row > .wf-outcome {
   flex: 1;
 }
 
-.workflow-step-icon {
-  display: grid;
-  place-items: center;
-  width: 26px;
-  height: 26px;
-  flex: 0 0 26px;
-  border-radius: 50%;
-  color: var(--muted);
-  border: 1px solid currentColor;
-}
-
-.workflow-step-label {
-  color: var(--text);
-  font-size: .78rem;
+.wf-outcome-or {
+  font-size: .7rem;
   font-weight: 700;
-  white-space: nowrap;
+  color: var(--muted);
+  flex-shrink: 0;
 }
 
-.workflow-step-note {
-  margin-top: 3px;
-  font-size: .66rem;
-  white-space: nowrap;
+/* ── Decision Remarks Footer ─────────────────────────────────────────────── */
+.wf-remarks-card {
+  padding: 14px 18px;
+  background: rgba(255,255,255,.03);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 10px;
 }
 
-.workflow-step.active {
-  background: rgba(80, 190, 255, .12);
-  border-color: var(--accent);
-  color: var(--accent);
+.wf-remarks-label {
+  font-size: .7rem;
+  font-weight: 700;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: .5px;
 }
 
-.workflow-step.active .workflow-step-icon,
-.workflow-step.complete .workflow-step-icon {
-  color: var(--accent);
+.wf-remarks-text {
+  font-size: .84rem;
+  color: var(--text);
+  margin-top: 5px;
+  font-weight: 500;
+  line-height: 1.5;
 }
 
-.workflow-step.rejected {
-  border-color: var(--red);
-  background: rgba(231, 76, 60, .12);
-}
-
-.workflow-step.rejected .workflow-step-icon {
-  color: var(--red);
-}
-
-.workflow-connector {
-  width: 28px;
-  height: 2px;
-  flex: 0 0 28px;
-  background: rgba(255,255,255,.14);
-}
-
-.workflow-connector.complete {
-  background: var(--accent);
-}
-
-.workflow-actions {
-  display: flex;
-  gap: 10px;
-  margin-left: 16px;
-  flex: 0 0 auto;
-}
-
-@media (max-width: 900px) {
-  .workflow-diagram {
-    align-items: stretch;
+/* ── Responsive ──────────────────────────────────────────────────────────── */
+@media (max-width: 768px) {
+  .wf-linear-row {
     flex-direction: column;
-    overflow-x: visible;
+    align-items: stretch;
   }
 
-  .workflow-step {
-    min-width: 0;
+  .wf-arrow-right {
+    transform: rotate(90deg);
   }
 
-  .workflow-connector {
-    width: 2px;
-    height: 18px;
-    margin-left: 25px;
+  .wf-branches-grid {
+    grid-template-columns: 1fr;
   }
 
-  .workflow-actions {
-    margin: 10px 0 0;
-    flex-wrap: wrap;
+  .wf-outcome-row {
+    flex-direction: column;
   }
 }

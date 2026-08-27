@@ -62,7 +62,6 @@ out/
 .apt_generated/
 
 # --- Visual Studio Code ---
-.vscode/
 
 # =========================================================================
 # Operating System Files

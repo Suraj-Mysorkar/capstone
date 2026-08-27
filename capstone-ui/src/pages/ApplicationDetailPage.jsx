@@ -1,13 +1,14 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { fetchApplicationById, fetchAuditLogs, submitManagerCallback } from '../services/api';
-import { ArrowLeft } from 'lucide-react';
+import { fetchApplicationById, fetchAuditLogs, submitManagerCallback, notifyDocumentUploaded } from '../services/api';
+import { ArrowLeft, UploadCloud, CheckCircle2, AlertTriangle, FileText } from 'lucide-react';
 import WorkflowDiagram from '../components/WorkflowDiagram';
 
 function statusBadge(s) {
-  if (s === 'APPROVED')              return <span className="badge badge-approved">Approved</span>;
-  if (s === 'REJECTED')              return <span className="badge badge-rejected">Rejected</span>;
-  if (s === 'MANUAL_REVIEW_REQUIRED') return <span className="badge badge-review">Manual Review</span>;
+  if (s === 'APPROVED')                 return <span className="badge badge-approved">Approved</span>;
+  if (s === 'REJECTED')                 return <span className="badge badge-rejected">Rejected</span>;
+  if (s === 'MANUAL_REVIEW_REQUIRED')    return <span className="badge badge-review">Manual Review</span>;
+  if (s === 'DOCUMENT_REVIEW_PENDING')   return <span className="badge badge-warning" style={{ background: '#f59e0b20', color: '#d97706', border: '1px solid #d97706' }}>Awaiting Documents</span>;
   return <span className="badge badge-default">{s}</span>;
 }
 
@@ -22,6 +23,11 @@ export default function ApplicationDetailPage() {
   const [logs, setLogs]   = useState([]);
   const [loading, setLoading] = useState(true);
   const [tab, setTab]     = useState('details');
+
+  // Document upload state
+  const [uploadDocIds, setUploadDocIds] = useState('DOC-KYC-VERIFIED, DOC-INCOME-VERIFIED');
+  const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [docUploadMsg, setDocUploadMsg] = useState('');
 
   // Manager callback
   const [decision, setDecision]   = useState('APPROVE');
@@ -55,6 +61,28 @@ export default function ApplicationDetailPage() {
 
   useEffect(() => { load(); }, [id]);
 
+  const doUploadDocuments = async () => {
+    if (!uploadDocIds.trim()) return;
+    setUploadingDoc(true);
+    setDocUploadMsg('');
+    try {
+      const docList = uploadDocIds.split(',').map(s => s.trim()).filter(Boolean);
+      const updated = await notifyDocumentUploaded(id, {
+        documentIds: docList,
+        customerId: app?.customerId || 'CUST-DEFAULT',
+      });
+      setDocUploadMsg('✅ Documents successfully uploaded! Workflow advanced.');
+      if (updated?.status) {
+        setApp(updated);
+      }
+      await load();
+    } catch (err) {
+      setDocUploadMsg('❌ Error uploading documents: ' + err.message);
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
+
   const doCallback = async (decisionOverride = decision, remarksOverride = remarks) => {
     setCbLoading(true); setCbResult(null); setCbError('');
     try {
@@ -87,7 +115,7 @@ export default function ApplicationDetailPage() {
           <ArrowLeft size={15}/> Back
         </button>
         <div style={{ fontWeight:700, fontSize:'1.1rem', marginLeft:4 }}>
-          Application Detail
+          Application Detail: {app.applicationId || app.id}
         </div>
         <div className="ml-auto">{statusBadge(app.status)}</div>
       </div>
@@ -111,7 +139,7 @@ export default function ApplicationDetailPage() {
                 {app.riskScore ?? '—'}
               </div>
               <div className="text-muted" style={{ marginTop:4 }}>
-                {app.riskScore == null ? '' : app.riskScore <= 30 ? 'Low Risk – Auto Approved' : app.riskScore >= 70 ? 'High Risk – Auto Rejected' : 'Medium Risk – Manual Review'}
+                {app.riskScore == null ? '' : app.riskScore <= 30 ? 'Low Risk – Eligible for Auto-Approval' : app.riskScore >= 70 ? 'High Risk – Auto-Rejected' : 'Medium Risk – Manual Underwriter Review'}
               </div>
             </div>
             <div className="card" style={{ flex:1, minWidth:200, padding:'20px 24px' }}>
@@ -125,6 +153,35 @@ export default function ApplicationDetailPage() {
               <div className="text-muted">DTI Ratio: {app.dtiRatio ?? '—'}%</div>
             </div>
           </div>
+
+          {/* Conditional Document Action Card when documents are missing or review pending */}
+          {app.status === 'DOCUMENT_REVIEW_PENDING' && (
+            <div className="card p-6" style={{ background: '#f59e0b10', borderColor: '#f59e0b', borderWidth: 1.5 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
+                <AlertTriangle color="#d97706" size={24} />
+                <div>
+                  <h4 style={{ margin: 0, color: '#d97706' }}>Action Required: Upload Verification Documents</h4>
+                  <p style={{ margin: '4px 0 0', fontSize: '.88rem', color: 'var(--text-muted)' }}>
+                    Documents are mandatory for approval. Once uploaded, if low-risk (Score ≤ 30), this application will be <strong>Auto-Approved</strong> immediately. If medium-risk, it will be routed to the Operations Manager.
+                  </p>
+                </div>
+              </div>
+              {docUploadMsg && <div style={{ marginBottom: 12, fontWeight: 600, fontSize: '.9rem' }}>{docUploadMsg}</div>}
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
+                <input
+                  className="form-input"
+                  style={{ flex: 1, minWidth: 250 }}
+                  value={uploadDocIds}
+                  onChange={e => setUploadDocIds(e.target.value)}
+                  placeholder="e.g. DOC-KYC-01, DOC-SALARY-01"
+                />
+                <button className="btn btn-primary" onClick={doUploadDocuments} disabled={uploadingDoc}>
+                  <UploadCloud size={16} style={{ marginRight: 6 }} />
+                  {uploadingDoc ? 'Uploading…' : 'Submit Verification Documents'}
+                </button>
+              </div>
+            </div>
+          )}
 
           {/* Customer */}
           <div className="card p-6">
@@ -152,13 +209,14 @@ export default function ApplicationDetailPage() {
             <div className="card-header-title" style={{ marginBottom:16 }}>Loan Details</div>
             <div className="detail-grid">
               {[
-                ['Application ID',      app.id],
+                ['Application ID',      app.applicationId || app.id],
                 ['Scheme ID',           app.schemeId],
                 ['Loan Type',           app.loanType?.replace(/_/g,' ')],
                 ['Amount',              fmt(app.loanAmount)],
                 ['Tenure',              app.tenureMonths + ' months'],
                 ['Interest Rate',       app.interestRate + '% p.a.'],
                 ['Status',              app.status],
+                ['Documents Provided',  app.documents?.length > 0 || app.status === 'APPROVED' ? '✅ Verified' : '⚠️ Pending'],
                 ['Orchestration ID',    app.orchestrationInstanceId || '—'],
                 ['Assigned Manager',    app.assignedManager || '—'],
                 ['Decision Remarks',    app.decisionRemarks || '—'],
@@ -253,14 +311,17 @@ export default function ApplicationDetailPage() {
 
       {tab === 'workflow' && (
         <div className="card p-6">
-          <div className="card-header-title" style={{ marginBottom:8 }}>Workflow Diagram</div>
           <WorkflowDiagram
             currentStatus={app.status}
+            riskScore={app.riskScore}
+            hasDocuments={app.documents?.length > 0 || app.status === 'APPROVED'}
+            decisionRemarks={app.decisionRemarks}
             onDecision={(newStatus) => {
               setDecision(newStatus);
-              setRemarks('Decision made via diagram');
-              doCallback(newStatus, 'Decision made via diagram');
+              setRemarks('Decision processed via Interactive Workflow Diagram');
+              doCallback(newStatus, 'Decision processed via Interactive Workflow Diagram');
             }}
+            onUploadDocs={doUploadDocuments}
           />
         </div>
       )}
