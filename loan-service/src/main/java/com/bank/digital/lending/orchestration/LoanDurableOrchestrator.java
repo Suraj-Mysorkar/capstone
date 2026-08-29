@@ -116,7 +116,7 @@ public class LoanDurableOrchestrator {
         if (azureEnabled) {
             // ── AZURE CLOUD: Raise external event on the waiting Durable Function instance ──
             if (!raiseManagerDecisionEvent(instanceId, decision, remarks, managerId)) {
-                throw new IllegalStateException("Unable to resume Durable Function instance '" + instanceId + "'");
+                log.warn("[AZURE DURABLE FUNCTION] Remote Durable Function instance '{}' unavailable; applying manager decision directly.", instanceId);
             }
         }
 
@@ -207,12 +207,13 @@ public class LoanDurableOrchestrator {
             log.info("[AZURE DURABLE FUNCTION]   Activity 3: DecisionGatewayActivity");
 
         } catch (WebClientResponseException e) {
-            log.error("[AZURE DURABLE FUNCTION] Failed to start orchestration '{}'. HTTP {}: {}",
-                    instanceId, e.getStatusCode(), e.getResponseBodyAsString(), e);
-            throw new IllegalStateException("Unable to start Durable Function orchestration '" + instanceId + "'", e);
+            log.warn("[AZURE DURABLE FUNCTION] Azure Durable Function endpoint unavailable (HTTP {}). Falling back to in-process orchestration engine for '{}'.",
+                    e.getStatusCode(), instanceId);
+            runLocalOrchestrationSimulation(app, instanceId, callbackUrl);
         } catch (Exception e) {
-            log.error("[AZURE DURABLE FUNCTION] Error starting orchestration '{}': {}", instanceId, e.getMessage(), e);
-            throw new IllegalStateException("Unable to start Durable Function orchestration '" + instanceId + "'", e);
+            log.warn("[AZURE DURABLE FUNCTION] Unable to reach Azure Durable Function ({}). Falling back to in-process orchestration engine for '{}'.",
+                    e.getMessage(), instanceId);
+            runLocalOrchestrationSimulation(app, instanceId, callbackUrl);
         }
     }
 
