@@ -1,6 +1,7 @@
 package com.bank.digital.lending.service;
 
 import com.bank.digital.lending.model.dto.*;
+import com.bank.digital.lending.model.entity.Customer;
 import com.bank.digital.lending.model.entity.LoanApplication;
 import com.bank.digital.lending.model.entity.LoanAuditLog;
 import com.bank.digital.lending.model.entity.LoanDocument;
@@ -8,6 +9,7 @@ import com.bank.digital.lending.model.entity.LoanScheme;
 import com.bank.digital.lending.model.enums.DocType;
 import com.bank.digital.lending.model.enums.LoanStatus;
 import com.bank.digital.lending.orchestration.LoanDurableOrchestrator;
+import com.bank.digital.lending.repository.CustomerRepository;
 import com.bank.digital.lending.repository.LoanApplicationRepository;
 import com.bank.digital.lending.repository.LoanAuditLogRepository;
 import com.bank.digital.lending.repository.LoanDocumentRepository;
@@ -35,6 +37,7 @@ public class LoanApplicationService {
     private final LoanSchemeRepository schemeRepository;
     private final LoanAuditLogRepository auditLogRepository;
     private final LoanDocumentRepository loanDocumentRepository;
+    private final CustomerRepository customerRepository;
     private final EMICalculatorProxyService emiCalculatorProxy;
     private final DocumentStorageProxyService documentStorageProxy;
     private final LoanDurableOrchestrator durableOrchestrator;
@@ -44,6 +47,7 @@ public class LoanApplicationService {
                                   LoanSchemeRepository schemeRepository,
                                   LoanAuditLogRepository auditLogRepository,
                                   LoanDocumentRepository loanDocumentRepository,
+                                  CustomerRepository customerRepository,
                                   EMICalculatorProxyService emiCalculatorProxy,
                                   DocumentStorageProxyService documentStorageProxy,
                                   LoanDurableOrchestrator durableOrchestrator,
@@ -52,6 +56,7 @@ public class LoanApplicationService {
         this.schemeRepository = schemeRepository;
         this.auditLogRepository = auditLogRepository;
         this.loanDocumentRepository = loanDocumentRepository;
+        this.customerRepository = customerRepository;
         this.emiCalculatorProxy = emiCalculatorProxy;
         this.documentStorageProxy = documentStorageProxy;
         this.durableOrchestrator = durableOrchestrator;
@@ -72,13 +77,45 @@ public class LoanApplicationService {
                 request.tenureMonths()
         );
 
-        // 2. Initialize Application Entity
+        // 2. Persist Customer into Customers table
+        Customer customer = null;
+        if (request.customerEmail() != null && !request.customerEmail().isBlank()) {
+            customer = customerRepository.findByEmail(request.customerEmail()).orElse(null);
+        }
+        if (customer == null && request.customerId() != null && !request.customerId().isBlank()) {
+            try {
+                String rawId = request.customerId().replace("CUST-", "");
+                customer = customerRepository.findById(Long.parseLong(rawId)).orElse(null);
+            } catch (Exception ignored) {}
+        }
+        if (customer == null) {
+            customer = new Customer(
+                    request.customerName(),
+                    request.customerEmail(),
+                    request.customerPhone(),
+                    request.monthlyIncome(),
+                    request.employmentType() != null ? request.employmentType().name() : "SALARIED"
+            );
+            customer = customerRepository.save(customer);
+        } else {
+            customer.setFullName(request.customerName());
+            customer.setMobileNumber(request.customerPhone());
+            customer.setIncomeDetails(request.monthlyIncome());
+            if (request.employmentType() != null) {
+                customer.setEmploymentDetails(request.employmentType().name());
+            }
+            customer = customerRepository.save(customer);
+        }
+
+        String assignedCustomerId = "CUST-" + customer.getCustomerId();
+
+        // 3. Initialize Application Entity
         LoanApplication app = new LoanApplication();
         app.setApplicationId(applicationId);
-        app.setCustomerId(request.customerId());
-        app.setCustomerName(request.customerName());
-        app.setCustomerEmail(request.customerEmail());
-        app.setCustomerPhone(request.customerPhone());
+        app.setCustomerId(assignedCustomerId);
+        app.setCustomerName(customer.getFullName());
+        app.setCustomerEmail(customer.getEmail());
+        app.setCustomerPhone(customer.getMobileNumber());
         app.setMonthlyIncome(request.monthlyIncome());
         app.setExistingLiabilities(request.existingLiabilities() != null ? request.existingLiabilities() : BigDecimal.ZERO);
         app.setEmploymentType(request.employmentType());
@@ -332,5 +369,23 @@ public class LoanApplicationService {
 
         LoanApplication saved = applicationRepository.save(app);
         return mapToResponse(saved);
+    }
+
+    @Transactional(readOnly = true)
+    public List<com.bank.digital.lending.model.dto.CustomerResponse> listCustomers() {
+        return customerRepository.findAll().stream()
+                .map(c -> new com.bank.digital.lending.model.dto.CustomerResponse(
+                        c.getCustomerId(),
+                        "CUST-" + c.getCustomerId(),
+                        c.getFullName(),
+                        c.getEmail(),
+                        c.getMobileNumber(),
+                        c.getAddress(),
+                        c.getEmploymentDetails(),
+                        c.getIncomeDetails(),
+                        c.getOnboardingStatus(),
+                        c.getCreatedAt()
+                ))
+                .toList();
     }
 }

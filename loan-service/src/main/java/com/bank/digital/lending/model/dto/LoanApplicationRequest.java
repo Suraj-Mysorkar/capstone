@@ -6,7 +6,6 @@ import java.math.BigDecimal;
 import java.util.List;
 
 public record LoanApplicationRequest(
-    @NotBlank(message = "Customer ID is required")
     String customerId,
 
     @NotBlank(message = "Customer Name is required")

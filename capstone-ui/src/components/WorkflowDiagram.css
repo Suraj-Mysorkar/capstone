@@ -356,7 +356,24 @@
   transition: all .15s ease;
 }
 
-.wf-btn:hover { filter: brightness(1.12); transform: translateY(-1px); }
+.wf-btn:hover:not(:disabled) { filter: brightness(1.12); transform: translateY(-1px); }
+
+.wf-btn:disabled {
+  opacity: 0.65;
+  cursor: not-allowed !important;
+  filter: grayscale(0.2);
+  transform: none !important;
+  pointer-events: none;
+}
+
+.wf-spin {
+  animation: wf-spin 1s linear infinite;
+}
+
+@keyframes wf-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
 
 .wf-btn-amber { background: #f59e0b; color: #000; }
 .wf-btn-green { background: var(--green); color: #000; }

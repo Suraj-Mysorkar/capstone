@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   CheckCircle2, Clock, XCircle, FileCheck, FileWarning,
-  UserCheck, ArrowDown, ArrowRight, ShieldCheck, Zap, UploadCloud
+  UserCheck, ArrowDown, ArrowRight, ShieldCheck, Zap, UploadCloud, Loader2
 } from 'lucide-react';
 import './WorkflowDiagram.css';
 
@@ -76,7 +76,8 @@ export default function WorkflowDiagram({
   riskScore,
   decisionRemarks,
   onDecision,
-  onUploadDocs
+  onUploadDocs,
+  isProcessing = false
 }) {
   const isDocPending    = currentStatus === 'DOCUMENT_REVIEW_PENDING';
   const isManualReview  = currentStatus === 'MANUAL_REVIEW_REQUIRED';
@@ -118,7 +119,7 @@ export default function WorkflowDiagram({
 
       {/* ── PHASE 1: Intake & Credit Assessment (Linear, same for all) ─── */}
       <div className="wf-phase">
-        <div className="wf-phase-label">PHASE 1 — INTAKE & AUTOMATED CREDIT ASSESSMENT</div>
+        <div className="wf-phase-label">PHASE 1 — INTAKE & CREDIT ASSESSMENT</div>
         <div className="wf-linear-row">
           <StepNode
             state={submittedState}
@@ -177,8 +178,12 @@ export default function WorkflowDiagram({
               <div className="wf-action-card wf-action-amber">
                 <FileWarning size={15} /> Documents pending! Submit to trigger auto-approval.
                 {onUploadDocs && (
-                  <button className="wf-btn wf-btn-amber" onClick={onUploadDocs}>
-                    <UploadCloud size={14} /> Submit Documents
+                  <button className="wf-btn wf-btn-amber" onClick={onUploadDocs} disabled={isProcessing}>
+                    {isProcessing ? (
+                      <><Loader2 size={14} className="wf-spin" /> Uploading...</>
+                    ) : (
+                      <><UploadCloud size={14} /> Submit Documents</>
+                    )}
                   </button>
                 )}
               </div>
@@ -216,8 +221,12 @@ export default function WorkflowDiagram({
               <div className="wf-action-card wf-action-amber">
                 <FileWarning size={15} /> Awaiting mandatory documents to proceed to Level 2.
                 {onUploadDocs && (
-                  <button className="wf-btn wf-btn-amber" onClick={onUploadDocs}>
-                    <UploadCloud size={14} /> Submit Documents → Escalate to Manager
+                  <button className="wf-btn wf-btn-amber" onClick={onUploadDocs} disabled={isProcessing}>
+                    {isProcessing ? (
+                      <><Loader2 size={14} className="wf-spin" /> Uploading...</>
+                    ) : (
+                      <><UploadCloud size={14} /> Submit Documents → Escalate to Manager</>
+                    )}
                   </button>
                 )}
               </div>
@@ -241,11 +250,19 @@ export default function WorkflowDiagram({
               <div className="wf-action-card wf-action-blue">
                 <UserCheck size={15} /> Awaiting Operations Manager decision on loan terms.
                 <div className="wf-action-buttons">
-                  <button className="wf-btn wf-btn-green" onClick={() => onDecision('APPROVE')}>
-                    ✓ Approve Loan
+                  <button className="wf-btn wf-btn-green" onClick={() => onDecision('APPROVE')} disabled={isProcessing}>
+                    {isProcessing ? (
+                      <><Loader2 size={14} className="wf-spin" /> Approving...</>
+                    ) : (
+                      <>✓ Approve Loan</>
+                    )}
                   </button>
-                  <button className="wf-btn wf-btn-red" onClick={() => onDecision('REJECT')}>
-                    ✕ Reject Loan
+                  <button className="wf-btn wf-btn-red" onClick={() => onDecision('REJECT')} disabled={isProcessing}>
+                    {isProcessing ? (
+                      <><Loader2 size={14} className="wf-spin" /> Rejecting...</>
+                    ) : (
+                      <>✕ Reject Loan</>
+                    )}
                   </button>
                 </div>
               </div>

@@ -28,6 +28,13 @@ public class LoanApplicationController {
         this.emiCalculatorProxy = emiCalculatorProxy;
     }
 
+    @GetMapping("/customers")
+    @Operation(summary = "List all registered customers",
+               description = "Retrieves customer records from Customers table")
+    public ResponseEntity<List<CustomerResponse>> listCustomers() {
+        return ResponseEntity.ok(applicationService.listCustomers());
+    }
+
     // Endpoint to receive document upload notification and advance workflow
     @PostMapping("/applications/{id}/document-uploaded")
     @Operation(summary = "Notify service that documents have been uploaded",

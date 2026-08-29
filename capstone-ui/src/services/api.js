@@ -1,11 +1,14 @@
 const BASE = import.meta.env.VITE_LOAN_API_URL || 'https://team6-loan-service.azurewebsites.net/api/v1/loans';
 
-// ── Schemes ─────────────────────────────────────────────────────────
+// ── Schemes & Customers ──────────────────────────────────────────────
 export const fetchSchemes = () =>
   fetch(`${BASE}/schemes`).then(r => r.json());
 
 export const fetchSchemeById = (id) =>
   fetch(`${BASE}/schemes/${id}`).then(r => r.json());
+
+export const fetchCustomers = () =>
+  fetch(`${BASE}/customers`).then(r => r.json());
 
 // ── EMI Calculator ───────────────────────────────────────────────────
 export const calculateEmi = (body) =>

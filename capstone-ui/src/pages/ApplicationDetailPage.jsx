@@ -84,6 +84,7 @@ export default function ApplicationDetailPage() {
   };
 
   const doCallback = async (decisionOverride = decision, remarksOverride = remarks) => {
+    if (cbLoading) return;
     setCbLoading(true); setCbResult(null); setCbError('');
     try {
       const res = await submitManagerCallback(id, {
@@ -316,6 +317,7 @@ export default function ApplicationDetailPage() {
             riskScore={app.riskScore}
             hasDocuments={app.documents?.length > 0 || app.status === 'APPROVED'}
             decisionRemarks={app.decisionRemarks}
+            isProcessing={cbLoading || uploadingDoc}
             onDecision={(newStatus) => {
               setDecision(newStatus);
               setRemarks('Decision processed via Interactive Workflow Diagram');
