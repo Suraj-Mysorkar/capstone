@@ -1,4 +1,4 @@
-const BASE = 'http://localhost:8080/api/v1/loans';
+const BASE = import.meta.env.VITE_LOAN_API_URL || 'https://team6-loan-service.azurewebsites.net/api/v1/loans';
 
 // ── Schemes ─────────────────────────────────────────────────────────
 export const fetchSchemes = () =>

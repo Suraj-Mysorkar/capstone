@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-const API_BASE_URL = 'http://localhost:8080/api/v1/loans';
+const API_BASE_URL = import.meta.env.VITE_LOAN_API_URL || 'https://team6-loan-service.azurewebsites.net/api/v1/loans';
 
 const STATUSES = ['ALL', 'APPROVED', 'REJECTED', 'MANUAL_REVIEW_REQUIRED', 'DOCUMENT_REVIEW_PENDING', 'SUBMITTED', 'VALIDATING', 'CREDIT_ASSESSMENT'];
 

@@ -19,7 +19,7 @@ export default function Header() {
     <header className="header">
       <div className="header-title">{title}</div>
       <div className="header-right">
-        <span className="badge-server">Backend Live · :8080</span>
+        <span className="badge-server">Cloud Live · Azure</span>
         <div className="avatar">
           <div className="avatar-initials">AK</div>
         </div>
