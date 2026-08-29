@@ -31,6 +31,8 @@ build/
 # --- Spring Boot specific ---
 *.log
 logs/
+data/
+**/data/
 .sts4-cache/
 .springBeans/
 HELP.md
@@ -40,6 +42,10 @@ HELP.md
 .env.local
 *.properties.local
 *.yml.local
+secrets.properties
+**/secrets.properties
+*.secrets
+secrets.env
 
 # =========================================================================
 # IDE Specific Files

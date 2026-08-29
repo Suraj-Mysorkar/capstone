@@ -1,37 +1,23 @@
-INSERT INTO documents (
-    customer_id,
-    application_id,
-    document_type,
-    document_name,
-    status,
-    created_at,
-    updated_at
-)
-VALUES
-    (1001, 5001, 'PAN_CARD', 'pan-card.pdf', 'VERIFIED',
-     CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+INSERT INTO document_types (type_code, category_name, description, is_mandatory, max_size_mb, allowed_extensions)
+SELECT 'IDENTITY_PROOF', 'Identity Proof', 'Aadhar Card, PAN Card, Passport', TRUE, 10, 'pdf,jpg,jpeg,png'
+WHERE NOT EXISTS (SELECT 1 FROM document_types WHERE type_code = 'IDENTITY_PROOF');
 
-    (1001, 5001, 'ADDRESS_PROOF', 'address-proof.pdf', 'UNDER_REVIEW',
-     CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+INSERT INTO document_types (type_code, category_name, description, is_mandatory, max_size_mb, allowed_extensions)
+SELECT 'INCOME_PROOF', 'Income Proof', 'Recent 3 months salary slips or Form 16 / ITR', TRUE, 10, 'pdf,jpg,jpeg,png'
+WHERE NOT EXISTS (SELECT 1 FROM document_types WHERE type_code = 'INCOME_PROOF');
 
-    (1002, 5002, 'INCOME_PROOF', 'salary-slip.pdf', 'UPLOADED',
-     CURRENT_TIMESTAMP, CURRENT_TIMESTAMP);
+INSERT INTO document_types (type_code, category_name, description, is_mandatory, max_size_mb, allowed_extensions)
+SELECT 'ADDRESS_PROOF', 'Address Proof', 'Electricity bill, Telephone bill, Rent Agreement', TRUE, 10, 'pdf,jpg,jpeg,png'
+WHERE NOT EXISTS (SELECT 1 FROM document_types WHERE type_code = 'ADDRESS_PROOF');
 
-INSERT INTO document_versions (
-    document_id,
-    version_number,
-    file_name,
-    content_type,
-    file_size,
-    file_data,
-    created_at
-)
-VALUES
-    (1, 1, 'pan-card.pdf', 'application/pdf', 102400,
-     NULL, CURRENT_TIMESTAMP),
+INSERT INTO document_types (type_code, category_name, description, is_mandatory, max_size_mb, allowed_extensions)
+SELECT 'BANK_STATEMENT', 'Bank Statement', 'Latest 6 months bank statement', TRUE, 15, 'pdf'
+WHERE NOT EXISTS (SELECT 1 FROM document_types WHERE type_code = 'BANK_STATEMENT');
 
-    (2, 1, 'address-proof.pdf', 'application/pdf', 204800,
-     NULL, CURRENT_TIMESTAMP),
+INSERT INTO document_types (type_code, category_name, description, is_mandatory, max_size_mb, allowed_extensions)
+SELECT 'PHOTOGRAPH', 'Photograph', 'Recent color passport size photograph', TRUE, 5, 'jpg,jpeg,png'
+WHERE NOT EXISTS (SELECT 1 FROM document_types WHERE type_code = 'PHOTOGRAPH');
 
-    (3, 1, 'salary-slip.pdf', 'application/pdf', 153600,
-     NULL, CURRENT_TIMESTAMP);
+INSERT INTO document_types (type_code, category_name, description, is_mandatory, max_size_mb, allowed_extensions)
+SELECT 'EMPLOYMENT_PROOF', 'Employment Proof', 'Official employee ID card or offer letter', FALSE, 10, 'pdf,jpg,jpeg,png'
+WHERE NOT EXISTS (SELECT 1 FROM document_types WHERE type_code = 'EMPLOYMENT_PROOF');

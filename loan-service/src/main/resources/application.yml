@@ -5,13 +5,17 @@ spring:
   application:
     name: digital-lending-loan-service
 
+  config:
+    import:
+      - "optional:file:../secrets.properties"
+      - "optional:file:secrets.properties"
+      - "optional:file:../../secrets.properties"
+
   datasource:
     url: jdbc:sqlserver://smzen-capstone.database.windows.net:1433;database=smzen-capstone-db;encrypt=true;trustServerCertificate=false;hostNameInCertificate=*.database.windows.net;loginTimeout=30;
     driverClassName: com.microsoft.sqlserver.jdbc.SQLServerDriver
-    username: cs_admin
-    password: Capstone@
-
-
+    username: ${DB_USERNAME:cs_admin}
+    password: ${DB_PASSWORD:Capstone@}
 
   jpa:
     database-platform: org.hibernate.dialect.SQLServerDialect
@@ -38,24 +42,22 @@ springdoc:
 
 # Azure Integrations & Cloud Flags (Toggle azure.enabled=true once Azure resources are provisioned)
 azure:
-  enabled: false # Set to true to switch from structured mock loggers to real Azure cloud SDKs
-  callback-base-url: "" # Required in cloud mode, e.g. https://loan-service.example.com
+  enabled: ${AZURE_ENABLED:false} # Set to true to switch from structured mock loggers to real Azure cloud SDKs
+  callback-base-url: "${AZURE_CALLBACK_BASE_URL:}" # Required in cloud mode, e.g. https://loan-service.example.com
   storage:
     blob:
-      connection-string: "DefaultEndpointsProtocol=https;AccountName=placeholder;AccountKey=placeholder;EndpointSuffix=core.windows.net"
-      container-name: loan-documents
+      connection-string: "${AZURE_STORAGE_CONNECTION_STRING:}"
+      container-name: "${AZURE_STORAGE_CONTAINER_NAME:customer-documents}"
   functions:
     emi-calc:
-      url: "https://bank-lending-functions.azurewebsites.net/api/v1/calculate-emi"
-      key: "placeholder-key"
+      url: "${AZURE_FUNCTIONS_BASE_URL:https://team6-lending-functions-gbdnd3ahh0bydkgc.southeastasia-01.azurewebsites.net}/api/v1/calculate-emi"
+      key: "${AZURE_FUNCTION_KEY:}"
   durable-functions:
-    # Base URL of the Azure Durable Functions HTTP Management API
-    # Used for: start orchestration, raise events, query orchestration status
-    orchestrator-base-url: "https://bank-lending-functions.azurewebsites.net/runtime/webhooks/durabletask"
-    # Azure Function host key (from Function App > App keys in Azure Portal)
-    function-key: "placeholder-function-key"
+    orchestrator-base-url: "${AZURE_FUNCTIONS_BASE_URL:https://team6-lending-functions-gbdnd3ahh0bydkgc.southeastasia-01.azurewebsites.net}/runtime/webhooks/durabletask"
+    function-key: "${AZURE_FUNCTION_KEY:}"
   logic-apps:
-    manager-approval-webhook-url: "https://prod-00.eastus.logic.azure.com/workflows/loan-approval/triggers/manual/paths/invoke"
+    manager-approval-webhook-url: "${AZURE_LOGIC_APPS_WEBHOOK_URL:}"
   servicebus:
-    connection-string: "Endpoint=sb://bank-lending-servicebus.servicebus.windows.net/;SharedAccessKeyName=RootManageSharedAccessKey;SharedAccessKey=placeholder"
-    topic-name: loan-events-topic
+    connection-string: "${AZURE_SERVICEBUS_CONNECTION_STRING:}"
+    topic-name: "${AZURE_SERVICEBUS_TOPIC_NAME:loan-events-topic}"
+

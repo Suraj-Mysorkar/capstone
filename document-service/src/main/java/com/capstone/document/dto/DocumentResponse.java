@@ -16,13 +16,23 @@ public class DocumentResponse {
     
     private Long documentId;
 
-    private Long customerId;
+    private String customerId;
 
-    private Long applicationId;
+    private String applicationId;
 
     private DocumentType documentType;
 
     private String documentName;
+
+    private String originalFileName;
+
+    private String blobPath;
+
+    private String blobUrl;
+
+    private String contentType;
+
+    private Long fileSizeBytes;
 
     private DocumentStatus status;
 

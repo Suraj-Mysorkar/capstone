@@ -3,12 +3,17 @@ package com.bank.digital.lending.service;
 import com.bank.digital.lending.model.dto.*;
 import com.bank.digital.lending.model.entity.LoanApplication;
 import com.bank.digital.lending.model.entity.LoanAuditLog;
+import com.bank.digital.lending.model.entity.LoanDocument;
 import com.bank.digital.lending.model.entity.LoanScheme;
+import com.bank.digital.lending.model.enums.DocType;
 import com.bank.digital.lending.model.enums.LoanStatus;
 import com.bank.digital.lending.orchestration.LoanDurableOrchestrator;
 import com.bank.digital.lending.repository.LoanApplicationRepository;
 import com.bank.digital.lending.repository.LoanAuditLogRepository;
+import com.bank.digital.lending.repository.LoanDocumentRepository;
 import com.bank.digital.lending.repository.LoanSchemeRepository;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,12 +26,15 @@ import java.util.UUID;
 @Service
 public class LoanApplicationService {
 
+    private static final Logger log = LoggerFactory.getLogger(LoanApplicationService.class);
+
     @Value("${azure.callback-base-url:}")
     private String callbackBaseUrl;
 
     private final LoanApplicationRepository applicationRepository;
     private final LoanSchemeRepository schemeRepository;
     private final LoanAuditLogRepository auditLogRepository;
+    private final LoanDocumentRepository loanDocumentRepository;
     private final EMICalculatorProxyService emiCalculatorProxy;
     private final DocumentStorageProxyService documentStorageProxy;
     private final LoanDurableOrchestrator durableOrchestrator;
@@ -35,6 +43,7 @@ public class LoanApplicationService {
     public LoanApplicationService(LoanApplicationRepository applicationRepository,
                                   LoanSchemeRepository schemeRepository,
                                   LoanAuditLogRepository auditLogRepository,
+                                  LoanDocumentRepository loanDocumentRepository,
                                   EMICalculatorProxyService emiCalculatorProxy,
                                   DocumentStorageProxyService documentStorageProxy,
                                   LoanDurableOrchestrator durableOrchestrator,
@@ -42,6 +51,7 @@ public class LoanApplicationService {
         this.applicationRepository = applicationRepository;
         this.schemeRepository = schemeRepository;
         this.auditLogRepository = auditLogRepository;
+        this.loanDocumentRepository = loanDocumentRepository;
         this.emiCalculatorProxy = emiCalculatorProxy;
         this.documentStorageProxy = documentStorageProxy;
         this.durableOrchestrator = durableOrchestrator;
@@ -237,7 +247,8 @@ public class LoanApplicationService {
     /**
      * Handles document uploaded callback (Level 1: Document Verification).
      *
-     * Workflow transitions after successful document submission:
+     * Persists a row in LOAN_DOCUMENTS for each uploaded document (blob URL, type, size, etc.)
+     * and transitions the loan application status:
      *  - Low Risk (Score ≤ 30):  DOCUMENT_REVIEW_PENDING → APPROVED (Auto-Approved by Credit Engine)
      *  - Medium Risk (31–69):    DOCUMENT_REVIEW_PENDING → MANUAL_REVIEW_REQUIRED (Level 2: Underwriter review)
      *  - High Risk (≥ 70):       Already REJECTED — document upload has no effect
@@ -247,6 +258,34 @@ public class LoanApplicationService {
         LoanApplication app = applicationRepository.findById(applicationId)
                 .orElseThrow(() -> new IllegalArgumentException("Loan application not found with ID: " + applicationId));
 
+        // ── 1. Persist document metadata in LOAN_DOCUMENTS table ──────────────────────────
+        String docId = "DOC-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        DocType docType = request.resolvedDocType();
+        String blobUrl   = request.blobUrl()   != null ? request.blobUrl()   : "";
+        String blobPath  = request.blobPath()  != null ? request.blobPath()  : blobUrl;
+        String fileName  = request.documentName() != null ? request.documentName() : docType.name() + ".pdf";
+        String mime      = request.contentType() != null ? request.contentType() : "application/pdf";
+        long   fileSize  = request.fileSizeBytes() != null ? request.fileSizeBytes() : 0L;
+        String customerId = request.customerId() != null ? request.customerId() : app.getCustomerId();
+
+        // Only save if we have a real blob URL (i.e., the upload actually went to Azure)
+        if (!blobUrl.isBlank()) {
+            LoanDocument loanDoc = new LoanDocument(
+                    docId,
+                    applicationId,
+                    customerId,
+                    docType,
+                    fileName,
+                    mime,
+                    blobPath.isBlank() ? blobUrl : blobPath,
+                    fileSize
+            );
+            loanDocumentRepository.save(loanDoc);
+            log.info("[LOAN-SERVICE] ✅ LOAN_DOCUMENTS persisted: docId={}, appId={}, type={}, blobUrl={}",
+                    docId, applicationId, docType, blobUrl);
+        }
+
+        // ── 2. Link legacy doc IDs (backward compat for pre-document-service uploads) ─────
         if (request.documentIds() != null && !request.documentIds().isEmpty()) {
             documentStorageProxy.linkDocumentsToApplication(request.documentIds(), applicationId);
         }
@@ -254,6 +293,7 @@ public class LoanApplicationService {
 
         LoanStatus previousStatus = app.getStatus();
 
+        // ── 3. Advance workflow based on risk score ────────────────────────────────────────
         if (app.getStatus() == LoanStatus.DOCUMENT_REVIEW_PENDING) {
             int score = app.getRiskScore() != null ? app.getRiskScore() : 50;
             String dti  = app.getDtiRatio() != null ? app.getDtiRatio().toString() : "—";
@@ -294,4 +334,3 @@ public class LoanApplicationService {
         return mapToResponse(saved);
     }
 }
-

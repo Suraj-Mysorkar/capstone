@@ -10,9 +10,9 @@ import com.capstone.document.entity.Document;
 @Repository
 public interface DocumentRepository extends JpaRepository<Document, Long> {
     
-    List<Document> findByCustomerId(Long customerId);
+    List<Document> findByCustomerId(String customerId);
 
-    List<Document> findByApplicationId(Long applicationId);
+    List<Document> findByApplicationId(String applicationId);
 
-    List<Document> findByCustomerIdAndApplicationId(Long customerId, Long applicationId);
+    List<Document> findByCustomerIdAndApplicationId(String customerId, String applicationId);
 }

@@ -3,9 +3,15 @@ package com.capstone.document.entity;
 import java.time.LocalDateTime;
 
 import jakarta.persistence.*;
+import lombok.AllArgsConstructor;
+import lombok.Data;
+import lombok.NoArgsConstructor;
 
 @Entity
-@Table(name = "managed_document_versions")
+@Table(name = "document_versions")
+@Data
+@NoArgsConstructor
+@AllArgsConstructor
 public class DocumentVersion {
     
     @Id
@@ -23,6 +29,12 @@ public class DocumentVersion {
     @Column(name = "file_name", nullable = false)
     private String fileName;
 
+    @Column(name = "blob_path", length = 500)
+    private String blobPath;
+
+    @Column(name = "blob_url", length = 1000)
+    private String blobUrl;
+
     @Column(name = "content_type", nullable = false)
     private String contentType;
 
@@ -34,69 +46,5 @@ public class DocumentVersion {
     private byte[] fileData;
 
     @Column(name = "created_at", nullable = false)
-    private LocalDateTime createdAt;
-
-    public Long getVersionId() {
-        return versionId;
-    }
-
-    public void setVersionId(Long versionId) {
-        this.versionId = versionId;
-    }
-
-    public Document getDocument() {
-        return document;
-    }
-
-    public void setDocument(Document document) {
-        this.document = document;
-    }
-
-    public Integer getVersionNumber() {
-        return versionNumber;
-    }
-
-    public void setVersionNumber(Integer versionNumber) {
-        this.versionNumber = versionNumber;
-    }
-
-    public String getFileName() {
-        return fileName;
-    }
-
-    public void setFileName(String fileName) {
-        this.fileName = fileName;
-    }
-
-    public String getContentType() {
-        return contentType;
-    }
-
-    public void setContentType(String contentType) {
-        this.contentType = contentType;
-    }
-
-    public Long getFileSize() {
-        return fileSize;
-    }
-
-    public void setFileSize(Long fileSize) {
-        this.fileSize = fileSize;
-    }
-
-    public byte[] getFileData() {
-        return fileData;
-    }
-
-    public void setFileData(byte[] fileData) {
-        this.fileData = fileData;
-    }
-
-    public LocalDateTime getCreatedAt() {
-        return createdAt;
-    }
-
-    public void setCreatedAt(LocalDateTime createdAt) {
-        this.createdAt = createdAt;
-    }
+    private LocalDateTime createdAt = LocalDateTime.now();
 }

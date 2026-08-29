@@ -142,7 +142,16 @@ public class DatabaseInitializer implements CommandLineRunner {
                 "IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('LOAN_APPLICATIONS') AND name = 'CREATED_BY') ALTER TABLE LOAN_APPLICATIONS ADD CREATED_BY VARCHAR(100) NULL",
                 "IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('LOAN_APPLICATIONS') AND name = 'CREATED_DATE') ALTER TABLE LOAN_APPLICATIONS ADD CREATED_DATE DATETIME2 NULL",
                 "IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('LOAN_APPLICATIONS') AND name = 'LAST_MODIFIED_BY') ALTER TABLE LOAN_APPLICATIONS ADD LAST_MODIFIED_BY VARCHAR(100) NULL",
-                "IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('LOAN_APPLICATIONS') AND name = 'LAST_MODIFIED_DATE') ALTER TABLE LOAN_APPLICATIONS ADD LAST_MODIFIED_DATE DATETIME2 NULL",
+                // 2c. Drop restrictive check constraints on LOAN_DOCUMENTS if any
+                """
+                DECLARE @drop_ck NVARCHAR(MAX) = N'';
+                SELECT @drop_ck += N'ALTER TABLE ' + QUOTENAME(OBJECT_SCHEMA_NAME(parent_object_id))
+                    + '.' + QUOTENAME(OBJECT_NAME(parent_object_id)) 
+                    + ' DROP CONSTRAINT ' + QUOTENAME(name) + ';'
+                FROM sys.check_constraints
+                WHERE parent_object_id IN (OBJECT_ID('LOAN_DOCUMENTS'), OBJECT_ID('loan_documents'), OBJECT_ID('LOAN_DOCUMENTS_AUD'), OBJECT_ID('loan_documents_aud'));
+                IF @drop_ck <> N'' EXEC sp_executesql @drop_ck;
+                """,
 
                 // 3. LOAN_DOCUMENTS
                 """
