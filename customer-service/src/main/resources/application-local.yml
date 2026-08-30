@@ -1,0 +1,42 @@
+# Local demo profile — zero infrastructure.
+#
+#   ./mvnw spring-boot:run -Dspring-boot.run.profiles=local
+#
+# Embedded in-memory H2 (no Azure SQL), Flyway off (Hibernate builds the schema),
+# security opened up (no Entra ID token required), permissive CORS so a Vite dev
+# server on another port can call it. Data is lost on restart.
+spring:
+  datasource:
+    url: jdbc:h2:mem:customerdb;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+
+  jpa:
+    database-platform: org.hibernate.dialect.H2Dialect
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+
+  flyway:
+    enabled: false
+
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+
+logging:
+  level:
+    com.bank.customerservice: DEBUG
+
+# Not used under the local profile (no JwtDecoder bean is created), kept only so
+# property resolution never fails.
+security:
+  jwt:
+    issuer-uri: http://localhost/none
+
+azure:
+  eventgrid:
+    topic-endpoint: http://localhost/local-fake-topic
+    topic-key: local
