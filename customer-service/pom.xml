@@ -18,6 +18,9 @@
     <description>Customer Service - Profile Management &amp; Onboarding Status Tracking</description>
 
     <properties>
+        <!-- This module targets Java 17 only. `java.version` drives the compiler
+             `release` flag; the build is additionally pinned to a JDK 17 toolchain
+             by the maven-enforcer-plugin below. -->
         <java.version>17</java.version>
         <azure.sdk.bom.version>1.2.25</azure.sdk.bom.version>
     </properties>
@@ -130,6 +133,32 @@
 
     <build>
         <plugins>
+            <!--
+                Pin the build to a JDK 17 toolchain. Fails fast with a clear
+                message on any other JDK (this project is not built or tested on
+                21/23 — newer JDKs also disable the implicit Lombok annotation
+                processing this module relies on).
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-enforcer-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <id>enforce-java-17</id>
+                        <goals>
+                            <goal>enforce</goal>
+                        </goals>
+                        <configuration>
+                            <rules>
+                                <requireJavaVersion>
+                                    <version>[17,18)</version>
+                                    <message>This module must be built with JDK 17.</message>
+                                </requireJavaVersion>
+                            </rules>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
             <plugin>
                 <groupId>org.springframework.boot</groupId>
                 <artifactId>spring-boot-maven-plugin</artifactId>
@@ -141,6 +170,23 @@
                         </exclude>
                     </excludes>
                 </configuration>
+            </plugin>
+            <!--
+                Runs the *IT integration tests (e.g. CustomerControllerIT) during the
+                `verify` phase. Without this, surefire's default patterns skip *IT
+                classes and they never execute in CI.
+            -->
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-failsafe-plugin</artifactId>
+                <executions>
+                    <execution>
+                        <goals>
+                            <goal>integration-test</goal>
+                            <goal>verify</goal>
+                        </goals>
+                    </execution>
+                </executions>
             </plugin>
         </plugins>
     </build>

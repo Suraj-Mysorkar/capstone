@@ -13,13 +13,16 @@ import java.time.Instant;
 import java.util.UUID;
 
 /**
- * Customer profile, persisted in Azure SQL Database.
- * Maps to the "Profiles &amp; Loans" store shared with the Loan Service.
+ * Customer profile, persisted in the shared Azure SQL Database (smzen-capstone-db).
+ * <p>
+ * Owns its own {@code customer_profiles} table — this is intentionally separate
+ * from the {@code Customers} table written by loan-service / report-service, which
+ * has a different primary-key type and column set.
  */
 @Entity
-@Table(name = "customers", indexes = {
-        @Index(name = "idx_customers_email", columnList = "email", unique = true),
-        @Index(name = "idx_customers_status", columnList = "onboardingStatus")
+@Table(name = "customer_profiles", indexes = {
+        @Index(name = "idx_customer_profiles_email", columnList = "email", unique = true),
+        @Index(name = "idx_customer_profiles_status", columnList = "onboardingStatus")
 })
 @Getter
 @Setter
@@ -66,8 +69,18 @@ public class Customer {
     @Column(length = 2)
     private String countryCode;
 
-    /** External subject identifier from Microsoft Entra ID (JWT `sub` claim). */
-    @Column(length = 255, unique = true)
+    /**
+     * External subject identifier from Microsoft Entra ID (JWT {@code sub} claim).
+     * Nullable — a profile is created at registration and linked to an identity
+     * later, so many rows legitimately have {@code NULL} here.
+     * <p>
+     * Uniqueness among the non-null values is enforced by the filtered unique
+     * index {@code idx_customer_profiles_identity_subject} in the V1 migration.
+     * A plain {@code unique = true} is deliberately NOT used: databases that
+     * treat NULLs as equal in a unique index (SQL Server, and H2 in MSSQL mode)
+     * would then allow only a single unlinked profile.
+     */
+    @Column(length = 255)
     private String identityProviderSubject;
 
     @Enumerated(EnumType.STRING)

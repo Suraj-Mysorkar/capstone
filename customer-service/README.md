@@ -15,7 +15,9 @@ Grid for downstream consumers (Notification Service, Reporting Dashboard).
   SQL, publishes `CustomerRegisteredEvent` / `CustomerStatusChangedEvent`
 - **Messaging & Events Layer** → Azure Event Grid topic, consumed by
   Notification Service and other event-driven services
-- **Azure Managed Data Stores** → Azure SQL Database (`customers` table)
+- **Azure Managed Data Stores** → shared Azure SQL Database `smzen-capstone-db`
+  (this service owns the `customer_profiles` table; the `Customers` table in the
+  same DB belongs to loan-service / report-service)
 
 ## Tech stack
 
@@ -29,12 +31,16 @@ Grid for downstream consumers (Notification Service, Reporting Dashboard).
 
 ## Configuration
 
-All config is externalized via environment variables (see
-`application.yml` / `application-dev.yml` / `application-prod.yml`):
+By default (no profile active) the service connects to the **shared Azure SQL
+Database `smzen-capstone-db`** — the same server used by loan-service and
+report-service. Every value is overridable via environment variables (see
+`application.yml` / `application-dev.yml` / `application-prod.yml`). You can also
+drop a `secrets.properties` file next to the module (git-ignored) to supply
+`DB_PASSWORD` etc. without exporting env vars.
 
 | Variable                  | Description                                              |
 |----------------------------|-----------------------------------------------------------|
-| `DB_URL`                   | JDBC URL for Azure SQL Database                          |
+| `DB_URL`                   | JDBC URL (default: shared Azure SQL `smzen-capstone-db`) |
 | `DB_USERNAME` / `DB_PASSWORD` | Azure SQL credentials (prefer Entra ID auth in prod)   |
 | `JWT_ISSUER_URI`           | Entra ID tenant issuer, e.g. `https://login.microsoftonline.com/<tenant-id>/v2.0` |
 | `EVENTGRID_TOPIC_ENDPOINT` | Azure Event Grid topic endpoint                          |
@@ -43,19 +49,25 @@ All config is externalized via environment variables (see
 
 ## Running locally
 
+Against the shared Azure SQL DB (default — the machine must be allow-listed on
+the server firewall):
+
 ```bash
-# requires a local SQL Server / Azure SQL Edge container, e.g.:
+./mvnw spring-boot:run
+```
+
+Against a local SQL Server / Azure SQL Edge container instead:
+
+```bash
 docker run -e "ACCEPT_EULA=1" -e "MSSQL_SA_PASSWORD=changeMe123!" \
   -p 1433:1433 -d mcr.microsoft.com/azure-sql-edge
 
-export JWT_ISSUER_URI=https://login.microsoftonline.com/<your-tenant-id>/v2.0
-export EVENTGRID_TOPIC_ENDPOINT=https://<your-topic>.<region>-1.eventgrid.azure.net/api/events
-export EVENTGRID_TOPIC_KEY=<topic-key>   # local/dev only
-
-mvn spring-boot:run
+SPRING_PROFILES_ACTIVE=dev ./mvnw spring-boot:run
 ```
 
-Flyway runs automatically on startup and creates the `customers` table.
+Flyway runs automatically on startup and creates the `customer_profiles` table.
+`baseline-version` is `0`, so V1 is applied even when the target database already
+contains other services' tables.
 
 ## API
 
@@ -93,9 +105,13 @@ has already committed).
 
 ## Build & test
 
+**Requires JDK 17.** The build is pinned to a Java 17 toolchain by
+`maven-enforcer-plugin` and fails fast on any other JDK.
+
 ```bash
-mvn clean verify        # runs unit + MockMvc integration tests against H2
-mvn spring-boot:run
+export JAVA_HOME=$(/usr/libexec/java_home -v 17)   # macOS
+./mvnw clean verify     # unit + MockMvc integration tests (*IT) against H2
+./mvnw spring-boot:run
 docker build -t customer-service .
 ```
 

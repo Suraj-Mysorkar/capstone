@@ -1,4 +1,7 @@
-CREATE TABLE customers (
+-- Customer Service owns its own table. It is deliberately NOT the "Customers"
+-- table used by loan-service / report-service (different key type + columns);
+-- on SQL Server's case-insensitive collation "customers" would collide with it.
+CREATE TABLE customer_profiles (
     id                          UNIQUEIDENTIFIER   NOT NULL PRIMARY KEY,
     first_name                  NVARCHAR(100)       NOT NULL,
     last_name                   NVARCHAR(100)       NOT NULL,
@@ -17,6 +20,6 @@ CREATE TABLE customers (
     updated_at                  DATETIME2           NOT NULL
 );
 
-CREATE UNIQUE INDEX idx_customers_email ON customers(email);
-CREATE UNIQUE INDEX idx_customers_identity_subject ON customers(identity_provider_subject) WHERE identity_provider_subject IS NOT NULL;
-CREATE INDEX idx_customers_status ON customers(onboarding_status);
+CREATE UNIQUE INDEX idx_customer_profiles_email ON customer_profiles(email);
+CREATE UNIQUE INDEX idx_customer_profiles_identity_subject ON customer_profiles(identity_provider_subject) WHERE identity_provider_subject IS NOT NULL;
+CREATE INDEX idx_customer_profiles_status ON customer_profiles(onboarding_status);
