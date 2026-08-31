@@ -132,4 +132,71 @@ public class LoanIntegrationEventPublisher {
             }
         }
     }
+
+    /**
+     * Publishes DOCUMENT_REVIEW_COMPLETED or DOCUMENT_REVIEW_FAILED event to Azure Service Bus.
+     */
+    public void publishDocumentReviewEvent(Long documentId,
+                                           String applicationId,
+                                           String customerId,
+                                           String documentName,
+                                           String documentType,
+                                           String status,
+                                           String remarks,
+                                           String verifiedBy,
+                                           String customerEmail) {
+        String eventId = "evt-" + UUID.randomUUID();
+        String timestamp = Instant.now().toString();
+        String docIdFormatted = "DOC-" + documentId;
+        String eventType = "VERIFIED".equalsIgnoreCase(status) ? "DOCUMENT_REVIEW_COMPLETED" : "DOCUMENT_REVIEW_FAILED";
+
+        String jsonPayload = "{\n"
+                + "  \"eventId\": \"" + eventId + "\",\n"
+                + "  \"eventType\": \"" + eventType + "\",\n"
+                + "  \"timestamp\": \"" + timestamp + "\",\n"
+                + "  \"data\": {\n"
+                + "    \"documentId\": \"" + docIdFormatted + "\",\n"
+                + "    \"applicationId\": \"" + (applicationId != null ? applicationId : "") + "\",\n"
+                + "    \"customerId\": \"" + (customerId != null ? customerId : "") + "\",\n"
+                + "    \"customerEmail\": \"" + (customerEmail != null && !customerEmail.isBlank() ? customerEmail : "itsarpitgupta@gmail.com") + "\",\n"
+                + "    \"documentName\": \"" + (documentName != null ? documentName.replace("\"", "\\\"") : "Document") + "\",\n"
+                + "    \"documentType\": \"" + documentType + "\",\n"
+                + "    \"status\": \"" + status + "\",\n"
+                + "    \"remarks\": \"" + (remarks != null ? remarks.replace("\"", "\\\"") : "") + "\",\n"
+                + "    \"verifiedBy\": \"" + (verifiedBy != null ? verifiedBy.replace("\"", "\\\"") : "Operations Manager") + "\"\n"
+                + "  }\n"
+                + "}";
+
+        if (serviceBusConnectionString != null && !serviceBusConnectionString.isBlank() && !serviceBusConnectionString.contains("placeholder")) {
+            String sessionKey = (applicationId != null && !applicationId.isBlank()) ? applicationId : ("SESSION-" + eventId);
+
+            try (ServiceBusSenderClient senderClient = new ServiceBusClientBuilder()
+                    .connectionString(serviceBusConnectionString)
+                    .sender()
+                    .topicName(eventBusTopic)
+                    .buildClient()) {
+
+                ServiceBusMessage message = new ServiceBusMessage(jsonPayload);
+                message.setMessageId(eventId);
+                message.setContentType("application/json");
+                message.setSubject(eventType);
+                message.setSessionId(sessionKey);
+                message.setPartitionKey(sessionKey);
+                message.getApplicationProperties().put("eventType", eventType);
+                message.getApplicationProperties().put("applicationId", applicationId != null ? applicationId : "");
+                message.getApplicationProperties().put("customerId", customerId != null ? customerId : "");
+                message.getApplicationProperties().put("customerEmail", customerEmail != null && !customerEmail.isBlank() ? customerEmail : "itsarpitgupta@gmail.com");
+                message.getApplicationProperties().put("status", status);
+
+                senderClient.sendMessage(message);
+                log.info("[AZURE SERVICE BUS] ✅ Message ID '{}' ('{}') published to topic '{}' for recipient '{}'",
+                        eventId, eventType, eventBusTopic, customerEmail);
+            } catch (Exception topicEx) {
+                log.error("[AZURE SERVICE BUS] Topic '{}' error: {}", eventBusTopic, topicEx.getMessage());
+            }
+        }
+
+        log.info("[DOCUMENT-REVIEW-EVENT] Dispatched event '{}' for document '{}' with remarks '{}'",
+                eventType, docIdFormatted, remarks);
+    }
 }

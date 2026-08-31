@@ -131,6 +131,20 @@ export const fetchDocumentBlobUrl = async (documentId, contentType = 'applicatio
   return `${DOC_BASE}/${cleanId}/download`;
 };
 
+export const updateDocumentStatus = async (documentId, payload) => {
+  const cleanId = String(documentId).trim().replace(/^DOC-/i, '');
+  const res = await fetch(`${DOC_BASE}/${cleanId}/status`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload)
+  });
+  if (!res.ok) {
+    const err = await res.json().catch(() => ({ message: `Status update failed (${res.status})` }));
+    throw new Error(err.message || 'Status update failed');
+  }
+  return res.json();
+};
+
 export const fetchCustomerDocuments = async (customerId) => {
   try {
     const r = await fetch(`${DOC_BASE}/customer/${customerId}`);

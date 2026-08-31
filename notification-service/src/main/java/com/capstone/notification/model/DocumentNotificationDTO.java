@@ -11,9 +11,12 @@ public class DocumentNotificationDTO {
     private String customerName;
     private String customerEmail;
     private String email;
+    private String documentName;
     private String documentType;
     private String blobUrl;
     private String status;
+    private String remarks;
+    private String verifiedBy;
 
     public DocumentNotificationDTO() {}
 
@@ -65,6 +68,14 @@ public class DocumentNotificationDTO {
         this.email = email;
     }
 
+    public String getDocumentName() {
+        return documentName != null ? documentName : (documentType != null ? documentType : "Document");
+    }
+
+    public void setDocumentName(String documentName) {
+        this.documentName = documentName;
+    }
+
     public String getDocumentType() {
         return documentType;
     }
@@ -87,5 +98,21 @@ public class DocumentNotificationDTO {
 
     public void setStatus(String status) {
         this.status = status;
+    }
+
+    public String getRemarks() {
+        return remarks;
+    }
+
+    public void setRemarks(String remarks) {
+        this.remarks = remarks;
+    }
+
+    public String getVerifiedBy() {
+        return verifiedBy != null ? verifiedBy : "Operations Manager";
+    }
+
+    public void setVerifiedBy(String verifiedBy) {
+        this.verifiedBy = verifiedBy;
     }
 }

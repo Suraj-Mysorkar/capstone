@@ -6,5 +6,6 @@ public enum DocumentStatus {
     UNDER_REVIEW,
     VERIFIED,
     REJECTED,
+    ACTION_REQUIRED,
     EXPIRED
 }

@@ -115,7 +115,23 @@ public class NotificationFunction {
                 return;
             }
 
-            // 2. Document Uploaded Event
+            // 2. Document Review Events (Verified / Failed / Action Required)
+            if ("DOCUMENT_REVIEW_COMPLETED".equalsIgnoreCase(eventType)
+                    || ("DOCUMENT_STATUS_UPDATED".equalsIgnoreCase(eventType) && "VERIFIED".equalsIgnoreCase(dataNode.path("status").asText()))) {
+                DocumentNotificationDTO docDto = objectMapper.treeToValue(dataNode, DocumentNotificationDTO.class);
+                notificationService.sendDocumentReviewCompletedNotification(docDto, context);
+                return;
+            }
+
+            if ("DOCUMENT_REVIEW_FAILED".equalsIgnoreCase(eventType)
+                    || "DOCUMENT_ACTION_REQUIRED".equalsIgnoreCase(eventType)
+                    || ("DOCUMENT_STATUS_UPDATED".equalsIgnoreCase(eventType) && ("REJECTED".equalsIgnoreCase(dataNode.path("status").asText()) || "ACTION_REQUIRED".equalsIgnoreCase(dataNode.path("status").asText())))) {
+                DocumentNotificationDTO docDto = objectMapper.treeToValue(dataNode, DocumentNotificationDTO.class);
+                notificationService.sendDocumentReviewFailedNotification(docDto, context);
+                return;
+            }
+
+            // 2b. Document Uploaded Event
             if ("DOCUMENT_UPLOADED".equalsIgnoreCase(eventType)
                     || "LOAN_DOCUMENT_UPLOADED".equalsIgnoreCase(eventType)
                     || dataNode.has("documentId")

@@ -17,4 +17,7 @@ public class DocumentStatusUpdateRequest {
 
     private String remarks;
 
+    private String verifiedBy;
+
+    private String customerEmail;
 }

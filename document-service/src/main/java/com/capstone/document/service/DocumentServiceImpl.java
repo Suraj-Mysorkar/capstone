@@ -253,6 +253,19 @@ public class DocumentServiceImpl implements DocumentService {
                 .findTopByDocumentDocumentIdOrderByVersionNumberDesc(documentId)
                 .orElse(null);
 
+        // Publish review event to Service Bus & notify customer via notification service
+        eventPublisher.publishDocumentReviewEvent(
+                savedDocument.getDocumentId(),
+                savedDocument.getApplicationId(),
+                savedDocument.getCustomerId(),
+                savedDocument.getDocumentName() != null ? savedDocument.getDocumentName() : savedDocument.getOriginalFileName(),
+                savedDocument.getDocumentType().name(),
+                request.getStatus().name(),
+                request.getRemarks(),
+                request.getVerifiedBy() != null ? request.getVerifiedBy() : "Operations Manager",
+                request.getCustomerEmail()
+        );
+
         return mapToResponse(savedDocument, latestVersion);
     }
 

@@ -162,6 +162,75 @@ public class NotificationService {
     }
 
     /**
+     * 3b. Handles Document Review Completed / Verified by Operations Manager
+     */
+    public void sendDocumentReviewCompletedNotification(DocumentNotificationDTO dto, ExecutionContext context) {
+        String name = dto.getCustomerName();
+        String appId = dto.getApplicationId() != null && !dto.getApplicationId().isBlank() ? dto.getApplicationId() : "N/A";
+        String docName = dto.getDocumentName() != null ? dto.getDocumentName() : (dto.getDocumentType() != null ? dto.getDocumentType() : "Document");
+        String remarks = dto.getRemarks() != null && !dto.getRemarks().isBlank() ? dto.getRemarks() : "Document meets all compliance and underwriting criteria.";
+        String verifiedBy = dto.getVerifiedBy() != null ? dto.getVerifiedBy() : "Operations Manager";
+
+        String subject = String.format("✅ Document Verified - %s (%s)", docName, appId);
+        String body = String.format(
+                "Dear %s,\n\n"
+                        + "We are pleased to inform you that your %s document has been "
+                        + "successfully reviewed and verified by our Operations Underwriting team.\n\n"
+                        + "Review Details\n"
+                        + "--------------\n"
+                        + "Application ID     : %s\n"
+                        + "Document ID        : %s\n"
+                        + "Document Name      : %s\n"
+                        + "Verification Status: VERIFIED / APPROVED\n"
+                        + "Verified By        : %s\n"
+                        + "Manager Remarks    : %s\n\n"
+                        + "Your application has moved forward to the next stage of credit processing.\n\n"
+                        + "Thank you for banking with Digital Lending.\n\n"
+                        + "Kind regards,\n"
+                        + "Digital Lending Operations & Underwriting Team",
+                name, docName, appId, dto.getDocumentId(), docName, verifiedBy, remarks
+        );
+
+        dispatchEmail(new EmailDto(dto.getCustomerEmail(), subject, body), context);
+    }
+
+    /**
+     * 3c. Handles Document Review Failed / Additional Documents Requested by Operations Manager
+     */
+    public void sendDocumentReviewFailedNotification(DocumentNotificationDTO dto, ExecutionContext context) {
+        String name = dto.getCustomerName();
+        String appId = dto.getApplicationId() != null && !dto.getApplicationId().isBlank() ? dto.getApplicationId() : "N/A";
+        String docName = dto.getDocumentName() != null ? dto.getDocumentName() : (dto.getDocumentType() != null ? dto.getDocumentType() : "Document");
+        String remarks = dto.getRemarks() != null && !dto.getRemarks().isBlank()
+                ? dto.getRemarks()
+                : "The submitted document requires revision or additional supporting records.";
+        String verifiedBy = dto.getVerifiedBy() != null ? dto.getVerifiedBy() : "Operations Manager";
+
+        String subject = String.format("⚠️ Action Required: Document Review Update - %s", appId);
+        String body = String.format(
+                "Dear %s,\n\n"
+                        + "Our Operations Underwriting team has completed the review of your submitted "
+                        + "document '%s' for Application %s and requires your attention.\n\n"
+                        + "Manager Feedback & Required Actions:\n"
+                        + "-------------------------------------\n"
+                        + "Review Status   : ACTION REQUIRED / REVISION NEEDED\n"
+                        + "Reviewed By     : %s\n"
+                        + "Manager Notes   : %s\n\n"
+                        + "Next Steps to Resume Application Processing:\n"
+                        + "1. Please log in to the Digital Banking portal (https://lively-grass-0d6cbb800.7.azurestaticapps.net/#/documents) "
+                        + "to upload the updated or requested documents.\n"
+                        + "2. Alternatively, you may reply directly to this email with the requested documents attached, "
+                        + "and our Operations Manager will upload them on your behalf.\n\n"
+                        + "If you have any questions, please contact our Customer Experience team.\n\n"
+                        + "Kind regards,\n"
+                        + "Digital Lending Operations & Underwriting Team",
+                name, docName, appId, verifiedBy, remarks
+        );
+
+        dispatchEmail(new EmailDto(dto.getCustomerEmail(), subject, body), context);
+    }
+
+    /**
      * 4. Handles Manual Review Escalations
      */
     public void sendManualReviewNotification(LoanStatusNotificationDTO dto, ExecutionContext context) {
