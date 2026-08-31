@@ -145,6 +145,18 @@ export const updateDocumentStatus = async (documentId, payload) => {
   return res.json();
 };
 
+export const deleteDocumentById = async (documentId) => {
+  const cleanId = String(documentId).trim().replace(/^DOC-/i, '');
+  const res = await fetch(`${DOC_BASE}/${cleanId}`, {
+    method: 'DELETE'
+  });
+  if (!res.ok && res.status !== 204) {
+    const err = await res.json().catch(() => ({ message: 'Delete failed' }));
+    throw new Error(err.message || 'Failed to delete document');
+  }
+  return true;
+};
+
 export const fetchCustomerDocuments = async (customerId) => {
   try {
     const r = await fetch(`${DOC_BASE}/customer/${customerId}`);

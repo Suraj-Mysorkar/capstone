@@ -5,7 +5,8 @@ import {
   fetchDocumentTypes,
   fetchDocumentBlobUrl,
   fetchCustomerDocuments,
-  updateDocumentStatus
+  updateDocumentStatus,
+  deleteDocumentById
 } from '../services/api';
 import {
   FolderUp,
@@ -24,8 +25,8 @@ import {
   Mail,
   ShieldCheck,
   AlertTriangle,
-  FilePlus2,
-  Send
+  X,
+  Trash2
 } from 'lucide-react';
 
 export default function DocumentsPage() {
@@ -52,13 +53,6 @@ export default function DocumentsPage() {
   const [reviewSubmitting, setReviewSubmitting] = useState(false);
   const [reviewSuccessMsg, setReviewSuccessMsg] = useState('');
   const [reviewErrorMsg, setReviewErrorMsg] = useState('');
-
-  // Upload on Behalf of Customer state
-  const [showUploadOnBehalf, setShowUploadOnBehalf] = useState(false);
-  const [behalfFile, setBehalfFile] = useState(null);
-  const [behalfDocType, setBehalfDocType] = useState('INCOME_PROOF');
-  const [behalfDocName, setBehalfDocName] = useState('');
-  const [behalfUploading, setBehalfUploading] = useState(false);
 
   // Upload Tab state
   const [uploadCustId, setUploadCustId] = useState('CUST-3');
@@ -103,7 +97,6 @@ export default function DocumentsPage() {
       setCustomerDocs(docList);
 
       if (docList.length > 0) {
-        // Auto-select the first document in the customer's list
         selectAndPreviewDoc(docList[0]);
       } else {
         setSelectedDoc(null);
@@ -134,7 +127,6 @@ export default function DocumentsPage() {
       const blobUrl = await fetchDocumentBlobUrl(effectiveId, doc.contentType);
       setPreviewBlobUrl(blobUrl);
 
-      // Pre-fill manager review notes template based on status
       if (doc.status === 'REJECTED' || doc.status === 'ACTION_REQUIRED') {
         setReviewStatus('REJECTED');
         setManagerRemarks('Document review failed. Please upload updated document with clear details.');
@@ -147,6 +139,34 @@ export default function DocumentsPage() {
       setPreviewBlobUrl(null);
     } finally {
       setDocLoading(false);
+    }
+  };
+
+  // Handle Document Delete with confirmation alert
+  const handleDeleteDocument = async (e, docToDelete) => {
+    e.stopPropagation();
+    const docId = docToDelete.documentId || docToDelete.id;
+    const docTitle = docToDelete.documentName || docToDelete.originalFileName || `Document ${docId}`;
+
+    const confirmed = window.confirm(`⚠️ Are you sure you want to delete this document?\n\nDocument ID: ${docId}\nName: ${docTitle}\n\nThis will remove the file from Azure Storage.`);
+    if (!confirmed) return;
+
+    try {
+      await deleteDocumentById(docId);
+      const remainingDocs = customerDocs.filter(d => String(d.documentId || d.id) !== String(docId));
+      setCustomerDocs(remainingDocs);
+      setReviewSuccessMsg(`🗑️ Document '${docTitle}' (ID: ${docId}) deleted successfully.`);
+
+      if (selectedDoc && String(selectedDoc.documentId || selectedDoc.id) === String(docId)) {
+        if (remainingDocs.length > 0) {
+          selectAndPreviewDoc(remainingDocs[0]);
+        } else {
+          setSelectedDoc(null);
+          setPreviewBlobUrl(null);
+        }
+      }
+    } catch (err) {
+      alert(`Failed to delete document: ${err.message}`);
     }
   };
 
@@ -179,7 +199,6 @@ export default function DocumentsPage() {
       const updatedDoc = { ...selectedDoc, ...updated, status: targetStatus };
       setSelectedDoc(updatedDoc);
 
-      // Update customer documents list in state
       setCustomerDocs(prev =>
         prev.map(d => (String(d.documentId || d.id) === String(effectiveId) ? updatedDoc : d))
       );
@@ -191,46 +210,6 @@ export default function DocumentsPage() {
       setReviewErrorMsg(e.message || 'Failed to submit document review decision.');
     } finally {
       setReviewSubmitting(false);
-    }
-  };
-
-  // Upload on Behalf of Customer handler
-  const doUploadOnBehalf = async () => {
-    if (!behalfFile) {
-      setReviewErrorMsg('Please select a file to upload on behalf of the customer.');
-      return;
-    }
-
-    setBehalfUploading(true);
-    setReviewSuccessMsg('');
-    setReviewErrorMsg('');
-
-    const fd = new FormData();
-    fd.append('customerId', activeCustomerId);
-    if (selectedDoc?.applicationId) fd.append('applicationId', selectedDoc.applicationId);
-    fd.append('documentType', behalfDocType);
-    fd.append('docType', behalfDocType);
-    fd.append('documentName', behalfDocName.trim() || behalfFile.name);
-    fd.append('file', behalfFile);
-
-    try {
-      const res = await uploadDocument(fd);
-      setReviewSuccessMsg(`✅ Document uploaded on behalf of ${activeCustomerId}! Ready for review.`);
-      setShowUploadOnBehalf(false);
-      setBehalfFile(null);
-      setBehalfDocName('');
-      
-      // Refresh list for customer and select newly uploaded document
-      const updatedDocs = await fetchCustomerDocuments(activeCustomerId);
-      setCustomerDocs(Array.isArray(updatedDocs) ? updatedDocs : []);
-      if (Array.isArray(updatedDocs) && updatedDocs.length > 0) {
-        const newlyCreated = updatedDocs.find(d => String(d.documentId || d.id) === String(res.documentId || res.id)) || updatedDocs[0];
-        selectAndPreviewDoc(newlyCreated);
-      }
-    } catch (e) {
-      setReviewErrorMsg(e.message || 'Upload on behalf failed.');
-    } finally {
-      setBehalfUploading(false);
     }
   };
 
@@ -384,7 +363,7 @@ export default function DocumentsPage() {
               </div>
             )}
 
-            {/* 2. All Documents for this Customer */}
+            {/* 2. All Documents for this Customer (with small 'x' delete button in front) */}
             <div>
               <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text)', marginBottom: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
@@ -412,10 +391,42 @@ export default function DocumentsPage() {
                           cursor: 'pointer',
                           background: isSelected ? 'rgba(0, 210, 255, 0.12)' : 'rgba(255, 255, 255, 0.02)',
                           border: isSelected ? '1px solid var(--accent)' : '1px solid var(--border)',
-                          transition: 'all 0.15s ease'
+                          transition: 'all 0.15s ease',
+                          gap: 8
                         }}
                       >
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden' }}>
+                        {/* Small 'x' Delete Button in front of document */}
+                        <button
+                          title="Delete this document"
+                          onClick={(e) => handleDeleteDocument(e, doc)}
+                          style={{
+                            background: 'rgba(239, 68, 68, 0.15)',
+                            border: '1px solid rgba(239, 68, 68, 0.3)',
+                            color: '#ef4444',
+                            borderRadius: '50%',
+                            width: 20,
+                            height: 20,
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            cursor: 'pointer',
+                            flexShrink: 0,
+                            padding: 0,
+                            transition: 'all 0.15s ease'
+                          }}
+                          onMouseEnter={e => {
+                            e.currentTarget.style.background = '#ef4444';
+                            e.currentTarget.style.color = '#ffffff';
+                          }}
+                          onMouseLeave={e => {
+                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
+                            e.currentTarget.style.color = '#ef4444';
+                          }}
+                        >
+                          <X size={11} strokeWidth={2.5} />
+                        </button>
+
+                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden', flex: 1 }}>
                           <span style={{ fontSize: '1rem' }}>{isPdf(doc) ? '📄' : '🖼️'}</span>
                           <div style={{ overflow: 'hidden' }}>
                             <div style={{ fontSize: '0.78rem', fontWeight: 600, color: isSelected ? 'var(--accent)' : 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
@@ -445,7 +456,7 @@ export default function DocumentsPage() {
                 </div>
               ) : (
                 <div style={{ padding: 12, textAlign: 'center', color: 'var(--muted)', fontSize: '0.78rem', background: 'rgba(255,255,255,0.01)', borderRadius: 6, border: '1px dashed var(--border)' }}>
-                  No documents found for {activeCustomerId}. You can upload a document below.
+                  No documents found for {activeCustomerId}. You can upload a document in the Upload Document tab.
                 </div>
               )}
             </div>
@@ -464,17 +475,8 @@ export default function DocumentsPage() {
                 border: '1px solid rgba(0, 210, 255, 0.2)'
               }}
             >
-              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ fontWeight: 700, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: 6, color: 'var(--accent)' }}>
-                  <ShieldCheck size={17} /> Manager Document Review Form
-                </div>
-                <button
-                  className="btn btn-ghost"
-                  style={{ fontSize: '0.72rem', padding: '2px 8px' }}
-                  onClick={() => setShowUploadOnBehalf(!showUploadOnBehalf)}
-                >
-                  <FilePlus2 size={12} /> {showUploadOnBehalf ? 'Cancel' : 'Upload on Behalf'}
-                </button>
+              <div style={{ fontWeight: 700, fontSize: '0.9rem', display: 'flex', alignItems: 'center', gap: 6, color: 'var(--accent)' }}>
+                <ShieldCheck size={17} /> Manager Document Review Form
               </div>
 
               {selectedDoc ? (
@@ -497,43 +499,6 @@ export default function DocumentsPage() {
               {reviewErrorMsg && (
                 <div className="error-box" style={{ fontSize: '0.78rem', padding: '8px 10px', display: 'flex', alignItems: 'center', gap: 6 }}>
                   <AlertCircle size={14} /> {reviewErrorMsg}
-                </div>
-              )}
-
-              {/* Upload on Behalf Sub-Panel */}
-              {showUploadOnBehalf && (
-                <div style={{ padding: 10, background: 'rgba(0,0,0,0.35)', borderRadius: 6, border: '1px dashed var(--border)', display: 'flex', flexDirection: 'column', gap: 8 }}>
-                  <div style={{ fontSize: '0.75rem', fontWeight: 600, color: 'var(--yellow)' }}>
-                    📥 Upload Document on Customer's Behalf (e.g. received via customer email):
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label" style={{ fontSize: '0.72rem' }}>Document Type</label>
-                    <select className="form-select" value={behalfDocType} onChange={e => setBehalfDocType(e.target.value)} style={{ fontSize: '0.78rem', padding: '4px 8px' }}>
-                      {docTypesList.map(t => (
-                        <option key={t.typeCode || t.code} value={t.typeCode || t.code}>
-                          {t.categoryName || t.description || t.typeCode}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="form-group" style={{ marginBottom: 0 }}>
-                    <label className="form-label" style={{ fontSize: '0.72rem' }}>Select Document File</label>
-                    <input
-                      type="file"
-                      className="form-input"
-                      accept=".pdf,.jpg,.jpeg,.png,.webp"
-                      onChange={e => setBehalfFile(e.target.files?.[0])}
-                      style={{ fontSize: '0.78rem', padding: '4px 8px' }}
-                    />
-                  </div>
-                  <button
-                    className="btn btn-primary"
-                    onClick={doUploadOnBehalf}
-                    disabled={behalfUploading || !behalfFile}
-                    style={{ fontSize: '0.78rem', padding: '6px 12px', justifyContent: 'center' }}
-                  >
-                    {behalfUploading ? <RefreshCw size={13} className="spin" /> : <FolderUp size={13} />} Upload & Attach to Customer
-                  </button>
                 </div>
               )}
 
