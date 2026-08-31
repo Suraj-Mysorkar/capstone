@@ -1,7 +1,24 @@
 import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { fetchApplicationById, fetchAuditLogs, submitManagerCallback, notifyDocumentUploaded } from '../services/api';
-import { ArrowLeft, UploadCloud, CheckCircle2, AlertTriangle, FileText } from 'lucide-react';
+import {
+  fetchApplicationById,
+  fetchAuditLogs,
+  submitManagerCallback,
+  notifyDocumentUploaded,
+  fetchCustomerDocuments
+} from '../services/api';
+import {
+  ArrowLeft,
+  UploadCloud,
+  CheckCircle2,
+  AlertTriangle,
+  FileText,
+  ExternalLink,
+  ShieldCheck,
+  Lock,
+  Search,
+  CheckCircle
+} from 'lucide-react';
 import WorkflowDiagram from '../components/WorkflowDiagram';
 
 function statusBadge(s) {
@@ -19,10 +36,11 @@ function fmt(n) {
 export default function ApplicationDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
-  const [app, setApp]     = useState(null);
-  const [logs, setLogs]   = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [tab, setTab]     = useState('details');
+  const [app, setApp]             = useState(null);
+  const [logs, setLogs]           = useState([]);
+  const [customerDocs, setCustomerDocs] = useState([]);
+  const [loading, setLoading]     = useState(true);
+  const [tab, setTab]             = useState('details');
 
   // Document upload state
   const [uploadDocIds, setUploadDocIds] = useState('DOC-KYC-VERIFIED, DOC-INCOME-VERIFIED');
@@ -52,6 +70,15 @@ export default function ApplicationDetailPage() {
       ]);
       setApp(a);
       setLogs(Array.isArray(l) ? l : []);
+
+      if (a?.customerId) {
+        try {
+          const docs = await fetchCustomerDocuments(a.customerId);
+          setCustomerDocs(Array.isArray(docs) ? docs : []);
+        } catch (docErr) {
+          console.warn('Could not fetch customer documents:', docErr);
+        }
+      }
     } catch (e) {
       console.error('Error loading application data', e);
     } finally {
@@ -83,22 +110,34 @@ export default function ApplicationDetailPage() {
     }
   };
 
-  const doCallback = async (decisionOverride = decision, remarksOverride = remarks) => {
+  // Safe callback submission without circular Event references
+  const doCallback = async (decisionOverride, remarksOverride) => {
+    const cleanDecision = (typeof decisionOverride === 'string' && decisionOverride) ? decisionOverride : decision;
+    const cleanRemarks = (typeof remarksOverride === 'string' && remarksOverride)
+      ? remarksOverride
+      : (remarks.trim() || 'Underwriting manual review decision submitted');
+    const cleanManagerId = (typeof managerId === 'string' && managerId) ? managerId.trim() : 'senior.underwriter@bank.com';
+
     if (cbLoading) return;
-    setCbLoading(true); setCbResult(null); setCbError('');
+    setCbLoading(true);
+    setCbResult(null);
+    setCbError('');
     try {
       const res = await submitManagerCallback(id, {
-        decision: decisionOverride,
-        remarks: remarksOverride,
-        managerId,
+        decision: cleanDecision,
+        remarks: cleanRemarks,
+        managerId: cleanManagerId,
       });
       setCbResult(res);
       if (res?.status) {
         setApp(currentApp => currentApp ? { ...currentApp, ...res } : currentApp);
       }
       await load();
-    } catch(e) { setCbError(e.message); }
-    finally { setCbLoading(false); }
+    } catch(e) {
+      setCbError(e.message || 'Manager decision submission failed');
+    } finally {
+      setCbLoading(false);
+    }
   };
 
   if (loading) return <div className="page"><div className="spinner"/></div>;
@@ -108,14 +147,19 @@ export default function ApplicationDetailPage() {
                   : app.riskScore <= 30   ? 'var(--green)'
                   : app.riskScore >= 70   ? 'var(--red)' : 'var(--yellow)';
 
+  // Check if Document Review is done and approved for this customer
+  const verifiedDocs = customerDocs.filter(d => d.status === 'VERIFIED' || d.status === 'APPROVED');
+  const rejectedDocs = customerDocs.filter(d => d.status === 'REJECTED' || d.status === 'ACTION_REQUIRED');
+  const isDocReviewCompleted = (customerDocs.length > 0 && verifiedDocs.length > 0) || (app.documents && app.documents.length > 0);
+
   return (
     <div className="page">
       {/* Back + title */}
-      <div className="flex-row" style={{ marginBottom:24 }}>
-        <button className="btn btn-ghost" style={{ padding:'7px 14px', fontSize:'.82rem' }} onClick={() => navigate('/applications')}>
+      <div className="flex-row" style={{ marginBottom: 24 }}>
+        <button className="btn btn-ghost" style={{ padding: '7px 14px', fontSize: '.82rem' }} onClick={() => navigate('/applications')}>
           <ArrowLeft size={15}/> Back
         </button>
-        <div style={{ fontWeight:700, fontSize:'1.1rem', marginLeft:4 }}>
+        <div style={{ fontWeight: 700, fontSize: '1.1rem', marginLeft: 4 }}>
           Application Detail: {app.applicationId || app.id}
         </div>
         <div className="ml-auto">{statusBadge(app.status)}</div>
@@ -123,39 +167,40 @@ export default function ApplicationDetailPage() {
 
       {/* Tabs */}
       <div className="tabs">
-        {['details','audit','manager','workflow'].map(t => (
+        {['details', 'audit', 'manager', 'workflow'].map(t => (
           <button key={t} className={`tab-btn${tab===t?' active':''}`} onClick={() => setTab(t)}>
-            {{ details:'Overview', audit:'Audit Trail', manager:'Manager Callback', workflow:'Workflow' }[t]}
+            {{ details: 'Overview', audit: 'Audit Trail', manager: 'Manager Callback', workflow: 'Workflow' }[t]}
           </button>
         ))}
       </div>
 
+      {/* ── TAB 1: OVERVIEW ── */}
       {tab === 'details' && (
         <div className="gap-4">
           {/* Summary strip */}
-          <div style={{ display:'flex', gap:16, flexWrap:'wrap' }}>
-            <div className="card" style={{ flex:1, minWidth:200, padding:'20px 24px' }}>
+          <div style={{ display: 'flex', gap: 16, flexWrap: 'wrap' }}>
+            <div className="card" style={{ flex: 1, minWidth: 200, padding: '20px 24px' }}>
               <div className="stat-label">Risk Score</div>
-              <div style={{ fontSize:'3rem', fontWeight:800, color:riskColor }}>
+              <div style={{ fontSize: '3rem', fontWeight: 800, color: riskColor }}>
                 {app.riskScore ?? '—'}
               </div>
-              <div className="text-muted" style={{ marginTop:4 }}>
+              <div className="text-muted" style={{ marginTop: 4 }}>
                 {app.riskScore == null ? '' : app.riskScore <= 30 ? 'Low Risk – Eligible for Auto-Approval' : app.riskScore >= 70 ? 'High Risk – Auto-Rejected' : 'Medium Risk – Manual Underwriter Review'}
               </div>
             </div>
-            <div className="card" style={{ flex:1, minWidth:200, padding:'20px 24px' }}>
+            <div className="card" style={{ flex: 1, minWidth: 200, padding: '20px 24px' }}>
               <div className="stat-label">Loan Amount</div>
-              <div style={{ fontSize:'1.8rem', fontWeight:800 }}>{fmt(app.loanAmount)}</div>
+              <div style={{ fontSize: '1.8rem', fontWeight: 800 }}>{fmt(app.loanAmount)}</div>
               <div className="text-muted">{app.tenureMonths} months · {app.interestRate}% p.a.</div>
             </div>
-            <div className="card" style={{ flex:1, minWidth:200, padding:'20px 24px' }}>
+            <div className="card" style={{ flex: 1, minWidth: 200, padding: '20px 24px' }}>
               <div className="stat-label">Monthly EMI</div>
-              <div style={{ fontSize:'1.8rem', fontWeight:800, color:'var(--accent)' }}>{fmt(app.calculatedEMI)}</div>
+              <div style={{ fontSize: '1.8rem', fontWeight: 800, color: 'var(--accent)' }}>{fmt(app.calculatedEMI)}</div>
               <div className="text-muted">DTI Ratio: {app.dtiRatio ?? '—'}%</div>
             </div>
           </div>
 
-          {/* Conditional Document Action Card when documents are missing or review pending */}
+          {/* Conditional Document Action Card */}
           {app.status === 'DOCUMENT_REVIEW_PENDING' && (
             <div className="card p-6" style={{ background: '#f59e0b10', borderColor: '#f59e0b', borderWidth: 1.5 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
@@ -163,7 +208,7 @@ export default function ApplicationDetailPage() {
                 <div>
                   <h4 style={{ margin: 0, color: '#d97706' }}>Action Required: Upload Verification Documents</h4>
                   <p style={{ margin: '4px 0 0', fontSize: '.88rem', color: 'var(--text-muted)' }}>
-                    Documents are mandatory for approval. Once uploaded, if low-risk (Score ≤ 30), this application will be <strong>Auto-Approved</strong> immediately. If medium-risk, it will be routed to the Operations Manager.
+                    Documents are mandatory for approval. Once verified by Underwriting, this application will advance.
                   </p>
                 </div>
               </div>
@@ -184,69 +229,103 @@ export default function ApplicationDetailPage() {
             </div>
           )}
 
-          {/* Customer */}
-          <div className="card p-6">
-            <div className="card-header-title" style={{ marginBottom:16 }}>Customer Information</div>
-            <div className="detail-grid">
-              {[
-                ['Customer ID',     app.customerId],
-                ['Full Name',       app.customerName],
-                ['Email',           app.customerEmail],
-                ['Phone',           app.customerPhone],
-                ['Employment',      app.employmentType],
-                ['Monthly Income',  fmt(app.monthlyIncome)],
-                ['Existing Liabilities', fmt(app.existingLiabilities)],
-              ].map(([l,v]) => (
-                <div key={l} className="detail-field">
-                  <div className="detail-field-label">{l}</div>
-                  <div className="detail-field-value">{v}</div>
-                </div>
-              ))}
+          {/* Customer & Document Status Row */}
+          <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+            <div className="card p-6">
+              <div className="card-header-title" style={{ marginBottom: 16 }}>Customer Information</div>
+              <div className="detail-grid">
+                {[
+                  ['Customer ID',     app.customerId],
+                  ['Full Name',       app.customerName],
+                  ['Email',           app.customerEmail],
+                  ['Phone',           app.customerPhone],
+                  ['Employment',      app.employmentType],
+                  ['Monthly Income',  fmt(app.monthlyIncome)],
+                  ['Existing Liabilities', fmt(app.existingLiabilities)],
+                ].map(([l, v]) => (
+                  <div key={l} className="detail-field">
+                    <div className="detail-field-label">{l}</div>
+                    <div className="detail-field-value">{v ?? '—'}</div>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
 
-          {/* Loan */}
-          <div className="card p-6">
-            <div className="card-header-title" style={{ marginBottom:16 }}>Loan Details</div>
-            <div className="detail-grid">
-              {[
-                ['Application ID',      app.applicationId || app.id],
-                ['Scheme ID',           app.schemeId],
-                ['Loan Type',           app.loanType?.replace(/_/g,' ')],
-                ['Amount',              fmt(app.loanAmount)],
-                ['Tenure',              app.tenureMonths + ' months'],
-                ['Interest Rate',       app.interestRate + '% p.a.'],
-                ['Status',              app.status],
-                ['Documents Provided',  app.documents?.length > 0 || app.status === 'APPROVED' ? '✅ Verified' : '⚠️ Pending'],
-                ['Orchestration ID',    app.orchestrationInstanceId || '—'],
-                ['Assigned Manager',    app.assignedManager || '—'],
-                ['Decision Remarks',    app.decisionRemarks || '—'],
-                ['Created At',          new Date(app.createdAt).toLocaleString()],
-                ['Updated At',          new Date(app.updatedAt).toLocaleString()],
-              ].map(([l,v]) => (
-                <div key={l} className="detail-field">
-                  <div className="detail-field-label">{l}</div>
-                  <div className="detail-field-value" style={{ fontSize:'.82rem' }}>{v}</div>
+            <div className="card p-6">
+              <div className="card-header-title" style={{ marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                <span>Uploaded Documents ({customerDocs.length})</span>
+                <button
+                  className="btn btn-ghost"
+                  style={{ fontSize: '.75rem', padding: '3px 8px' }}
+                  onClick={() => navigate('/documents')}
+                >
+                  <Search size={12} /> Document Review Portal →
+                </button>
+              </div>
+
+              {customerDocs.length > 0 ? (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                  {customerDocs.map(d => (
+                    <div
+                      key={d.documentId || d.id}
+                      style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        padding: '8px 12px',
+                        borderRadius: 6,
+                        background: 'rgba(255, 255, 255, 0.02)',
+                        border: '1px solid var(--border)'
+                      }}
+                    >
+                      <div>
+                        <div style={{ fontSize: '.82rem', fontWeight: 600 }}>
+                          ID: {d.documentId || d.id} — {d.documentName || d.originalFileName || d.documentType}
+                        </div>
+                        <div style={{ fontSize: '.72rem', color: 'var(--muted)' }}>
+                          Type: {d.documentType} {d.fileSizeBytes ? `• ${(d.fileSizeBytes / 1024).toFixed(1)} KB` : ''}
+                        </div>
+                      </div>
+
+                      <span
+                        className={`badge ${
+                          d.status === 'VERIFIED' || d.status === 'APPROVED'
+                            ? 'badge-approved'
+                            : d.status === 'REJECTED' || d.status === 'ACTION_REQUIRED'
+                            ? 'badge-rejected'
+                            : 'badge-under-review'
+                        }`}
+                        style={{ fontSize: '.7rem' }}
+                      >
+                        {d.status || 'UPLOADED'}
+                      </span>
+                    </div>
+                  ))}
                 </div>
-              ))}
+              ) : (
+                <div style={{ color: 'var(--muted)', fontSize: '.82rem' }}>
+                  No documents found for customer {app.customerId}.
+                </div>
+              )}
             </div>
           </div>
         </div>
       )}
 
+      {/* ── TAB 2: AUDIT TRAIL ── */}
       {tab === 'audit' && (
         <div className="card p-6">
-          <div className="card-header-title" style={{ marginBottom:20 }}>Audit Trail</div>
+          <div className="card-header-title" style={{ marginBottom: 16 }}>Audit Trail</div>
           {logs.length === 0 ? (
             <div className="empty">No audit logs available.</div>
           ) : (
             <ul className="timeline">
-              {logs.map((l,i) => (
+              {logs.map((l, i) => (
                 <li key={i} className="timeline-item">
                   <div className="timeline-dot"/>
-                  <div style={{ fontWeight:600, fontSize:'.88rem' }}>
+                  <div style={{ fontWeight: 600, fontSize: '.88rem' }}>
                     {l.previousStatus
-                      ? <>{l.previousStatus} <span style={{color:'var(--muted)'}}>→</span> {l.newStatus}</>
+                      ? <>{l.previousStatus} <span style={{ color: 'var(--muted)' }}>→</span> {l.newStatus}</>
                       : l.newStatus}
                   </div>
                   <div className="timeline-meta">
@@ -260,62 +339,171 @@ export default function ApplicationDetailPage() {
         </div>
       )}
 
+      {/* ── TAB 3: MANAGER CALLBACK ── */}
       {tab === 'manager' && (
         <div className="card p-6">
-          <div className="card-header-title" style={{ marginBottom:8 }}>Manager Decision Callback</div>
-          <div className="text-muted" style={{ marginBottom:20, fontSize:'.83rem' }}>
-            Only applications in <strong>MANUAL_REVIEW_REQUIRED</strong> state can receive a manager decision.
+          <div className="card-header-title" style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
+            <ShieldCheck size={20} color="var(--accent)" /> Manager Underwriting Decision Callback
+          </div>
+          <div className="text-muted" style={{ marginBottom: 20, fontSize: '.83rem' }}>
+            Only applications in <strong>MANUAL_REVIEW_REQUIRED</strong> state can receive an underwriter approval.
           </div>
 
           {app.status !== 'MANUAL_REVIEW_REQUIRED' && (
-            <div className="info-box">
+            <div className="info-box" style={{ marginBottom: 16 }}>
               This application is currently <strong>{app.status}</strong>. Manager callback is only applicable when status is MANUAL_REVIEW_REQUIRED.
             </div>
           )}
 
-          {cbError  && <div className="error-box">{cbError}</div>}
+          {cbError  && <div className="error-box" style={{ marginBottom: 16 }}>{cbError}</div>}
           {cbResult && (
-            <div className="success-box">
+            <div className="success-box" style={{ marginBottom: 16 }}>
               ✅ Callback submitted! New status: <strong>{cbResult.status}</strong>
             </div>
           )}
 
+          {/* DOCUMENT REVIEW STATUS CHECK */}
+          {!isDocReviewCompleted ? (
+            <div
+              style={{
+                background: 'rgba(245, 158, 11, 0.1)',
+                border: '1.5px solid #f59e0b',
+                borderRadius: 8,
+                padding: '16px 20px',
+                marginBottom: 20
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12 }}>
+                <AlertTriangle color="#d97706" size={22} style={{ flexShrink: 0, marginTop: 2 }} />
+                <div>
+                  <div style={{ fontWeight: 700, fontSize: '0.95rem', color: '#d97706' }}>
+                    Document Review Pending / Incomplete
+                  </div>
+                  <div style={{ fontSize: '0.82rem', color: 'var(--text)', marginTop: 4, lineHeight: 1.5 }}>
+                    The customer ({app.customerId}) has not yet had their required KYC / Income documents reviewed and marked <strong>VERIFIED</strong>.
+                    <br />
+                    Loan approval is locked until document underwriting verification is completed.
+                  </div>
+
+                  <div style={{ display: 'flex', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
+                    <button
+                      className="btn btn-primary"
+                      onClick={() => navigate('/documents')}
+                      style={{ fontSize: '.82rem', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 6 }}
+                    >
+                      <FileText size={15} /> Go to Document Review for {app.customerId} →
+                    </button>
+                    <button
+                      className="btn"
+                      onClick={() => doCallback('REJECT', 'Rejected during manual underwriting due to pending/invalid documents')}
+                      style={{
+                        background: '#dc2626',
+                        color: '#fff',
+                        fontSize: '.82rem',
+                        padding: '6px 14px'
+                      }}
+                      disabled={cbLoading}
+                    >
+                      ✕ Reject Application
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div
+              style={{
+                background: 'rgba(16, 185, 129, 0.08)',
+                border: '1px solid var(--green)',
+                borderRadius: 8,
+                padding: '12px 16px',
+                marginBottom: 20,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 10
+              }}
+            >
+              <CheckCircle size={18} color="var(--green)" />
+              <div style={{ fontSize: '.85rem' }}>
+                <strong>Document Review Complete:</strong> Verified supporting documents on file for {app.customerId}. Approval unlocked.
+              </div>
+            </div>
+          )}
+
+          {/* Form Controls */}
           <div className="form-grid">
             <div className="form-group">
               <label className="form-label">Decision *</label>
-              <select className="form-select" value={decision} onChange={e=>setDecision(e.target.value)}>
-                <option value="APPROVE">APPROVE</option>
+              <select
+                className="form-select"
+                value={decision}
+                onChange={e => setDecision(e.target.value)}
+                disabled={!isDocReviewCompleted && decision === 'APPROVE'}
+              >
+                <option value="APPROVE" disabled={!isDocReviewCompleted}>
+                  APPROVE {isDocReviewCompleted ? '(Documents Verified)' : '(Locked - Doc Review Pending)'}
+                </option>
                 <option value="REJECT">REJECT</option>
                 <option value="REQUEST_MORE_INFO">REQUEST_MORE_INFO</option>
               </select>
             </div>
+
             <div className="form-group">
               <label className="form-label">Manager ID *</label>
-              <input className="form-input" value={managerId} onChange={e=>setManagerId(e.target.value)}/>
+              <input className="form-input" value={managerId} onChange={e => setManagerId(e.target.value)}/>
             </div>
-            <div className="form-group" style={{ gridColumn:'1 / -1' }}>
+
+            <div className="form-group" style={{ gridColumn: '1 / -1' }}>
               <label className="form-label">Remarks *</label>
-              <input className="form-input" value={remarks} onChange={e=>setRemarks(e.target.value)} placeholder="Enter underwriting justification"/>
+              <input
+                className="form-input"
+                value={remarks}
+                onChange={e => setRemarks(e.target.value)}
+                placeholder="Enter underwriting justification"
+              />
             </div>
           </div>
 
-          <div className="mt-4 flex-row">
-            <button className="btn btn-success" onClick={doCallback} disabled={cbLoading}>
-              {cbLoading ? 'Submitting…' : '✓ Submit Decision'}
-            </button>
-            <button className="btn btn-danger" onClick={() => { setDecision('REJECT'); }}>
-              Pre-fill Reject
+          {/* Action Buttons */}
+          <div className="mt-4 flex-row" style={{ gap: 10 }}>
+            {isDocReviewCompleted ? (
+              <button
+                className="btn btn-success"
+                onClick={() => doCallback('APPROVE')}
+                disabled={cbLoading}
+                style={{ padding: '8px 18px', fontSize: '.88rem' }}
+              >
+                {cbLoading ? 'Submitting…' : '✓ Approve Loan Application'}
+              </button>
+            ) : (
+              <button
+                className="btn btn-ghost"
+                onClick={() => navigate('/documents')}
+                style={{ padding: '8px 18px', fontSize: '.88rem', display: 'flex', alignItems: 'center', gap: 6 }}
+              >
+                <Lock size={15} /> Complete Document Review First →
+              </button>
+            )}
+
+            <button
+              className="btn btn-danger"
+              onClick={() => doCallback('REJECT')}
+              disabled={cbLoading}
+              style={{ padding: '8px 18px', fontSize: '.88rem' }}
+            >
+              ✕ Reject Application
             </button>
           </div>
         </div>
       )}
 
+      {/* ── TAB 4: WORKFLOW DIAGRAM ── */}
       {tab === 'workflow' && (
         <div className="card p-6">
           <WorkflowDiagram
             currentStatus={app.status}
             riskScore={app.riskScore}
-            hasDocuments={app.documents?.length > 0 || app.status === 'APPROVED'}
+            hasDocuments={isDocReviewCompleted || app.status === 'APPROVED'}
             decisionRemarks={app.decisionRemarks}
             isProcessing={cbLoading || uploadingDoc}
             onDecision={(newStatus) => {
