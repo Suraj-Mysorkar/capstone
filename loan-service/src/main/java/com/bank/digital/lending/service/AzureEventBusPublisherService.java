@@ -46,7 +46,20 @@ public class AzureEventBusPublisherService {
         this.objectMapper = objectMapper;
     }
 
+    public void publishLoanSubmittedEvent(LoanApplication app) {
+        publishEventInternal(app, "LOAN_APPLICATION_SUBMITTED", "Initial loan application submitted by applicant.");
+    }
+
+    public void publishLoanStatusEvent(LoanApplication app, String eventType, String remarks) {
+        publishEventInternal(app, eventType, remarks);
+    }
+
     public void publishLoanCompletedEvent(LoanApplication app) {
+        String eventType = (app.getStatus() != null) ? "LOAN_APPLICATION_" + app.getStatus().name() : "LOAN_APPLICATION_COMPLETED";
+        publishEventInternal(app, eventType, app.getDecisionRemarks());
+    }
+
+    private void publishEventInternal(LoanApplication app, String eventType, String remarks) {
         LoanCompletedEventData eventData = new LoanCompletedEventData(
                 app.getApplicationId(),
                 app.getCustomerId(),
@@ -61,11 +74,11 @@ public class AzureEventBusPublisherService {
                 app.getRiskScore(),
                 app.getDtiRatio(),
                 app.getAssignedManager() != null ? app.getAssignedManager() : "SYSTEM_CREDIT_ENGINE",
-                app.getDecisionRemarks(),
+                remarks != null ? remarks : app.getDecisionRemarks(),
                 LocalDateTime.now()
         );
 
-        LoanApplicationCompletedEvent event = LoanApplicationCompletedEvent.of(eventData);
+        LoanApplicationCompletedEvent event = LoanApplicationCompletedEvent.of(eventType, eventData);
 
         try {
             String jsonPayload = objectMapper.writerWithDefaultPrettyPrinter().writeValueAsString(event);
@@ -73,10 +86,7 @@ public class AzureEventBusPublisherService {
             if (azureEnabled) {
                 // ─── AZURE CLOUD MODE ─────────────────────────────────────────────────────
                 // Publishes the event to Azure Service Bus Topic using the SDK.
-                // ServiceBusSenderClient is synchronous and thread-safe.
-                // In production: replace connection-string auth with DefaultAzureCredential
-                // + fully-qualified namespace for zero-secret Managed Identity auth.
-                log.info("[AZURE SERVICE BUS] Publishing LoanApplicationCompletedEvent to topic '{}'...", topicName);
+                log.info("[AZURE SERVICE BUS] Publishing {} to topic '{}'...", eventType, topicName);
 
                 try (ServiceBusSenderClient senderClient = new ServiceBusClientBuilder()
                         .connectionString(serviceBusConnectionString)
@@ -87,9 +97,12 @@ public class AzureEventBusPublisherService {
                     ServiceBusMessage message = new ServiceBusMessage(jsonPayload);
                     message.setMessageId(event.eventId());
                     message.setContentType("application/json");
+                    message.setSubject(eventType);
                     message.getApplicationProperties().put("eventType", event.eventType());
                     message.getApplicationProperties().put("applicationId", app.getApplicationId());
-                    message.getApplicationProperties().put("finalStatus", app.getStatus().name());
+                    message.getApplicationProperties().put("customerEmail", app.getCustomerEmail());
+                    message.getApplicationProperties().put("customerName", app.getCustomerName());
+                    message.getApplicationProperties().put("finalStatus", app.getStatus() != null ? app.getStatus().name() : "UNKNOWN");
 
                     senderClient.sendMessage(message);
 
@@ -98,20 +111,20 @@ public class AzureEventBusPublisherService {
 
             } else {
                 // ─── LOCAL DEV / MOCK MODE ────────────────────────────────────────────────
-                // Structured console logger simulates what the real SDK call would do.
                 log.info("================================================================================");
                 log.info("[MOCK AZURE SERVICE BUS] >>> DISPATCHING MESSAGE TO AZURE EVENT BUS <<<");
                 log.info("[MOCK AZURE SERVICE BUS] Target Topic: '{}' | Event Type: '{}'", topicName, event.eventType());
                 log.info("[MOCK AZURE SERVICE BUS] Message ID: {} | Source: {}", event.eventId(), event.source());
-                log.info("[MOCK AZURE SERVICE BUS] Application: {} | Final Status: {}", app.getApplicationId(), app.getStatus());
+                log.info("[MOCK AZURE SERVICE BUS] Application: {} | Status: {} | Recipient: {}",
+                        app.getApplicationId(), app.getStatus(), app.getCustomerEmail());
                 log.info("[MOCK AZURE SERVICE BUS] Event Payload:\n{}", jsonPayload);
                 log.info("[MOCK AZURE SERVICE BUS] >>> MESSAGE PUBLISHED SUCCESSFULLY (ACK RECEIVED) <<<");
                 log.info("================================================================================");
             }
 
         } catch (Exception e) {
-            log.error("[AZURE SERVICE BUS] Failed to serialize or publish event for application {}: {}",
-                    app.getApplicationId(), e.getMessage(), e);
+            log.error("[AZURE SERVICE BUS] Failed to serialize or publish event {} for application {}: {}",
+                    eventType, app.getApplicationId(), e.getMessage(), e);
         }
     }
 }

@@ -138,18 +138,25 @@ public class LoanApplicationService {
             documentStorageProxy.linkDocumentsToApplication(request.documentIds(), applicationId);
         }
 
-        // 4. Trigger Azure Durable Function Orchestrator
+        // 4. Publish initial Application Submitted Event
+        eventBusPublisher.publishLoanSubmittedEvent(savedApp);
+
+        // 5. Trigger Azure Durable Function Orchestrator
         String callbackUrl = callbackUrlFor(applicationId);
         durableOrchestrator.runOrchestrationWorkflow(savedApp, callbackUrl);
 
-        // 5. Persist State Changes & Record Audit Logs
+        // 6. Persist State Changes & Record Audit Logs
         LoanApplication updatedApp = applicationRepository.save(savedApp);
         recordAuditLog(applicationId, LoanStatus.SUBMITTED, updatedApp.getStatus(),
                 "DURABLE_ORCHESTRATOR", updatedApp.getDecisionRemarks());
 
-        // 6. If Completed (Auto-Approved / Auto-Rejected), Publish Event to Azure Service Bus
+        // 7. Publish Status Event to Azure Service Bus (Approved, Rejected, Manual Review, Doc Pending)
         if (updatedApp.getStatus() == LoanStatus.APPROVED || updatedApp.getStatus() == LoanStatus.REJECTED) {
             eventBusPublisher.publishLoanCompletedEvent(updatedApp);
+        } else if (updatedApp.getStatus() == LoanStatus.MANUAL_REVIEW_REQUIRED) {
+            eventBusPublisher.publishLoanStatusEvent(updatedApp, "LOAN_MANUAL_REVIEW_REQUIRED", updatedApp.getDecisionRemarks());
+        } else if (updatedApp.getStatus() == LoanStatus.DOCUMENT_REVIEW_PENDING) {
+            eventBusPublisher.publishLoanStatusEvent(updatedApp, "LOAN_DOCUMENT_REVIEW_PENDING", updatedApp.getDecisionRemarks());
         }
 
         return mapToResponse(updatedApp);
@@ -360,6 +367,7 @@ public class LoanApplicationService {
                         "Level 1 (Document Review) passed. Escalated to Level 2 (Underwriter Review).");
                 String callbackUrl = callbackUrlFor(applicationId);
                 durableOrchestrator.triggerManagerReviewWorkflow(app, callbackUrl);
+                eventBusPublisher.publishLoanStatusEvent(app, "LOAN_MANUAL_REVIEW_REQUIRED", app.getDecisionRemarks());
             }
         } else {
             // Additional documents on an already-processed application

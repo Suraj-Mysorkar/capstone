@@ -4,6 +4,10 @@
     "AzureWebJobsStorage": "UseDevelopmentStorage=true",
     "AzureWebJobsSecretStorageType": "Files",
     "FUNCTIONS_WORKER_RUNTIME": "java",
-    "FUNCTIONS_WORKER_JAVA_LOAD_APP_LIBS": "1"
+    "FUNCTIONS_WORKER_JAVA_LOAD_APP_LIBS": "1",
+    "AZURE_SERVICEBUS_CONNECTION_STRING": "",
+    "AZURE_SERVICEBUS_TOPIC_NAME": "loan-events-topic",
+    "AZURE_SERVICEBUS_DOC_TOPIC_NAME": "document-events-topic",
+    "AZURE_LOGIC_APPS_WEBHOOK_URL": ""
   }
 }

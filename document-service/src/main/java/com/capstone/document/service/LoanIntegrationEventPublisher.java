@@ -80,7 +80,9 @@ public class LoanIntegrationEventPublisher {
                 message.setSubject("DOCUMENT_UPLOADED");
                 message.setSessionId(sessionKey);
                 message.setPartitionKey(sessionKey);
+                message.getApplicationProperties().put("eventType", "DOCUMENT_UPLOADED");
                 message.getApplicationProperties().put("applicationId", applicationId);
+                message.getApplicationProperties().put("customerId", customerId != null ? customerId : "");
                 message.getApplicationProperties().put("documentType", documentType);
 
                 senderClient.sendMessage(message);
