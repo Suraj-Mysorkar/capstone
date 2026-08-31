@@ -70,14 +70,21 @@ public class NotificationService {
         String name = customerRegEvent.getCustomerName() != null ? customerRegEvent.getCustomerName() : "Valued Customer";
         String status = customerRegEvent.getStatus() != null ? customerRegEvent.getStatus() : "ACTIVE";
 
-        String subject = "Welcome to Digital Banking - Account Registered Successfully";
+        String subject = "Welcome to Digital Banking - Registration Successful";
         String body = String.format(
                 "Dear %s,\n\n"
-                + "Welcome to Digital Banking! Your customer account has been registered successfully.\n"
-                + "Account Status: %s\n\n"
-                + "You can now log in to apply for loans, track existing applications, and securely upload documents.\n\n"
-                + "Best Regards,\n"
-                + "Digital Banking Customer Experience Team",
+                        + "Welcome to Digital Banking.\n\n"
+                        + "We are pleased to confirm that your customer account has been "
+                        + "successfully registered.\n\n"
+                        + "Account Details\n"
+                        + "----------------\n"
+                        + "Account Status : %s\n\n"
+                        + "You can now securely access the Digital Banking portal to apply "
+                        + "for loans, track your applications, and upload the required documents.\n\n"
+                        + "If you have any questions or require assistance, please contact "
+                        + "our Customer Support team.\n\n"
+                        + "Kind regards,\n"
+                        + "Digital Banking Customer Experience Team",
                 name, status
         );
 
@@ -95,17 +102,24 @@ public class NotificationService {
         String subject = String.format("Loan Application Received - %s", appId);
         String body = String.format(
                 "Dear %s,\n\n"
-                + "Thank you for applying for a %s Loan with Digital Lending.\n\n"
-                + "── Application Summary ──\n"
-                + "• Application ID   : %s\n"
-                + "• Requested Amount : %s\n"
-                + "• Tenure           : %d Months\n"
-                + "• Estimated EMI    : %s/month\n"
-                + "• Status           : %s\n\n"
-                + "Your application has been received and entered our automated validation and credit assessment engine. "
-                + "We will notify you as soon as the status is updated.\n\n"
-                + "Best Regards,\n"
-                + "Digital Lending Origination Team",
+                        + "Thank you for submitting your %s application through Digital Lending.\n\n"
+                        + "We are pleased to confirm that your application has been "
+                        + "successfully received and is currently being processed.\n\n"
+                        + "Application Details\n"
+                        + "-------------------\n"
+                        + "Application ID        : %s\n"
+                        + "Loan Type             : %s\n"
+                        + "Requested Amount      : %s\n"
+                        + "Tenure                : %d Months\n"
+                        + "Estimated Monthly EMI : %s\n"
+                        + "Application Status    : %s\n\n"
+                        + "Your application has now entered our automated validation and "
+                        + "credit assessment process. We will notify you by email when "
+                        + "there is an update regarding your application.\n\n"
+                        + "No further action is required from you at this stage.\n\n"
+                        + "Thank you for choosing Digital Lending.\n\n"
+                        + "Kind regards,\n"
+                        + "Digital Lending Origination Team",
                 name, dto.getLoanType(), appId, amountFormatted, dto.getTenureMonths(),
                 formatCurrency(dto.getCalculatedEMI()), dto.getStatus()
         );
@@ -124,15 +138,23 @@ public class NotificationService {
         String subject = String.format("Documents Received for Loan Application %s", appId);
         String body = String.format(
                 "Dear %s,\n\n"
-                + "We have successfully received your %s document for Loan Application %s.\n\n"
-                + "── Document Details ──\n"
-                + "• Document ID   : %s\n"
-                + "• Document Type : %s\n"
-                + "• Status        : Uploaded & Under Verification\n\n"
-                + "Our automated document verification system is reviewing the submitted files. "
-                + "Your loan application will advance to the next step once verified.\n\n"
-                + "Best Regards,\n"
-                + "Digital Lending Verification Team",
+                        + "We confirm that your %s document has been successfully "
+                        + "received for your loan application.\n\n"
+                        + "Document Details\n"
+                        + "-----------------\n"
+                        + "Application ID : %s\n"
+                        + "Document ID    : %s\n"
+                        + "Document Type  : %s\n"
+                        + "Document Status: Received - Under Verification\n\n"
+                        + "Your submitted document is currently being reviewed by our "
+                        + "document verification process. Your loan application will "
+                        + "proceed to the next stage once the required documents have "
+                        + "been successfully verified.\n\n"
+                        + "No further action is required from you at this stage unless "
+                        + "additional information or documentation is requested.\n\n"
+                        + "Thank you for your cooperation.\n\n"
+                        + "Kind regards,\n"
+                        + "Digital Lending Verification Team",
                 name, docType, appId, dto.getDocumentId(), docType
         );
 
@@ -146,20 +168,32 @@ public class NotificationService {
         String name = dto.getCustomerName();
         String appId = dto.getApplicationId();
 
-        String subject = String.format("Application Update: Manual Review in Progress - %s", appId);
+        String subject = String.format("Application Update - Review in Progress - %s", appId);
+
+        String remarks = dto.getDecisionRemarks() != null
+                ? dto.getDecisionRemarks()
+                : "Your application requires additional review before a final decision can be made.";
+
         String body = String.format(
                 "Dear %s,\n\n"
-                + "Your loan application (%s) for %s is currently being reviewed by our Senior Underwriting Team.\n\n"
-                + "── Review Information ──\n"
-                + "• Application ID   : %s\n"
-                + "• Current Status   : MANUAL_REVIEW_REQUIRED\n"
-                + "• Review Stage     : Level 2 Operations / Credit Assessment\n"
-                + "• Notes            : %s\n\n"
-                + "No further action is required from you at this stage. An Underwriting Specialist will complete the review shortly.\n\n"
-                + "Best Regards,\n"
-                + "Digital Lending Underwriting Team",
-                name, appId, formatCurrency(dto.getAmount()), appId,
-                dto.getDecisionRemarks() != null ? dto.getDecisionRemarks() : "Standard manual risk assessment."
+                        + "We are writing to inform you that your loan application "
+                        + "is currently undergoing a further review by our underwriting team.\n\n"
+                        + "Application Details\n"
+                        + "-------------------\n"
+                        + "Application ID    : %s\n"
+                        + "Loan Type         : %s\n"
+                        + "Requested Amount  : %s\n"
+                        + "Application Status: Manual Review Required\n"
+                        + "Review Remarks    : %s\n\n"
+                        + "As part of our standard lending process, your application "
+                        + "requires additional review before a final decision can be made.\n\n"
+                        + "No further action is required from you at this stage. "
+                        + "Our underwriting team will complete the review and notify "
+                        + "you once a decision has been reached.\n\n"
+                        + "We appreciate your patience and understanding.\n\n"
+                        + "Kind regards,\n"
+                        + "Digital Lending Underwriting Team",
+                name, appId, dto.getLoanType(), formatCurrency(dto.getAmount()), remarks
         );
 
         dispatchEmail(new EmailDto(dto.getCustomerEmail(), subject, body), context);
@@ -172,23 +206,38 @@ public class NotificationService {
         String name = dto.getCustomerName();
         String appId = dto.getApplicationId();
 
-        String subject = String.format("🎉 Congratulations! Your Loan Application %s is Approved", appId);
+        String subject = String.format("🎉 Congratulations! Your Loan Application %s Has Been Approved", appId);
+
+         String remarks = dto.getDecisionRemarks() != null
+                ? dto.getDecisionRemarks()
+                : "Your application has been approved based on the applicable lending criteria.";
+
         String body = String.format(
                 "Dear %s,\n\n"
-                + "We are pleased to inform you that your %s Loan Application (%s) has been APPROVED!\n\n"
-                + "── Approved Sanction Terms ──\n"
-                + "• Sanctioned Amount: %s\n"
-                + "• Tenure           : %d Months\n"
-                + "• Interest Rate    : %.2f%% p.a.\n"
-                + "• Monthly EMI      : %s/month\n"
-                + "• Remarks          : %s\n\n"
-                + "Next Step: Please log into the customer portal to digitally review and sign your sanction letter for instant disbursement.\n\n"
-                + "Congratulations on your loan approval!\n\n"
-                + "Best Regards,\n"
-                + "Digital Lending Credit & Disbursal Team",
-                name, dto.getLoanType(), appId, formatCurrency(dto.getAmount()),
+                        + "We are pleased to inform you that your %s loan application "
+                        + "(%s) has been successfully approved.\n\n"
+                        + "Approved Loan Details\n"
+                        + "---------------------\n"
+                        + "Application ID : %s\n"
+                        + "Approved Amount: %s\n"
+                        + "Tenure         : %d Months\n"
+                        + "Interest Rate  : %.2f%% p.a.\n"
+                        + "Monthly EMI    : %s\n"
+                        + "Remarks        : %s\n\n"
+                        + "Next Steps\n"
+                        + "----------\n"
+                        + "Please log in to the Digital Banking portal to review and "
+                        + "digitally sign your sanction letter. Once the required "
+                        + "documentation and acceptance are completed, your loan will "
+                        + "proceed towards disbursement.\n\n"
+                        + "We appreciate your trust in Digital Lending and look forward "
+                        + "to serving you.\n\n"
+                        + "Congratulations once again on your loan approval.\n\n"
+                        + "Kind regards,\n"
+                        + "Digital Lending Credit & Disbursal Team",
+                name, dto.getLoanType(), appId, appId, formatCurrency(dto.getAmount()),
                 dto.getTenureMonths(), dto.getInterestRate(), formatCurrency(dto.getCalculatedEMI()),
-                dto.getDecisionRemarks() != null ? dto.getDecisionRemarks() : "Approved based on credit criteria."
+                remarks
         );
 
         dispatchEmail(new EmailDto(dto.getCustomerEmail(), subject, body), context);
@@ -201,20 +250,34 @@ public class NotificationService {
         String name = dto.getCustomerName();
         String appId = dto.getApplicationId();
 
-        String subject = String.format("Status Update regarding your Loan Application %s", appId);
+        String subject = String.format("Loan Application Status Update - %s", appId);
+
+        String remarks = dto.getDecisionRemarks() != null
+                ? dto.getDecisionRemarks()
+                : "Your application does not meet the current lending guidelines.";
+
         String body = String.format(
                 "Dear %s,\n\n"
-                + "Thank you for your interest in Digital Lending.\n\n"
-                + "After careful evaluation of your application (%s) for %s against our credit and risk underwriting criteria, "
-                + "we regret to inform you that we cannot approve your loan application at this time.\n\n"
-                + "── Decision Details ──\n"
-                + "• Status  : REJECTED\n"
-                + "• Remarks : %s\n\n"
-                + "You may re-apply after 90 days or contact customer support for further inquiries.\n\n"
-                + "Best Regards,\n"
-                + "Digital Lending Underwriting Team",
-                name, appId, formatCurrency(dto.getAmount()),
-                dto.getDecisionRemarks() != null ? dto.getDecisionRemarks() : "Does not meet current lending guidelines."
+                        + "Thank you for your interest in Digital Lending.\n\n"
+                        + "Following a careful assessment of your loan application, "
+                        + "we regret to inform you that your application could not "
+                        + "be approved at this time.\n\n"
+                        + "Application Details\n"
+                        + "-------------------\n"
+                        + "Application ID     : %s\n"
+                        + "Loan Type          : %s\n"
+                        + "Requested Amount   : %s\n"
+                        + "Application Status : Not Approved\n"
+                        + "Remarks            : %s\n\n"
+                        + "This decision has been made following an assessment against "
+                        + "our applicable lending and risk criteria.\n\n"
+                        + "If applicable, you may submit a new application after the "
+                        + "relevant waiting period. If you require further information "
+                        + "or assistance, please contact our Customer Support team.\n\n"
+                        + "We appreciate your understanding.\n\n"
+                        + "Kind regards,\n"
+                        + "Digital Lending Underwriting Team",
+                name, appId, dto.getLoanType(), formatCurrency(dto.getAmount()), remarks
         );
 
         dispatchEmail(new EmailDto(dto.getCustomerEmail(), subject, body), context);
