@@ -3,10 +3,8 @@ import {
   uploadDocument,
   fetchDocumentById,
   fetchDocumentTypes,
-  getDocumentDownloadUrl,
-  fetchDocumentSasUrl,
-  fetchCustomerDocuments,
-  fetchApplicationDocuments
+  fetchDocumentBlobUrl,
+  fetchCustomerDocuments
 } from '../services/api';
 import {
   FolderUp,
@@ -19,12 +17,16 @@ import {
   CheckCircle,
   AlertCircle,
   FileCheck,
-  RefreshCw
+  RefreshCw,
+  Clock,
+  Layers
 } from 'lucide-react';
 
 export default function DocumentsPage() {
   const [tab, setTab] = useState('upload');
   const [docTypesList, setDocTypesList] = useState([]);
+  const [customerDocs, setCustomerDocs] = useState([]);
+  const [loadingCustomerDocs, setLoadingCustomerDocs] = useState(false);
 
   // Upload state
   const [customerId, setCustomerId] = useState('CUST-3');
@@ -37,15 +39,14 @@ export default function DocumentsPage() {
   const [uploadResult, setUploadResult] = useState(null);
   const [uploadError, setUploadError] = useState('');
 
-  // Fetch state
-  const [docId, setDocId] = useState('1');
+  // Fetch / Viewer state
+  const [docId, setDocId] = useState('3');
   const [docResult, setDocResult] = useState(null);
   const [docError, setDocError] = useState('');
   const [docLoading, setDocLoading] = useState(false);
-  const [previewSrc, setPreviewSrc] = useState(null);
-  const [sasUrl, setSasUrl] = useState(null);
+  const [previewBlobUrl, setPreviewBlobUrl] = useState(null);
 
-  // Load document types on mount
+  // Load document types and existing customer documents on mount
   useEffect(() => {
     fetchDocumentTypes().then(types => {
       if (Array.isArray(types) && types.length > 0) {
@@ -53,9 +54,24 @@ export default function DocumentsPage() {
         setDocType(types[0].typeCode || types[0].code || 'IDENTITY_PROOF');
       }
     });
+
+    loadCustomerDocuments('CUST-3');
   }, []);
 
-  // Handle local file selection and create client-side preview
+  const loadCustomerDocuments = async (cust = customerId) => {
+    if (!cust) return;
+    setLoadingCustomerDocs(true);
+    try {
+      const docs = await fetchCustomerDocuments(cust);
+      setCustomerDocs(Array.isArray(docs) ? docs : []);
+    } catch (e) {
+      console.warn('Could not fetch customer documents:', e);
+    } finally {
+      setLoadingCustomerDocs(false);
+    }
+  };
+
+  // Handle local file selection
   const handleFileChange = (e) => {
     const selectedFile = e.target.files?.[0];
     if (!selectedFile) return;
@@ -65,19 +81,16 @@ export default function DocumentsPage() {
       setDocName(selectedFile.name);
     }
 
-    if (selectedFile.type.startsWith('image/')) {
+    try {
       const url = URL.createObjectURL(selectedFile);
       setFilePreviewUrl(url);
-    } else if (selectedFile.type === 'application/pdf') {
-      const url = URL.createObjectURL(selectedFile);
-      setFilePreviewUrl(url);
-    } else {
-      setFilePreviewUrl(null);
+    } catch (err) {
+      console.warn('Preview URL creation failed:', err);
     }
   };
 
   const doUpload = async () => {
-    if (!customerId || !file) {
+    if (!customerId.trim() || !file) {
       setUploadError('Customer ID and file are required.');
       return;
     }
@@ -98,13 +111,15 @@ export default function DocumentsPage() {
       const res = await uploadDocument(fd);
       setUploadResult(res);
 
-      // Auto-populate fetch tab with the newly uploaded document ID
       const createdId = res.documentId || res.id;
       if (createdId) {
         setDocId(String(createdId));
       }
+
+      // Refresh documents list
+      await loadCustomerDocuments(customerId.trim());
     } catch (e) {
-      setUploadError(e.message || 'Failed to upload document to Azure storage.');
+      setUploadError(e.message || 'Failed to upload document to Azure Blob Storage.');
     } finally {
       setUploading(false);
     }
@@ -120,39 +135,28 @@ export default function DocumentsPage() {
     setDocLoading(true);
     setDocError('');
     setDocResult(null);
-    setPreviewSrc(null);
-    setSasUrl(null);
+    setPreviewBlobUrl(null);
 
     try {
       const res = await fetchDocumentById(cleanId);
       if (res && (res.documentId || res.id)) {
         setDocResult(res);
 
-        // Fetch secure SAS URL or fallback to download endpoint for browser streaming
+        // Fetch streaming blob URL for reliable browser rendering
         const effectiveId = res.documentId || res.id;
-        const directDownload = getDocumentDownloadUrl(effectiveId);
-        
-        let targetPreview = res.blobUrl || directDownload;
-        try {
-          const directSas = await fetchDocumentSasUrl(effectiveId);
-          if (directSas) {
-            setSasUrl(directSas);
-            targetPreview = directSas;
-          }
-        } catch (ignored) {}
-
-        setPreviewSrc(targetPreview);
+        const blobUrl = await fetchDocumentBlobUrl(effectiveId, res.contentType);
+        setPreviewBlobUrl(blobUrl);
       } else {
-        setDocError(res.message || `Document '${cleanId}' not found.`);
+        setDocError(res?.message || `Document '${cleanId}' not found.`);
       }
     } catch (e) {
-      setDocError(e.message || 'Error retrieving document from Azure.');
+      setDocError(e.message || `Error retrieving document '${cleanId}'.`);
     } finally {
       setDocLoading(false);
     }
   };
 
-  // Determine file type helper
+  // File type detection helpers
   const isPdf = (doc) => {
     if (!doc) return false;
     const type = (doc.contentType || doc.mimeType || '').toLowerCase();
@@ -168,16 +172,26 @@ export default function DocumentsPage() {
   };
 
   return (
-    <div className="page" style={{ maxWidth: 1200, margin: '0 auto' }}>
+    <div className="page" style={{ maxWidth: 1200, margin: '0 auto', paddingBottom: 40 }}>
+      {/* Page Header */}
       <div className="flex-row" style={{ justifyContent: 'space-between', alignItems: 'center', marginBottom: 20 }}>
         <div>
-          <h2 style={{ fontSize: '1.4rem', fontWeight: 800 }}>Document Management & Azure Storage</h2>
+          <h2 style={{ fontSize: '1.45rem', fontWeight: 800 }}>Document Management & Azure Storage</h2>
           <p style={{ color: 'var(--muted)', fontSize: '0.85rem', marginTop: 4 }}>
             Direct ingestion to Azure Blob Storage with automated verification & in-browser preview.
           </p>
         </div>
+        <button
+          className="btn btn-ghost"
+          style={{ fontSize: '0.8rem', padding: '6px 12px' }}
+          onClick={() => loadCustomerDocuments(customerId)}
+          disabled={loadingCustomerDocs}
+        >
+          <RefreshCw size={14} className={loadingCustomerDocs ? 'spin' : ''} /> Refresh Documents
+        </button>
       </div>
 
+      {/* Tabs */}
       <div className="tabs" style={{ marginBottom: 20 }}>
         <button
           className={`tab-btn${tab === 'upload' ? ' active' : ''}`}
@@ -188,7 +202,10 @@ export default function DocumentsPage() {
         </button>
         <button
           className={`tab-btn${tab === 'fetch' ? ' active' : ''}`}
-          onClick={() => setTab('fetch')}
+          onClick={() => {
+            setTab('fetch');
+            if (docId && !docResult) doFetch(docId);
+          }}
           style={{ display: 'flex', alignItems: 'center', gap: 8 }}
         >
           <Eye size={16} /> Fetch & View Document (In-Browser)
@@ -203,7 +220,7 @@ export default function DocumentsPage() {
           </div>
 
           {uploadError && (
-            <div className="error-box" style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+            <div className="error-box" style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16 }}>
               <AlertCircle size={18} /> {uploadError}
             </div>
           )}
@@ -230,16 +247,18 @@ export default function DocumentsPage() {
                 </div>
               </div>
 
-              <div className="mt-3 flex-row" style={{ gap: 10 }}>
+              <div className="mt-4 flex-row" style={{ gap: 10 }}>
                 <button
                   className="btn btn-primary"
-                  style={{ fontSize: '0.8rem', padding: '6px 14px' }}
+                  style={{ fontSize: '0.82rem', padding: '6px 16px' }}
                   onClick={() => {
+                    const idToFetch = String(uploadResult.documentId || uploadResult.id);
+                    setDocId(idToFetch);
                     setTab('fetch');
-                    doFetch(uploadResult.documentId || uploadResult.id);
+                    doFetch(idToFetch);
                   }}
                 >
-                  <Eye size={14} /> View in Browser Viewer
+                  <Eye size={15} /> View in Browser Viewer
                 </button>
               </div>
             </div>
@@ -251,7 +270,10 @@ export default function DocumentsPage() {
               <input
                 className="form-input"
                 value={customerId}
-                onChange={e => setCustomerId(e.target.value)}
+                onChange={e => {
+                  setCustomerId(e.target.value);
+                  loadCustomerDocuments(e.target.value);
+                }}
                 placeholder="e.g. CUST-3"
               />
             </div>
@@ -392,7 +414,7 @@ export default function DocumentsPage() {
                 className="form-input"
                 value={docId}
                 onChange={e => setDocId(e.target.value)}
-                placeholder="Enter Document ID (e.g. 1, DOC-1, etc.)"
+                placeholder="Enter Document ID (e.g. 1, 2, 3, etc.)"
                 onKeyDown={e => e.key === 'Enter' && doFetch()}
               />
             </div>
@@ -409,23 +431,29 @@ export default function DocumentsPage() {
             </button>
           </div>
 
-          {/* Quick document suggestions for easy testing */}
-          <div className="flex-row" style={{ gap: 8, alignItems: 'center', marginBottom: 24, fontSize: '0.8rem' }}>
-            <span style={{ color: 'var(--muted)' }}>Quick Samples:</span>
-            {['1', '2', 'DOC-09B563D7', 'DOC-CD6A4BE0', 'DOC-974ACFAB'].map(sampleId => (
-              <button
-                key={sampleId}
-                className="btn btn-ghost"
-                style={{ padding: '3px 10px', fontSize: '0.75rem' }}
-                onClick={() => {
-                  setDocId(sampleId);
-                  doFetch(sampleId);
-                }}
-              >
-                ID: {sampleId}
-              </button>
-            ))}
-          </div>
+          {/* Customer Documents Quick List */}
+          {customerDocs.length > 0 && (
+            <div className="mb-6 p-4 card" style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid var(--border)' }}>
+              <div style={{ fontSize: '0.85rem', fontWeight: 600, marginBottom: 10, display: 'flex', alignItems: 'center', gap: 6, color: 'var(--muted)' }}>
+                <Layers size={14} /> Available Documents for {customerId}:
+              </div>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8 }}>
+                {customerDocs.map(doc => (
+                  <button
+                    key={doc.documentId}
+                    className={`btn ${String(docId) === String(doc.documentId) ? 'btn-primary' : 'btn-ghost'}`}
+                    style={{ fontSize: '0.75rem', padding: '4px 10px' }}
+                    onClick={() => {
+                      setDocId(String(doc.documentId));
+                      doFetch(doc.documentId);
+                    }}
+                  >
+                    {isPdf(doc) ? '📄' : '🖼️'} ID: {doc.documentId} — {doc.documentName || doc.originalFileName || doc.documentType}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
 
           {/* Document Metadata Display */}
           {docResult && (
@@ -442,7 +470,7 @@ export default function DocumentsPage() {
                   ['Document Type', docResult.documentType || docResult.docType || '—'],
                   ['File Name', docResult.originalFileName || docResult.fileName || docResult.documentName || '—'],
                   ['Content Type', docResult.contentType || docResult.mimeType || 'application/pdf'],
-                  ['File Size', docResult.fileSizeBytes ? `${docResult.fileSizeBytes} bytes` : '—'],
+                  ['File Size', docResult.fileSizeBytes ? `${(docResult.fileSizeBytes / 1024).toFixed(1)} KB (${docResult.fileSizeBytes} bytes)` : '—'],
                   ['Status', docResult.status || 'UPLOADED'],
                   ['Uploaded At', docResult.createdAt ? new Date(docResult.createdAt).toLocaleString() : '—'],
                 ].map(([label, val]) => (
@@ -474,27 +502,31 @@ export default function DocumentsPage() {
                 </div>
 
                 <div className="flex-row" style={{ gap: 8 }}>
-                  <a
-                    href={getDocumentDownloadUrl(docResult.documentId || docResult.id)}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="btn btn-ghost"
-                    style={{ fontSize: '0.8rem', padding: '6px 12px' }}
-                  >
-                    <ExternalLink size={14} /> Open in New Tab
-                  </a>
-                  <a
-                    href={getDocumentDownloadUrl(docResult.documentId || docResult.id)}
-                    download={docResult.originalFileName || docResult.fileName || 'document.pdf'}
-                    className="btn btn-primary"
-                    style={{ fontSize: '0.8rem', padding: '6px 12px' }}
-                  >
-                    <Download size={14} /> Download
-                  </a>
+                  {previewBlobUrl && (
+                    <>
+                      <a
+                        href={previewBlobUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="btn btn-ghost"
+                        style={{ fontSize: '0.8rem', padding: '6px 12px' }}
+                      >
+                        <ExternalLink size={14} /> Open in New Tab
+                      </a>
+                      <a
+                        href={previewBlobUrl}
+                        download={docResult.originalFileName || docResult.fileName || 'document.pdf'}
+                        className="btn btn-primary"
+                        style={{ fontSize: '0.8rem', padding: '6px 12px' }}
+                      >
+                        <Download size={14} /> Download
+                      </a>
+                    </>
+                  )}
                 </div>
               </div>
 
-              {/* IN-BROWSER VIEWER FOR PDF OR IMAGE */}
+              {/* IN-BROWSER VIEWER FOR PDF OR IMAGE ON SAME PAGE */}
               <div
                 className="document-browser-frame card"
                 style={{
@@ -505,47 +537,54 @@ export default function DocumentsPage() {
                   overflow: 'hidden'
                 }}
               >
-                {isPdf(docResult) ? (
-                  <div style={{ width: '100%' }}>
-                    <iframe
-                      src={getDocumentDownloadUrl(docResult.documentId || docResult.id)}
-                      title={`PDF Preview: ${docResult.documentId}`}
-                      style={{
-                        width: '100%',
-                        height: '650px',
-                        borderRadius: 6,
-                        border: '1px solid var(--border)',
-                        background: '#ffffff'
-                      }}
-                    />
-                  </div>
-                ) : isImage(docResult) ? (
-                  <div style={{ textAlign: 'center', padding: '20px 0' }}>
-                    <img
-                      src={getDocumentDownloadUrl(docResult.documentId || docResult.id)}
-                      alt={docResult.originalFileName || 'Document Image'}
-                      style={{
-                        maxWidth: '100%',
-                        maxHeight: '650px',
-                        objectFit: 'contain',
-                        borderRadius: 8,
-                        boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
-                        border: '1px solid var(--border)'
-                      }}
-                    />
-                  </div>
+                {previewBlobUrl ? (
+                  isPdf(docResult) ? (
+                    <div style={{ width: '100%' }}>
+                      <iframe
+                        src={previewBlobUrl}
+                        title={`PDF Preview: ${docResult.documentId}`}
+                        style={{
+                          width: '100%',
+                          height: '650px',
+                          borderRadius: 6,
+                          border: '1px solid var(--border)',
+                          background: '#ffffff'
+                        }}
+                      />
+                    </div>
+                  ) : isImage(docResult) ? (
+                    <div style={{ textAlign: 'center', padding: '20px 0' }}>
+                      <img
+                        src={previewBlobUrl}
+                        alt={docResult.originalFileName || 'Document Image'}
+                        style={{
+                          maxWidth: '100%',
+                          maxHeight: '650px',
+                          objectFit: 'contain',
+                          borderRadius: 8,
+                          boxShadow: '0 8px 24px rgba(0,0,0,0.5)',
+                          border: '1px solid var(--border)'
+                        }}
+                      />
+                    </div>
+                  ) : (
+                    <div style={{ width: '100%' }}>
+                      <iframe
+                        src={previewBlobUrl}
+                        title={`Document View: ${docResult.documentId}`}
+                        style={{
+                          width: '100%',
+                          height: '550px',
+                          borderRadius: 6,
+                          border: 'none'
+                        }}
+                      />
+                    </div>
+                  )
                 ) : (
-                  <div style={{ width: '100%' }}>
-                    <iframe
-                      src={getDocumentDownloadUrl(docResult.documentId || docResult.id)}
-                      title={`Document View: ${docResult.documentId}`}
-                      style={{
-                        width: '100%',
-                        height: '550px',
-                        borderRadius: 6,
-                        border: 'none'
-                      }}
-                    />
+                  <div style={{ textAlign: 'center', padding: '40px 0', color: 'var(--muted)' }}>
+                    <RefreshCw size={24} className="spin" style={{ margin: '0 auto 12px' }} />
+                    <div>Loading document into browser preview…</div>
                   </div>
                 )}
               </div>

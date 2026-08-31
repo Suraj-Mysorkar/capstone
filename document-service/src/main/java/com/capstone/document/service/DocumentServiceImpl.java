@@ -157,7 +157,7 @@ public class DocumentServiceImpl implements DocumentService {
 
         return ResponseEntity.ok()
                 .contentType(mediaType)
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + latestVersion.getFileName() + "\"")
+                .header(HttpHeaders.CONTENT_DISPOSITION, "inline; filename=\"" + latestVersion.getFileName() + "\"")
                 .body(resource);
     }
 
