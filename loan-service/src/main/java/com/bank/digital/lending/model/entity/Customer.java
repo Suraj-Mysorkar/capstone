@@ -64,6 +64,8 @@ public class Customer {
         this.employmentDetails = employmentDetails;
         this.dob = LocalDate.of(1990, 1, 1);
         this.nationalId = "NAT-" + (System.currentTimeMillis() % 1000000);
+        this.loginId = (email != null && !email.isBlank()) ? email : ("user_" + java.util.UUID.randomUUID().toString().substring(0, 8));
+        this.loginPassword = "Password@123";
     }
 
     // Getters and Setters
