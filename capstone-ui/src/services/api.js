@@ -231,3 +231,23 @@ export const notifyDocumentUploaded = (id, body) =>
     if (!r.ok) throw new Error(`Document notification failed (${r.status})`);
     return r.json();
   });
+
+// ── Employee Authentication (Azure API Management) ───────────────────
+export const employeeLogin = async (username, password) => {
+  const APIM_LOGIN_URL = 'https://team6-api-management.azure-api.net/auth/internal/login';
+  const res = await fetch(APIM_LOGIN_URL, {
+    method: 'POST',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({ username, password }),
+  });
+
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) {
+    const errorMsg = data.error || data.message || `Login failed with status ${res.status}`;
+    throw new Error(errorMsg);
+  }
+  return data;
+};
+

@@ -9,26 +9,32 @@ import DocumentsPage        from './pages/DocumentsPage';
 import ApplyPage            from './pages/ApplyPage';
 import ApplicationsPage     from './pages/ApplicationsPage';
 import ApplicationDetailPage from './pages/ApplicationDetailPage';
+import EmployeeLoginPage    from './pages/EmployeeLoginPage';
+import { AuthProvider }     from './context/AuthContext';
 import './index.css';
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <div className="layout">
-        <Sidebar />
-        <div className="main">
-          <Header />
-          <Routes>
-            <Route path="/"                         element={<Dashboard />} />
-            <Route path="/schemes"                  element={<SchemesPage />} />
-            <Route path="/emi"                      element={<EmiPage />} />
-            <Route path="/documents"                element={<DocumentsPage />} />
-            <Route path="/apply"                    element={<ApplyPage />} />
-            <Route path="/applications"             element={<ApplicationsPage />} />
-            <Route path="/applications/:id"         element={<ApplicationDetailPage />} />
-          </Routes>
+    <AuthProvider>
+      <BrowserRouter>
+        <div className="layout">
+          <Sidebar />
+          <div className="main">
+            <Header />
+            <Routes>
+              <Route path="/"                         element={<Dashboard />} />
+              <Route path="/schemes"                  element={<SchemesPage />} />
+              <Route path="/emi"                      element={<EmiPage />} />
+              <Route path="/documents"                element={<DocumentsPage />} />
+              <Route path="/apply"                    element={<ApplyPage />} />
+              <Route path="/applications"             element={<ApplicationsPage />} />
+              <Route path="/applications/:id"         element={<ApplicationDetailPage />} />
+              <Route path="/login"                    element={<EmployeeLoginPage />} />
+              <Route path="/employee-login"           element={<EmployeeLoginPage />} />
+            </Routes>
+          </div>
         </div>
-      </div>
-    </BrowserRouter>
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
