@@ -72,20 +72,53 @@ public class NotificationService {
 
         String subject = "Welcome to Digital Banking - Registration Successful";
         String body = String.format(
-                "Dear %s,\n\n"
-                        + "Welcome to Digital Banking.\n\n"
-                        + "We are pleased to confirm that your customer account has been "
-                        + "successfully registered.\n\n"
-                        + "Account Details\n"
-                        + "----------------\n"
-                        + "Account Status : %s\n\n"
-                        + "You can now securely access the Digital Banking portal to apply "
-                        + "for loans, track your applications, and upload the required documents.\n\n"
-                        + "If you have any questions or require assistance, please contact "
-                        + "our Customer Support team.\n\n"
-                        + "Kind regards,\n"
-                        + "Digital Banking Customer Experience Team",
-                name, status
+                "<html>"
+                        + "<body style=\"font-family: Arial, sans-serif; "
+                        + "font-size: 14px; color: #333333; line-height: 1.6;\">"
+
+                        + "<p>Dear %s,</p>"
+
+                        + "<p>Welcome to Digital Banking.</p>"
+
+                        + "<p>"
+                        + "We are pleased to confirm that your customer account "
+                        + "has been successfully registered."
+                        + "</p>"
+
+                        + "<h3>Account Details</h3>"
+
+                        + "<table style=\"border-collapse: collapse; width: 100%%; "
+                        + "max-width: 600px;\">"
+
+                        + "<tr>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                        + "font-weight: bold;\">Account Status</td>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">%s</td>"
+                        + "</tr>"
+
+                        + "</table>"
+
+                        + "<p>"
+                        + "You can now securely access the Digital Banking portal "
+                        + "to apply for loans, track your applications, and upload "
+                        + "the required documents."
+                        + "</p>"
+
+                        + "<p>"
+                        + "If you have any questions or require assistance, "
+                        + "please contact our Customer Support team."
+                        + "</p>"
+
+                        + "<p>"
+                        + "Kind regards,<br>"
+                        + "<strong>Digital Banking Customer Experience Team</strong>"
+                        + "</p>"
+
+                        + "</body>"
+                        + "</html>",
+                        
+                escapeHtml(name),
+                escapeHtml(status)
         );
 
         dispatchEmail(new EmailDto(customerRegEvent.getEmail(), subject, body), context);
@@ -97,31 +130,96 @@ public class NotificationService {
     public void sendLoanApplicationReceivedNotification(LoanStatusNotificationDTO dto, ExecutionContext context) {
         String name = dto.getCustomerName();
         String appId = dto.getApplicationId();
+
+        String loanType = dto.getLoanType();
         String amountFormatted = formatCurrency(dto.getAmount());
+        String emiFormatted = formatCurrency(dto.getCalculatedEMI());
 
         String subject = String.format("Loan Application Received - %s", appId);
         String body = String.format(
-                "Dear %s,\n\n"
-                        + "Thank you for submitting your %s application through Digital Lending.\n\n"
-                        + "We are pleased to confirm that your application has been "
-                        + "successfully received and is currently being processed.\n\n"
-                        + "Application Details\n"
-                        + "-------------------\n"
-                        + "Application ID        : %s\n"
-                        + "Loan Type             : %s\n"
-                        + "Requested Amount      : %s\n"
-                        + "Tenure                : %d Months\n"
-                        + "Estimated Monthly EMI : %s\n"
-                        + "Application Status    : %s\n\n"
-                        + "Your application has now entered our automated validation and "
-                        + "credit assessment process. We will notify you by email when "
-                        + "there is an update regarding your application.\n\n"
-                        + "No further action is required from you at this stage.\n\n"
-                        + "Thank you for choosing Digital Lending.\n\n"
-                        + "Kind regards,\n"
-                        + "Digital Lending Origination Team",
-                name, dto.getLoanType(), appId, amountFormatted, dto.getTenureMonths(),
-                formatCurrency(dto.getCalculatedEMI()), dto.getStatus()
+                "<html>"
+                        + "<body style=\"font-family: Arial, sans-serif; "
+                        + "font-size: 14px; color: #333333; line-height: 1.6;\">"
+
+                        + "<p>Dear %s,</p>"
+
+                        + "<p>"
+                        + "Thank you for submitting your <strong>%s</strong> "
+                        + "application through Digital Lending."
+                        + "</p>"
+
+                        + "<p>"
+                        + "We are pleased to confirm that your application has "
+                        + "been successfully received and is currently being processed."
+                        + "</p>"
+
+                        + "<h3>Application Details</h3>"
+
+                        + "<table style=\"border-collapse: collapse; width: 100%%; "
+                        + "max-width: 650px;\">"
+
+                        + "<tr>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                        + "font-weight: bold;\">Application ID</td>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">%s</td>"
+                        + "</tr>"
+
+                        + "<tr>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                        + "font-weight: bold;\">Loan Type</td>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">%s</td>"
+                        + "</tr>"
+
+                        + "<tr>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                        + "font-weight: bold;\">Requested Amount</td>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">%s</td>"
+                        + "</tr>"
+
+                        + "<tr>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                        + "font-weight: bold;\">Tenure</td>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">%d Months</td>"
+                        + "</tr>"
+
+                        + "<tr>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                        + "font-weight: bold;\">Estimated Monthly EMI</td>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">%s</td>"
+                        + "</tr>"
+
+                        + "<tr>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                        + "font-weight: bold;\">Application Status</td>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">%s</td>"
+                        + "</tr>"
+
+                        + "</table>"
+
+                        + "<p>"
+                        + "Your application has now entered our automated validation "
+                        + "and credit assessment process. We will notify you by email "
+                        + "when there is an update regarding your application."
+                        + "</p>"
+
+                        + "<p>"
+                        + "No further action is required from you at this stage."
+                        + "</p>"
+
+                        + "<p>"
+                        + "Thank you for choosing Digital Lending."
+                        + "</p>"
+
+                        + "<p>"
+                        + "Kind regards,<br>"
+                        + "<strong>Digital Lending Origination Team</strong>"
+                        + "</p>"
+
+                        + "</body>"
+                        + "</html>",
+
+                escapeHtml(name), escapeHtml(loanType), escapeHtml(appId), escapeHtml(loanType), amountFormatted,
+                dto.getTenureMonths(), emiFormatted, escapeHtml(dto.getStatus())
         );
 
         dispatchEmail(new EmailDto(dto.getCustomerEmail(), subject, body), context);
@@ -137,25 +235,76 @@ public class NotificationService {
 
         String subject = String.format("Documents Received for Loan Application %s", appId);
         String body = String.format(
-                "Dear %s,\n\n"
-                        + "We confirm that your %s document has been successfully "
-                        + "received for your loan application.\n\n"
-                        + "Document Details\n"
-                        + "-----------------\n"
-                        + "Application ID : %s\n"
-                        + "Document ID    : %s\n"
-                        + "Document Type  : %s\n"
-                        + "Document Status: Received - Under Verification\n\n"
-                        + "Your submitted document is currently being reviewed by our "
-                        + "document verification process. Your loan application will "
-                        + "proceed to the next stage once the required documents have "
-                        + "been successfully verified.\n\n"
+                "<html>"
+                        + "<body style=\"font-family: Arial, sans-serif; "
+                        + "font-size: 14px; color: #333333; line-height: 1.6;\">"
+
+                        + "<p>Dear %s,</p>"
+
+                        + "<p>"
+                        + "We confirm that your <strong>%s</strong> document has "
+                        + "been successfully received for your loan application."
+                        + "</p>"
+
+                        + "<h3>Document Details</h3>"
+
+                        + "<table style=\"border-collapse: collapse; width: 100%%; "
+                        + "max-width: 650px;\">"
+
+                        + "<tr>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                        + "font-weight: bold;\">Application ID</td>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">%s</td>"
+                        + "</tr>"
+
+                        + "<tr>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                        + "font-weight: bold;\">Document ID</td>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">%s</td>"
+                        + "</tr>"
+
+                        + "<tr>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                        + "font-weight: bold;\">Document Type</td>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">%s</td>"
+                        + "</tr>"
+
+                        + "<tr>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                        + "font-weight: bold;\">Document Status</td>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">"
+                        + "Received - Under Verification"
+                        + "</td>"
+                        + "</tr>"
+
+                        + "</table>"
+
+                        + "<p>"
+                        + "Your submitted document is currently being reviewed by "
+                        + "our document verification process. Your loan application "
+                        + "will proceed to the next stage once the required documents "
+                        + "have been successfully verified."
+                        + "</p>"
+
+                        + "<p>"
                         + "No further action is required from you at this stage unless "
-                        + "additional information or documentation is requested.\n\n"
-                        + "Thank you for your cooperation.\n\n"
-                        + "Kind regards,\n"
-                        + "Digital Lending Verification Team",
-                name, docType, appId, dto.getDocumentId(), docType
+                        + "additional information or documentation is requested."
+                        + "</p>"
+
+                        + "<p>"
+                        + "Thank you for your cooperation."
+                        + "</p>"
+
+                        + "<p>"
+                        + "Kind regards,<br>"
+                        + "<strong>Digital Lending Verification Team</strong>"
+                        + "</p>"
+
+                        + "</body>"
+                        + "</html>",
+
+                escapeHtml(name), escapeHtml(docType), escapeHtml(appId), escapeHtml(dto.getDocumentId()),
+                escapeHtml(docType)
         );
 
         dispatchEmail(new EmailDto(dto.getCustomerEmail(), subject, body), context);
@@ -173,22 +322,88 @@ public class NotificationService {
 
         String subject = String.format("✅ Document Verified - %s (%s)", docName, appId);
         String body = String.format(
-                "Dear %s,\n\n"
-                        + "We are pleased to inform you that your %s document has been "
-                        + "successfully reviewed and verified by our Operations Underwriting team.\n\n"
-                        + "Review Details\n"
-                        + "--------------\n"
-                        + "Application ID     : %s\n"
-                        + "Document ID        : %s\n"
-                        + "Document Name      : %s\n"
-                        + "Verification Status: VERIFIED / APPROVED\n"
-                        + "Verified By        : %s\n"
-                        + "Manager Remarks    : %s\n\n"
-                        + "Your application has moved forward to the next stage of credit processing.\n\n"
-                        + "Thank you for banking with Digital Lending.\n\n"
-                        + "Kind regards,\n"
-                        + "Digital Lending Operations & Underwriting Team",
-                name, docName, appId, dto.getDocumentId(), docName, verifiedBy, remarks
+                "<html>"
+                    + "<body style=\"font-family: Arial, sans-serif; "
+                    + "font-size: 14px; color: #333333; line-height: 1.6;\">"
+
+                    + "<p>Dear %s,</p>"
+
+                    + "<p>"
+                    + "We are pleased to inform you that your "
+                    + "<strong>%s</strong> document has been successfully "
+                    + "reviewed and verified by our Operations Underwriting team."
+                    + "</p>"
+
+                    + "<h3>Review Details</h3>"
+
+                    + "<table style=\"border-collapse: collapse; width: 100%%; "
+                    + "max-width: 650px;\">"
+
+                    + "<tr>"
+                    + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                    + "font-weight: bold;\">Application ID</td>"
+                    + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">%s</td>"
+                    + "</tr>"
+
+                    + "<tr>"
+                    + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                    + "font-weight: bold;\">Document ID</td>"
+                    + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">%s</td>"
+                    + "</tr>"
+
+                    + "<tr>"
+                    + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                    + "font-weight: bold;\">Document Name</td>"
+                    + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">%s</td>"
+                    + "</tr>"
+
+                    + "<tr>"
+                    + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                    + "font-weight: bold;\">Verification Status</td>"
+                    + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">"
+                    + "VERIFIED / APPROVED"
+                    + "</td>"
+                    + "</tr>"
+
+                    + "<tr>"
+                    + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                    + "font-weight: bold;\">Verified By</td>"
+                    + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">%s</td>"
+                    + "</tr>"
+
+                    + "<tr>"
+                    + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                    + "font-weight: bold;\">Manager Remarks</td>"
+                    + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">%s</td>"
+                    + "</tr>"
+
+                    + "</table>"
+
+                    + "<p>"
+                    + "Your application has moved forward to the next stage "
+                    + "of credit processing."
+                    + "</p>"
+
+                    + "<p>"
+                    + "Thank you for banking with Digital Lending."
+                    + "</p>"
+
+                    + "<p>"
+                    + "Kind regards,<br>"
+                    + "<strong>Digital Lending Operations &amp; "
+                    + "Underwriting Team</strong>"
+                    + "</p>"
+
+                    + "</body>"
+                    + "</html>",
+
+            escapeHtml(name),
+            escapeHtml(docName),
+            escapeHtml(appId),
+            escapeHtml(dto.getDocumentId()),
+            escapeHtml(docName),
+            escapeHtml(verifiedBy),
+            escapeHtml(remarks)
         );
 
         dispatchEmail(new EmailDto(dto.getCustomerEmail(), subject, body), context);
@@ -208,23 +423,108 @@ public class NotificationService {
 
         String subject = String.format("⚠️ Action Required: Document Review Update - %s", appId);
         String body = String.format(
-                "Dear %s,\n\n"
-                        + "Our Operations Underwriting team has completed the review of your submitted "
-                        + "document '%s' for Application %s and requires your attention.\n\n"
-                        + "Manager Feedback & Required Actions:\n"
-                        + "-------------------------------------\n"
-                        + "Review Status   : ACTION REQUIRED / REVISION NEEDED\n"
-                        + "Reviewed By     : %s\n"
-                        + "Manager Notes   : %s\n\n"
-                        + "Next Steps to Resume Application Processing:\n"
-                        + "1. Please log in to the Digital Banking portal (https://lively-grass-0d6cbb800.7.azurestaticapps.net/#/documents) "
-                        + "to upload the updated or requested documents.\n"
-                        + "2. Alternatively, you may reply directly to this email with the requested documents attached, "
-                        + "and our Operations Manager will upload them on your behalf.\n\n"
-                        + "If you have any questions, please contact our Customer Experience team.\n\n"
-                        + "Kind regards,\n"
-                        + "Digital Lending Operations & Underwriting Team",
-                name, docName, appId, verifiedBy, remarks
+                "<html>"
+                    + "<body style=\"font-family: Arial, sans-serif; "
+                    + "font-size: 14px; color: #333333; line-height: 1.6;\">"
+
+                    + "<p>Dear %s,</p>"
+
+                    + "<p>"
+                    + "Our Operations Underwriting team has completed the review "
+                    + "of your submitted <strong>%s</strong> document for "
+                    + "Application <strong>%s</strong>."
+                    + "</p>"
+
+                    + "<p>"
+                    + "Additional information or an updated document is required "
+                    + "before your application can proceed to the next stage."
+                    + "</p>"
+
+                    + "<h3>Review Details</h3>"
+
+                    + "<table style=\"border-collapse: collapse; width: 100%%; "
+                    + "max-width: 650px;\">"
+
+                    + "<tr>"
+                    + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                    + "font-weight: bold;\">Application ID</td>"
+                    + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">%s</td>"
+                    + "</tr>"
+
+                    + "<tr>"
+                    + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                    + "font-weight: bold;\">Document ID</td>"
+                    + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">%s</td>"
+                    + "</tr>"
+
+                    + "<tr>"
+                    + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                    + "font-weight: bold;\">Document Name</td>"
+                    + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">%s</td>"
+                    + "</tr>"
+
+                    + "<tr>"
+                    + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                    + "font-weight: bold;\">Review Status</td>"
+                    + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">"
+                    + "ACTION REQUIRED / REVISION NEEDED"
+                    + "</td>"
+                    + "</tr>"
+
+                    + "<tr>"
+                    + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                    + "font-weight: bold;\">Reviewed By</td>"
+                    + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">%s</td>"
+                    + "</tr>"
+
+                    + "<tr>"
+                    + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                    + "font-weight: bold;\">Manager Remarks</td>"
+                    + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">%s</td>"
+                    + "</tr>"
+
+                    + "</table>"
+
+                    + "<h3>Next Steps</h3>"
+
+                    + "<ol>"
+                    + "<li>"
+                    + "Please log in to the Digital Banking portal to upload "
+                    + "the updated or requested documents."
+                    + "</li>"
+                    + "<li>"
+                    + "Alternatively, you may contact our Customer Experience "
+                    + "team for assistance with submitting the requested documents."
+                    + "</li>"
+                    + "</ol>"
+
+                    + "<p>"
+                    + "Your application will proceed once the required documents "
+                    + "have been received and successfully verified."
+                    + "</p>"
+
+                    + "<p>"
+                    + "If you have any questions, please contact our "
+                    + "Customer Experience team."
+                    + "</p>"
+
+                    + "<p>"
+                    + "Kind regards,<br>"
+                    + "<strong>Digital Lending Operations &amp; "
+                    + "Underwriting Team</strong>"
+                    + "</p>"
+
+                    + "</body>"
+                    + "</html>",
+
+            escapeHtml(name),
+            escapeHtml(docName),
+            escapeHtml(appId),
+            escapeHtml(appId),
+            escapeHtml(dto.getDocumentId()),
+            escapeHtml(docName),
+            escapeHtml(verifiedBy),
+            escapeHtml(remarks)
         );
 
         dispatchEmail(new EmailDto(dto.getCustomerEmail(), subject, body), context);
@@ -244,25 +544,81 @@ public class NotificationService {
                 : "Your application requires additional review before a final decision can be made.";
 
         String body = String.format(
-                "Dear %s,\n\n"
+                "<html>"
+                        + "<body style=\"font-family: Arial, sans-serif; "
+                        + "font-size: 14px; color: #333333; line-height: 1.6;\">"
+
+                        + "<p>Dear %s,</p>"
+
+                        + "<p>"
                         + "We are writing to inform you that your loan application "
-                        + "is currently undergoing a further review by our underwriting team.\n\n"
-                        + "Application Details\n"
-                        + "-------------------\n"
-                        + "Application ID    : %s\n"
-                        + "Loan Type         : %s\n"
-                        + "Requested Amount  : %s\n"
-                        + "Application Status: Manual Review Required\n"
-                        + "Review Remarks    : %s\n\n"
+                        + "is currently undergoing a further review by our underwriting team."
+                        + "</p>"
+
+                        + "<h3>Application Details</h3>"
+
+                        + "<table style=\"border-collapse: collapse; width: 100%%; "
+                        + "max-width: 650px;\">"
+
+                        + "<tr>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                        + "font-weight: bold;\">Application ID</td>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">%s</td>"
+                        + "</tr>"
+
+                        + "<tr>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                        + "font-weight: bold;\">Loan Type</td>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">%s</td>"
+                        + "</tr>"
+
+                        + "<tr>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                        + "font-weight: bold;\">Requested Amount</td>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">%s</td>"
+                        + "</tr>"
+
+                        + "<tr>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                        + "font-weight: bold;\">Application Status</td>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">"
+                        + "Manual Review Required"
+                        + "</td>"
+                        + "</tr>"
+
+                        + "<tr>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                        + "font-weight: bold;\">Review Remarks</td>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">%s</td>"
+                        + "</tr>"
+
+                        + "</table>"
+
+                        + "<p>"
                         + "As part of our standard lending process, your application "
-                        + "requires additional review before a final decision can be made.\n\n"
-                        + "No further action is required from you at this stage. "
-                        + "Our underwriting team will complete the review and notify "
-                        + "you once a decision has been reached.\n\n"
-                        + "We appreciate your patience and understanding.\n\n"
-                        + "Kind regards,\n"
-                        + "Digital Lending Underwriting Team",
-                name, appId, dto.getLoanType(), formatCurrency(dto.getAmount()), remarks
+                        + "requires additional review before a final decision can be made."
+                        + "</p>"
+
+                        + "<p>"
+                        + "<strong>No further action is required from you at this stage.</strong> "
+                        + "Our underwriting team will complete the review and notify you "
+                        + "once a decision has been reached."
+                        + "</p>"
+
+                        + "<p>"
+                        + "We appreciate your patience and understanding."
+                        + "</p>"
+
+                        + "<p>"
+                        + "Kind regards,<br>"
+                        + "<strong>Digital Lending Underwriting Team</strong>"
+                        + "</p>"
+
+                        + "</body>"
+                        + "</html>",
+
+                escapeHtml(name), escapeHtml(appId), escapeHtml(dto.getLoanType()),
+                formatCurrency(dto.getAmount()), escapeHtml(remarks)
         );
 
         dispatchEmail(new EmailDto(dto.getCustomerEmail(), subject, body), context);
@@ -282,31 +638,95 @@ public class NotificationService {
                 : "Your application has been approved based on the applicable lending criteria.";
 
         String body = String.format(
-                "Dear %s,\n\n"
-                        + "We are pleased to inform you that your %s loan application "
-                        + "(%s) has been successfully approved.\n\n"
-                        + "Approved Loan Details\n"
-                        + "---------------------\n"
-                        + "Application ID : %s\n"
-                        + "Approved Amount: %s\n"
-                        + "Tenure         : %d Months\n"
-                        + "Interest Rate  : %.2f%% p.a.\n"
-                        + "Monthly EMI    : %s\n"
-                        + "Remarks        : %s\n\n"
-                        + "Next Steps\n"
-                        + "----------\n"
+                "<html>"
+                        + "<body style=\"font-family: Arial, sans-serif; "
+                        + "font-size: 14px; color: #333333; line-height: 1.6;\">"
+
+                        + "<p>Dear %s,</p>"
+
+                        + "<p>"
+                        + "We are pleased to inform you that your <strong>%s</strong> "
+                        + "loan application (%s) has been successfully approved."
+                        + "</p>"
+
+                        + "<h3>Approved Loan Details</h3>"
+
+                        + "<table style=\"border-collapse: collapse; width: 100%%; "
+                        + "max-width: 650px;\">"
+
+                        + "<tr>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                        + "font-weight: bold;\">Application ID</td>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">%s</td>"
+                        + "</tr>"
+
+                        + "<tr>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                        + "font-weight: bold;\">Approved Amount</td>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">%s</td>"
+                        + "</tr>"
+
+                        + "<tr>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                        + "font-weight: bold;\">Tenure</td>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">%d Months</td>"
+                        + "</tr>"
+
+                        + "<tr>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                        + "font-weight: bold;\">Interest Rate</td>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">%.2f%% p.a.</td>"
+                        + "</tr>"
+
+                        + "<tr>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                        + "font-weight: bold;\">Monthly EMI</td>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">%s</td>"
+                        + "</tr>"
+
+                        + "<tr>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                        + "font-weight: bold;\">Remarks</td>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">%s</td>"
+                        + "</tr>"
+
+                        + "</table>"
+
+                        + "<h3>Next Steps</h3>"
+
+                        + "<p>"
                         + "Please log in to the Digital Banking portal to review and "
                         + "digitally sign your sanction letter. Once the required "
                         + "documentation and acceptance are completed, your loan will "
-                        + "proceed towards disbursement.\n\n"
+                        + "proceed towards disbursement."
+                        + "</p>"
+
+                        + "<p>"
                         + "We appreciate your trust in Digital Lending and look forward "
-                        + "to serving you.\n\n"
-                        + "Congratulations once again on your loan approval.\n\n"
-                        + "Kind regards,\n"
-                        + "Digital Lending Credit & Disbursal Team",
-                name, dto.getLoanType(), appId, appId, formatCurrency(dto.getAmount()),
-                dto.getTenureMonths(), dto.getInterestRate(), formatCurrency(dto.getCalculatedEMI()),
-                remarks
+                        + "to serving you."
+                        + "</p>"
+
+                        + "<p>"
+                        + "Congratulations once again on your loan approval."
+                        + "</p>"
+
+                        + "<p>"
+                        + "Kind regards,<br>"
+                        + "<strong>Digital Lending Credit &amp; Disbursal Team</strong>"
+                        + "</p>"
+
+                        + "</body>"
+                        + "</html>",
+
+                escapeHtml(name),
+                escapeHtml(dto.getLoanType()),
+                escapeHtml(appId),
+                escapeHtml(appId),
+                formatCurrency(dto.getAmount()),
+                dto.getTenureMonths(),
+                dto.getInterestRate(),
+                formatCurrency(dto.getCalculatedEMI()),
+                escapeHtml(remarks)
         );
 
         dispatchEmail(new EmailDto(dto.getCustomerEmail(), subject, body), context);
@@ -326,27 +746,89 @@ public class NotificationService {
                 : "Your application does not meet the current lending guidelines.";
 
         String body = String.format(
-                "Dear %s,\n\n"
-                        + "Thank you for your interest in Digital Lending.\n\n"
+                "<html>"
+                        + "<body style=\"font-family: Arial, sans-serif; "
+                        + "font-size: 14px; color: #333333; line-height: 1.6;\">"
+
+                        + "<p>Dear %s,</p>"
+
+                        + "<p>"
+                        + "Thank you for your interest in Digital Lending."
+                        + "</p>"
+
+                        + "<p>"
                         + "Following a careful assessment of your loan application, "
                         + "we regret to inform you that your application could not "
-                        + "be approved at this time.\n\n"
-                        + "Application Details\n"
-                        + "-------------------\n"
-                        + "Application ID     : %s\n"
-                        + "Loan Type          : %s\n"
-                        + "Requested Amount   : %s\n"
-                        + "Application Status : Not Approved\n"
-                        + "Remarks            : %s\n\n"
+                        + "be approved at this time."
+                        + "</p>"
+
+                        + "<h3>Application Details</h3>"
+
+                        + "<table style=\"border-collapse: collapse; width: 100%%; "
+                        + "max-width: 650px;\">"
+
+                        + "<tr>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                        + "font-weight: bold;\">Application ID</td>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">%s</td>"
+                        + "</tr>"
+
+                        + "<tr>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                        + "font-weight: bold;\">Loan Type</td>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">%s</td>"
+                        + "</tr>"
+
+                        + "<tr>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                        + "font-weight: bold;\">Requested Amount</td>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">%s</td>"
+                        + "</tr>"
+
+                        + "<tr>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                        + "font-weight: bold;\">Application Status</td>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">"
+                        + "Not Approved"
+                        + "</td>"
+                        + "</tr>"
+
+                        + "<tr>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd; "
+                        + "font-weight: bold;\">Remarks</td>"
+                        + "<td style=\"padding: 8px; border: 1px solid #dddddd;\">%s</td>"
+                        + "</tr>"
+
+                        + "</table>"
+
+                        + "<p>"
                         + "This decision has been made following an assessment against "
-                        + "our applicable lending and risk criteria.\n\n"
+                        + "our applicable lending and risk criteria."
+                        + "</p>"
+
+                        + "<p>"
                         + "If applicable, you may submit a new application after the "
                         + "relevant waiting period. If you require further information "
-                        + "or assistance, please contact our Customer Support team.\n\n"
-                        + "We appreciate your understanding.\n\n"
-                        + "Kind regards,\n"
-                        + "Digital Lending Underwriting Team",
-                name, appId, dto.getLoanType(), formatCurrency(dto.getAmount()), remarks
+                        + "or assistance, please contact our Customer Support team."
+                        + "</p>"
+
+                        + "<p>"
+                        + "We appreciate your understanding."
+                        + "</p>"
+
+                        + "<p>"
+                        + "Kind regards,<br>"
+                        + "<strong>Digital Lending Underwriting Team</strong>"
+                        + "</p>"
+
+                        + "</body>"
+                        + "</html>",
+
+                escapeHtml(name),
+                escapeHtml(appId),
+                escapeHtml(dto.getLoanType()),
+                formatCurrency(dto.getAmount()),
+                escapeHtml(remarks)
         );
 
         dispatchEmail(new EmailDto(dto.getCustomerEmail(), subject, body), context);
@@ -374,5 +856,22 @@ public class NotificationService {
     private String formatCurrency(double amount) {
         NumberFormat currencyFormat = NumberFormat.getCurrencyInstance(Locale.US);
         return currencyFormat.format(amount);
+    }
+
+     /**
+     * Escapes dynamic values before inserting them into HTML email content.
+     */
+    private String escapeHtml(String value) {
+
+        if (value == null) {
+            return "";
+        }
+
+        return value
+                .replace("&", "&amp;")
+                .replace("<", "&lt;")
+                .replace(">", "&gt;")
+                .replace("\"", "&quot;")
+                .replace("'", "&#39;");
     }
 }
