@@ -3,22 +3,21 @@ import { NavLink } from 'react-router-dom';
 import {
   LayoutDashboard, BookOpen, Calculator, FolderUp,
   FileText, CheckCircle, Settings, HelpCircle, Activity,
-  ShieldCheck, LogIn
+  LogOut, UserCheck
 } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const links = [
-  { to: '/',             icon: LayoutDashboard, label: 'Dashboard' },
+  { to: '/dashboard',    icon: LayoutDashboard, label: 'Dashboard' },
   { to: '/schemes',      icon: BookOpen,         label: 'Loan Schemes' },
   { to: '/emi',          icon: Calculator,       label: 'EMI Calculator' },
   { to: '/documents',    icon: FolderUp,         label: 'Documents' },
   { to: '/apply',        icon: FileText,         label: 'Apply for Loan' },
   { to: '/applications', icon: CheckCircle,      label: 'Applications' },
-  { to: '/login',        icon: ShieldCheck,      label: 'Employee Portal' },
 ];
 
 export default function Sidebar() {
-  const { currentUser, isAuthenticated } = useAuth();
+  const { currentUser, logout } = useAuth();
 
   return (
     <aside className="sidebar">
@@ -31,23 +30,10 @@ export default function Sidebar() {
         <NavLink
           key={to}
           to={to}
-          end={to === '/'}
           className={({ isActive }) => `nav-link${isActive ? ' active' : ''}`}
         >
           <Icon size={18} />
           {label}
-          {to === '/login' && isAuthenticated && (
-            <span
-              style={{
-                marginLeft: 'auto',
-                width: 8,
-                height: 8,
-                borderRadius: '50%',
-                background: '#10b981',
-                boxShadow: '0 0 8px #10b981'
-              }}
-            />
-          )}
         </NavLink>
       ))}
 
@@ -58,6 +44,30 @@ export default function Sidebar() {
       <div className="nav-link" style={{ cursor: 'default' }}>
         <HelpCircle size={18} /> Help
       </div>
+
+      {currentUser && (
+        <div style={{ marginTop: 'auto', paddingTop: 16, borderTop: '1px solid var(--border)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '8px 12px', borderRadius: 6, background: 'rgba(255,255,255,0.02)', marginBottom: 8 }}>
+            <UserCheck size={16} color="var(--accent)" />
+            <div style={{ overflow: 'hidden' }}>
+              <div style={{ fontSize: '0.78rem', fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {currentUser.name || currentUser.username}
+              </div>
+              <div style={{ fontSize: '0.68rem', color: 'var(--muted)' }}>
+                {currentUser.username}
+              </div>
+            </div>
+          </div>
+
+          <button
+            className="btn btn-ghost"
+            style={{ width: '100%', fontSize: '0.78rem', padding: '6px 10px', justifyContent: 'flex-start', color: '#ef4444' }}
+            onClick={logout}
+          >
+            <LogOut size={14} /> Sign Out
+          </button>
+        </div>
+      )}
     </aside>
   );
 }

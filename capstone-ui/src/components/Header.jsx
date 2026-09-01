@@ -1,22 +1,21 @@
 import React from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import { ShieldCheck, LogIn, LogOut } from 'lucide-react';
+import { LogOut, ShieldCheck } from 'lucide-react';
 
 const titles = {
   '/':             'Dashboard',
+  '/dashboard':    'Dashboard',
   '/schemes':      'Loan Schemes',
   '/emi':          'EMI Calculator',
   '/documents':    'Document Upload & Review',
   '/apply':        'Apply for Loan',
-  '/applications': 'Applications',
-  '/login':        'Employee Portal & Authentication',
+  '/applications': 'Applications Queue',
 };
 
 export default function Header() {
   const { pathname } = useLocation();
-  const navigate = useNavigate();
-  const { currentUser, isAuthenticated, logout } = useAuth();
+  const { currentUser, logout } = useAuth();
 
   const base = '/' + pathname.split('/')[1];
   const title = titles[base] || 'Dashboard';
@@ -32,18 +31,15 @@ export default function Header() {
     <header className="header">
       <div className="header-title">{title}</div>
       <div className="header-right" style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-        <span className="badge-server">Cloud Live · Azure APIM</span>
+        <span className="badge-server">Cloud Live · Azure</span>
 
-        {isAuthenticated && currentUser ? (
+        {currentUser && (
           <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
             <div
               className="avatar"
               style={{
-                background: 'linear-gradient(135deg, #00d2ff 0%, #9d4edd 100%)',
-                cursor: 'pointer'
+                background: 'linear-gradient(135deg, #00d2ff 0%, #3a7bd5 100%)'
               }}
-              onClick={() => navigate('/login')}
-              title="View Employee Profile"
             >
               <div className="avatar-initials">{getInitials(currentUser.name || currentUser.username)}</div>
             </div>
@@ -52,27 +48,19 @@ export default function Header() {
                 {currentUser.name || currentUser.username}
               </span>
               <span style={{ fontSize: '0.7rem', color: 'var(--accent)', fontWeight: 600 }}>
-                {currentUser.role ? 'Underwriter' : 'Employee'}
+                {currentUser.role || 'Underwriter'}
               </span>
             </div>
 
             <button
               className="btn btn-ghost"
-              style={{ padding: '4px 8px', fontSize: '0.75rem', color: 'var(--muted)' }}
+              style={{ padding: '5px 8px', fontSize: '0.75rem', color: 'var(--muted)', marginLeft: 4 }}
               onClick={logout}
               title="Sign Out"
             >
               <LogOut size={14} />
             </button>
           </div>
-        ) : (
-          <button
-            className="btn btn-primary"
-            style={{ padding: '5px 12px', fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: 5 }}
-            onClick={() => navigate('/login')}
-          >
-            <LogIn size={13} /> Employee Login
-          </button>
         )}
       </div>
     </header>
