@@ -1,24 +1,78 @@
-# Logs
-logs
+# =========================================================================
+# Spring Boot Standard .gitignore
+# =========================================================================
+
+# --- Compiled Java Files ---
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+*.jmod
+
+# --- Build Tool Directories ---
+# Maven
+target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+# Avoid ignoring Maven wrapper jar if you want to keep the wrapper self-contained
+# !.mvn/wrapper/maven-wrapper.jar
+
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
+
+# --- Spring Boot specific ---
 *.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
+logs/
+.sts4-cache/
+.springBeans/
+HELP.md
 
-node_modules
-dist
-dist-ssr
-*.local
+# --- Secrets and Environment Configurations ---
+.env
+.env.local
+*.properties.local
+*.yml.local
 
-# Editor directories and files
-.vscode/*
-!.vscode/extensions.json
-.idea
+# =========================================================================
+# IDE Specific Files
+# =========================================================================
+
+# --- IntelliJ IDEA ---
+.idea/
+*.iws
+*.iml
+*.ipr
+out/
+.vscode/
+
+# --- Eclipse / Spring Tool Suite (STS) ---
+.metadata/
+.classpath
+.project
+.settings/
+.factorypath
+.springBeans
+.apt_generated/
+
+# --- Visual Studio Code ---
+
+# =========================================================================
+# Operating System Files
+# =========================================================================
+# macOS
 .DS_Store
-*.suo
-*.ntvs*
-*.njsproj
-*.sln
-*.sw?
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini

@@ -1,0 +1,118 @@
+<policies>
+    <inbound>
+        <base />
+        <!-- 1. Cache the incoming frontend request body in memory so we don't lose it -->
+        <set-variable name="loginRequestBody" value="@(context.Request.Body.As<string>(preserveContent: true))" />
+        <!-- 2. Call your Azure Function behind the scenes to validate against the database -->
+        <!-- Make sure to replace this URL with the exact Function URL you copied earlier! -->
+        <send-request mode="new" response-variable-name="dbCheckResponse" timeout="10" ignore-error="false">
+            <set-url>https://team6-user-validator-function-app-btdzhhgqdtfsdhdw.southindia-01.azurewebsites.net/api/check-password</set-url>
+            <set-method>POST</set-method>
+            <set-header name="Content-Type" exists-action="override">
+                <value>application/json</value>
+            </set-header>
+            <!-- ADD THIS FIXED BLOCK: Pass your secret default key -->
+            <set-header name="x-functions-key" exists-action="override">
+                <value>RxU5ZMeMR6Z3SjTQHmWh7b3u5Ev7fVqcFjASN18JHTYhAzFuuvc-mg==</value>
+            </set-header>
+            <!-- FIXED: Used GetValueOrDefault to avoid System.Object compiler errors -->
+            <set-body>@(context.Variables.GetValueOrDefault<string>("loginRequestBody"))</set-body>
+        </send-request>
+        <!-- 3. Evaluate the result from the Azure Function -->
+        <choose>
+            <!-- Check if the Azure Function returned 200 OK -->
+            <!-- Check if the Azure Function returned 200 OK -->
+            <when condition="@(((IResponse)context.Variables["dbCheckResponse"]).StatusCode == 200)">
+                <!-- Stream the raw string response out exactly ONCE to prevent stream-lock crashes -->
+                <set-variable name="functionRawResponse" value="@(((IResponse)context.Variables["dbCheckResponse"]).Body.As<string>(preserveContent: true))" />
+                <!-- 2. Parse everything using structured variable Extractions to prevent 500 errors -->
+                <set-variable name="username" value="@{
+                    var body = JObject.Parse(context.Variables.GetValueOrDefault<string>("loginRequestBody"));
+                    return body["username"] != null ? body["username"].ToString() : "anonymous";
+                }" />
+                <!-- 4. Replaced issue-token tag with manual JWT structural generation -->
+                <set-variable name="generatedToken" value="@{
+                    // Create JWT Header
+                    var header = new JObject(
+                        new JProperty("alg", "HS256"), 
+                        new JProperty("typ", "JWT")
+                    );
+
+                    string rawResponse = (string)context.Variables["functionRawResponse"];
+                    var resBody = JObject.Parse(rawResponse);
+                    string extractedRole = resBody["userRole"] != null ? resBody["userRole"].ToString().ToUpper() : "CUSTOMER";
+                    string extractedUserId = resBody["userId"] != null ? resBody["userId"].ToString() : "0";
+                    string extractedName = resBody["username"] != null ? resBody["username"].ToString() : "anonymous";
+
+                    // Create JWT Payload / Claims
+                    var payload = new JObject(
+                        new JProperty("iss", "https://azure-api.net"),
+                        new JProperty("aud", "db74cad0-c753-480f-a0fe-a31dbc1d17e6"),
+                        new JProperty("exp", (DateTimeOffset.UtcNow.ToUnixTimeSeconds() + 3600)),
+                        new JProperty("preferred_username", context.Variables.GetValueOrDefault<string>("username")),
+                        new JProperty("userId", extractedUserId),
+                        new JProperty("name", extractedName),
+                        new JProperty("roles", "ROLE_" + extractedRole)
+                    );
+
+                    // FIXED: Perform inline Base64Url encoding instead of using a prohibited System.Func delegate
+                    var headerBytes = System.Text.Encoding.UTF8.GetBytes(header.ToString(Newtonsoft.Json.Formatting.None));
+                    var encodedHeader = Convert.ToBase64String(headerBytes).Split('=')[0].Replace('+', '-').Replace('/', '_');
+
+                    var payloadBytes = System.Text.Encoding.UTF8.GetBytes(payload.ToString(Newtonsoft.Json.Formatting.None));
+                    var encodedPayload = Convert.ToBase64String(payloadBytes).Split('=')[0].Replace('+', '-').Replace('/', '_');
+
+                    // Combine to build the unsigned data string segment
+                    string stringToSign = encodedHeader + "." + encodedPayload;
+
+                    // DEFINE YOUR SECRET TEXT KEY HERE (Must be a long string phrase)
+                    string secretKey = "YourSuperLongAndSecureSecretKeyThatIsAtLeast256BitsLong!!";
+
+                    // Compute the secure HMACSHA256 signature token stamp
+                    byte[] keyBytes = System.Text.Encoding.UTF8.GetBytes(secretKey);
+                    byte[] messageBytes = System.Text.Encoding.UTF8.GetBytes(stringToSign);
+                    
+                    using (var hmac = new System.Security.Cryptography.HMACSHA256(keyBytes))
+                    {
+                        byte[] hashBytes = hmac.ComputeHash(messageBytes);
+                        var encodedSignature = Convert.ToBase64String(hashBytes).Split('=')[0].Replace('+', '-').Replace('/', '_');
+                        
+                        // Return the fully compiled, securely signed token: header.payload.signature
+                        return stringToSign + "." + encodedSignature;
+                    }
+
+                }" />
+                <!-- 5. Intercept the gateway pipeline and return the token to the frontend immediately -->
+                <return-response>
+                    <set-status code="200" reason="OK" />
+                    <set-header name="Content-Type" exists-action="override">
+                        <value>application/json</value>
+                    </set-header>
+                    <set-body>@{
+                        var token = context.Variables.GetValueOrDefault<string>("generatedToken");
+                        return new JObject(new JProperty("access_token", token)).ToString();
+                    }</set-body>
+                </return-response>
+            </when>
+            <!-- If the function returned 401, reject the user immediately -->
+            <otherwise>
+                <return-response>
+                    <set-status code="401" reason="Unauthorized" />
+                    <set-header name="Content-Type" exists-action="override">
+                        <value>application/json</value>
+                    </set-header>
+                    <set-body>{"error": "Invalid username or password"}</set-body>
+                </return-response>
+            </otherwise>
+        </choose>
+    </inbound>
+    <backend>
+        <base />
+    </backend>
+    <outbound>
+        <base />
+    </outbound>
+    <on-error>
+        <base />
+    </on-error>
+</policies>

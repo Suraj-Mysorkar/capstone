@@ -1,32 +1,78 @@
-HELP.md
+# =========================================================================
+# Spring Boot Standard .gitignore
+# =========================================================================
+
+# --- Compiled Java Files ---
+*.class
+*.jar
+*.war
+*.ear
+*.nar
+*.jmod
+
+# --- Build Tool Directories ---
+# Maven
 target/
-.mvn/wrapper/maven-wrapper.jar
-!**/src/main/**/target/
-!**/src/test/**/target/
+pom.xml.tag
+pom.xml.releaseBackup
+pom.xml.next
+release.properties
+dependency-reduced-pom.xml
+buildNumber.properties
+.mvn/timing.properties
+# Avoid ignoring Maven wrapper jar if you want to keep the wrapper self-contained
+# !.mvn/wrapper/maven-wrapper.jar
 
-### STS ###
-.apt_generated
-.classpath
-.factorypath
-.project
-.settings
-.springBeans
-.sts4-cache
+# Gradle
+.gradle/
+build/
+!gradle/wrapper/gradle-wrapper.jar
 
-### IntelliJ IDEA ###
-.idea
+# --- Spring Boot specific ---
+*.log
+logs/
+.sts4-cache/
+.springBeans/
+HELP.md
+
+# --- Secrets and Environment Configurations ---
+.env
+.env.local
+*.properties.local
+*.yml.local
+
+# =========================================================================
+# IDE Specific Files
+# =========================================================================
+
+# --- IntelliJ IDEA ---
+.idea/
 *.iws
 *.iml
 *.ipr
+out/
+.vscode/
 
-### NetBeans ###
-/nbproject/private/
-/nbbuild/
-/dist/
-/nbdist/
-/.nb-gradle/
-build/
-!**/src/main/**/build/
-!**/src/test/**/build/
+# --- Eclipse / Spring Tool Suite (STS) ---
+.metadata/
+.classpath
+.project
+.settings/
+.factorypath
+.springBeans
+.apt_generated/
 
-### VS Code ###
+# --- Visual Studio Code ---
+
+# =========================================================================
+# Operating System Files
+# =========================================================================
+# macOS
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows
+Thumbs.db
+ehthumbs.db
+Desktop.ini

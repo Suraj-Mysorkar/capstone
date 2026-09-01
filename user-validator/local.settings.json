@@ -1,0 +1,10 @@
+{
+  "IsEncrypted": false,
+  "Values": {
+    "AzureWebJobsStorage": "UseDevelopmentStorage=true",
+    "AzureWebJobsSecretStorageType": "Files",
+    "FUNCTIONS_WORKER_RUNTIME": "java",
+    "FUNCTIONS_WORKER_JAVA_LOAD_APP_LIBS": "1",
+    "SqlConnectionString": "jdbc:sqlserver://smzen-capstone.database.windows.net:1433;database=smzen-capstone-db;user=cs_admin@smzen-capstone;password=Capstone@;encrypt=true;trustServerCertificate=false;hostNameInCertificate=*.database.windows.net;loginTimeout=30;"
+  }
+}
