@@ -1,14 +1,11 @@
 package com.capstone.user.validator;
 
-import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
-import java.util.Optional;
-
-import com.capstone.user.validator.dto.UserCredentialsDto;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.capstone.user.validator.dto.UserLoginResponseDto;
 import com.capstone.user.validator.model.User;
 import com.microsoft.azure.functions.ExecutionContext;
@@ -22,103 +19,110 @@ import com.microsoft.azure.functions.annotation.HttpTrigger;
 
 public class UserValidatorFunction {
 
-	 @FunctionName("check-password")
-	    public HttpResponseMessage run(
-	            @HttpTrigger(name = "req", methods = {HttpMethod.POST}, authLevel = AuthorizationLevel.FUNCTION) 
-	            HttpRequestMessage<Optional<UserCredentialsDto>> request,
-	            final ExecutionContext context) {
+    private static final ObjectMapper mapper = new ObjectMapper();
 
-	        UserCredentialsDto creds = request.getBody().orElse(null);
-	        if (creds == null || creds.getUsername() == null || creds.getPassword() == null) {
-	            return request.createResponseBuilder(HttpStatus.BAD_REQUEST).body("Missing credentials").build();
-	        }
+    static {
+        try {
+            Class.forName("com.microsoft.sqlserver.jdbc.SQLServerDriver");
+        } catch (Throwable t) {
+            System.err.println("SQLServerDriver class loading: " + t.getMessage());
+        }
+    }
 
-			String pwd = creds.getPassword();
-			
-			context.getLogger().info(">>>>>>" + creds.getUsername() + ">>>>>"+ pwd);
+    @FunctionName("check-password")
+    public HttpResponseMessage run(
+            @HttpTrigger(name = "req", methods = {HttpMethod.POST}, authLevel = AuthorizationLevel.FUNCTION) 
+            HttpRequestMessage<String> request,
+            final ExecutionContext context) {
 
-	        // 1. Run the hashing math on the typed password
-	        // String computedHash = hashPassword(creds.getPassword());
+        String body = request.getBody();
+        context.getLogger().info("Received check-password request body: " + body);
 
-	        // 2. Mock Database Check (Replace this line with your actual JPA/JDBC database call)
-	        User userDb = fetchHashFromYourDatabase(creds.getUsername(),  context); 
-	        context.getLogger().info(">>>>>>" +  userDb.getLoginPassword());
-	        // 3. Compare hashes
-	        if (userDb != null && pwd.equals(userDb.getLoginPassword())) {
-	            context.getLogger().info("User verified successfully!");
-	            UserLoginResponseDto userResponse = buildResponse(userDb);
-	            return request.createResponseBuilder(HttpStatus.OK).body(userResponse).build();
-	        } else {
-	            return request.createResponseBuilder(HttpStatus.UNAUTHORIZED).body("Invalid credentials").build();
-	        }
-	    }
+        if (body == null || body.isBlank()) {
+            return request.createResponseBuilder(HttpStatus.BAD_REQUEST)
+                    .header("Content-Type", "application/json")
+                    .body("{\"error\":\"Missing request body\"}")
+                    .build();
+        }
 
-		private UserLoginResponseDto buildResponse(User userDb) {
-			UserLoginResponseDto userResponse = new UserLoginResponseDto();
-			userResponse.setUsername(userDb.getName());
-			userResponse.setUserId(userDb.getUserId());
-			userResponse.setUserRole(userDb.getRole());
-			userResponse.setStatus("valid");
-			return userResponse;
-		}
+        String username = "";
+        String pwd = "";
 
-		private String hashPassword(String password) {
-	        try {
-	            MessageDigest digest = MessageDigest.getInstance("SHA-256");
-	            byte[] hash = digest.digest(password.getBytes(StandardCharsets.UTF_8));
-	            StringBuilder hexString = new StringBuilder();
-	            for (byte b : hash) {
-	                String hex = Integer.toHexString(0xff & b);
-	                if (hex.length() == 1) hexString.append('0');
-	                hexString.append(hex);
-	            }
-	            return hexString.toString();
-	        } catch (Exception e) {
-	            throw new RuntimeException(e);
-	        }
-	    }
+        try {
+            JsonNode root = mapper.readTree(body);
+            if (root.has("username")) username = root.get("username").asText().trim();
+            if (root.has("password")) pwd = root.get("password").asText().trim();
+        } catch (Exception e) {
+            context.getLogger().severe("Failed to parse JSON body: " + e.getMessage());
+            return request.createResponseBuilder(HttpStatus.BAD_REQUEST)
+                    .header("Content-Type", "application/json")
+                    .body("{\"error\":\"Invalid JSON body\"}")
+                    .build();
+        }
 
-	    // Dummy method representing your database lookup
-//	    private String fetchHashFromYourDatabase(String username) {
-//	        if ("employee123".equals(username)) return "2bb80dc437a3b3a6c9cf1c614b62db5244..."; 
-//	        return null;
-//	    }
-	    
-	    /**
-	     * Connects to Azure SQL and looks up the password hash for a specific username
-	     */
-	    private User fetchHashFromYourDatabase(String username, ExecutionContext context) {
-	        // Read the connection string safely from environment variables
-	        String connectionString = System.getenv("SqlConnectionString");
-	        
-	        // Secure Parameterized SQL Query (Prevents SQL Injection attacks)
-	        String query = "SELECT * FROM Users WHERE loginid = ?";
-	        
-	        User user = null;
+        if (username.isEmpty() || pwd.isEmpty()) {
+            return request.createResponseBuilder(HttpStatus.BAD_REQUEST)
+                    .header("Content-Type", "application/json")
+                    .body("{\"error\":\"Missing credentials\"}")
+                    .build();
+        }
 
-	        // Automatically manages and closes database resources using try-with-resources
-	        try (Connection connection = DriverManager.getConnection(connectionString);
-	             PreparedStatement statement = connection.prepareStatement(query)) {
-	            
-	            statement.setString(1, username);
-	            
-	            try (ResultSet resultSet = statement.executeQuery()) {
-	                if (resultSet.next()) {
-	                	user = new User();
-	                	user.setEmail(resultSet.getString("email"));
-	                	user.setLoginId(resultSet.getString("loginid"));
-	                	user.setLoginPassword(resultSet.getString("login_password"));
-	                	user.setName(resultSet.getString("name"));
-	                	user.setRole(resultSet.getString("user_role"));
-	                	System.out.println("User Id " + resultSet.getLong("User_ID"));
-	                	user.setUserId(resultSet.getLong("User_ID"));
-	                    // Extract the text string from your database column
-	                    return user;
-	                }
-	            }
-	        } catch (Exception e) {
-	            context.getLogger().severe("Database connection error: " + e.getMessage());
-	        }
-	        return null; // Return null if the user doesn't exist or database fails
-	    }
+        context.getLogger().info("Validating credentials for username: " + username);
+
+        User userDb = fetchUserFromDatabase(username, context); 
+        
+        if (userDb != null && userDb.getLoginPassword() != null && pwd.equals(userDb.getLoginPassword().trim())) {
+            context.getLogger().info("User " + username + " verified successfully with role: " + userDb.getRole());
+            UserLoginResponseDto userResponse = new UserLoginResponseDto();
+            userResponse.setUsername(userDb.getName() != null ? userDb.getName() : userDb.getLoginId());
+            userResponse.setUserId(userDb.getUserId());
+            userResponse.setUserRole(userDb.getRole());
+            userResponse.setStatus("valid");
+            return request.createResponseBuilder(HttpStatus.OK)
+                    .header("Content-Type", "application/json")
+                    .body(userResponse)
+                    .build();
+        } else {
+            context.getLogger().warning("Invalid credentials or user not found for: " + username);
+            return request.createResponseBuilder(HttpStatus.UNAUTHORIZED)
+                    .header("Content-Type", "application/json")
+                    .body("{\"error\":\"Invalid credentials\"}")
+                    .build();
+        }
+    }
+
+    private User fetchUserFromDatabase(String username, ExecutionContext context) {
+        String connectionString = System.getenv("SqlConnectionString");
+        if (connectionString == null || connectionString.isBlank()) {
+            connectionString = "jdbc:sqlserver://smzen-capstone.database.windows.net:1433;database=smzen-capstone-db;user=cs_admin;password=Capstone@;encrypt=true;trustServerCertificate=false;loginTimeout=30;";
+        }
+        
+        String query = "SELECT * FROM Users WHERE LOWER(loginid) = LOWER(?)";
+        
+        try (Connection connection = DriverManager.getConnection(connectionString);
+             PreparedStatement statement = connection.prepareStatement(query)) {
+            
+            statement.setString(1, username);
+            
+            try (ResultSet resultSet = statement.executeQuery()) {
+                if (resultSet.next()) {
+                    User user = new User();
+                    user.setEmail(resultSet.getString("email"));
+                    user.setLoginId(resultSet.getString("loginid"));
+                    user.setLoginPassword(resultSet.getString("login_password"));
+                    user.setName(resultSet.getString("name"));
+                    user.setRole(resultSet.getString("user_role"));
+                    try {
+                        user.setUserId(resultSet.getLong("User_ID"));
+                    } catch (Exception e) {
+                        user.setUserId(1L);
+                    }
+                    return user;
+                }
+            }
+        } catch (Exception e) {
+            context.getLogger().severe("Database query error: " + e.getMessage());
+        }
+        return null;
+    }
 }

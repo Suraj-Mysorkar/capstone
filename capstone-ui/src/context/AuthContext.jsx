@@ -1,7 +1,23 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState } from 'react';
 import { employeeLogin } from '../services/api';
 
 const AuthContext = createContext(null);
+
+function parseJwt(token) {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map(c => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch (e) {
+    return null;
+  }
+}
 
 export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(() => {
@@ -21,23 +37,27 @@ export function AuthProvider({ children }) {
     setAuthError('');
     try {
       const res = await employeeLogin(username, password);
+      const token = res.access_token || res.token || res.accessToken || res.jwt || '';
+      const jwtClaims = token ? parseJwt(token) : null;
+
       const userData = {
-        username: res.username || username,
-        role: res.role || 'Senior Underwriter / Operations Manager',
-        name: res.name || res.fullName || (username === 'markj' ? 'Mark Jenkins' : username),
-        token: res.token || res.accessToken || res.jwt || 'apim-session-token',
+        username: jwtClaims?.preferred_username || res.username || username,
+        role: jwtClaims?.roles?.replace(/^ROLE_/, '') || res.role || 'Employee',
+        name: jwtClaims?.name || res.name || (username === 'markj' ? 'Mark Jack' : username),
+        userId: jwtClaims?.userId || res.userId || '3',
+        token: token,
         loginTime: new Date().toISOString(),
         ...res
       };
 
       setCurrentUser(userData);
       localStorage.setItem('capstone_employee_user', JSON.stringify(userData));
-      if (userData.token) {
-        localStorage.setItem('capstone_employee_token', userData.token);
+      if (token) {
+        localStorage.setItem('capstone_employee_token', token);
       }
       return userData;
     } catch (err) {
-      const errMsg = err.message || 'Login failed. Please check your credentials.';
+      const errMsg = err.message || 'Invalid username or password.';
       setAuthError(errMsg);
       throw err;
     } finally {
