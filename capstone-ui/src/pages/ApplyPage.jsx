@@ -107,6 +107,9 @@ export default function ApplyPage() {
   const [schemes, setSchemes] = useState([]);
   const [customers, setCustomers] = useState([]);
   const [form, setForm] = useState(INITIAL_FORM);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isDropdownOpen, setIsDropdownOpen] = useState(false);
+  const [selectedCustObj, setSelectedCustObj] = useState(null);
   const [loading, setLoading] = useState(false);
   const [result, setResult] = useState(null);
   const [error, setError] = useState('');
@@ -119,6 +122,8 @@ export default function ApplyPage() {
       setCustomers(list);
       if (list.length > 0) {
         const first = list[0];
+        setSelectedCustObj(first);
+        setSearchQuery(first.customerCode || `CUST-${first.customerId}`);
         setForm(f => ({
           ...f,
           selectedCustomer: String(first.customerId),
@@ -133,9 +138,11 @@ export default function ApplyPage() {
     });
   }, []);
 
-  const handleCustomerChange = (e) => {
-    const val = e.target.value;
-    if (val === 'new') {
+  const selectCustomer = (cust) => {
+    if (!cust) {
+      setSelectedCustObj(null);
+      setSearchQuery('');
+      setIsDropdownOpen(false);
       setForm(f => ({
         ...f,
         selectedCustomer: 'new',
@@ -146,26 +153,80 @@ export default function ApplyPage() {
         monthlyIncome: 50000,
         employmentType: 'SALARIED',
       }));
-    } else {
-      const cust = customers.find(c => String(c.customerId) === val);
-      if (cust) {
+      return;
+    }
+    setSelectedCustObj(cust);
+    const code = cust.customerCode || `CUST-${cust.customerId}`;
+    setSearchQuery(code);
+    setIsDropdownOpen(false);
+    setForm(f => ({
+      ...f,
+      selectedCustomer: String(cust.customerId),
+      customerId: code,
+      customerName: cust.fullName || '',
+      customerEmail: cust.email || '',
+      customerPhone: cust.mobileNumber || '',
+      monthlyIncome: cust.incomeDetails || 75000,
+      employmentType: cust.employmentDetails && EMP_TYPES.includes(cust.employmentDetails) ? cust.employmentDetails : 'SALARIED',
+    }));
+  };
+
+  const handleSearchChange = (e) => {
+    const val = e.target.value;
+    setSearchQuery(val);
+    setIsDropdownOpen(true);
+
+    // Auto-match if exact Customer ID / Code is typed
+    const trimmed = val.trim().toUpperCase();
+    if (trimmed) {
+      const exact = customers.find(c => {
+        const code = (c.customerCode || `CUST-${c.customerId}`).toUpperCase();
+        const idStr = String(c.customerId);
+        return code === trimmed || idStr === trimmed || `CUST-${idStr}` === trimmed;
+      });
+      if (exact) {
+        setSelectedCustObj(exact);
         setForm(f => ({
           ...f,
-          selectedCustomer: val,
-          customerId: cust.customerCode || `CUST-${cust.customerId}`,
-          customerName: cust.fullName || '',
-          customerEmail: cust.email || '',
-          customerPhone: cust.mobileNumber || '',
-          monthlyIncome: cust.incomeDetails || 75000,
-          employmentType: cust.employmentDetails && EMP_TYPES.includes(cust.employmentDetails) ? cust.employmentDetails : 'SALARIED',
+          selectedCustomer: String(exact.customerId),
+          customerId: exact.customerCode || `CUST-${exact.customerId}`,
+          customerName: exact.fullName || '',
+          customerEmail: exact.email || '',
+          customerPhone: exact.mobileNumber || '',
+          monthlyIncome: exact.incomeDetails || 75000,
+          employmentType: exact.employmentDetails && EMP_TYPES.includes(exact.employmentDetails) ? exact.employmentDetails : 'SALARIED',
         }));
+        return;
       }
     }
+
+    // If clearing search
+    if (!val.trim()) {
+      setSelectedCustObj(null);
+      setForm(f => ({
+        ...f,
+        selectedCustomer: 'new',
+        customerId: '',
+      }));
+    }
   };
+
+  const filteredCustomers = customers.filter(c => {
+    if (!searchQuery.trim()) return true;
+    const q = searchQuery.toLowerCase();
+    const code = (c.customerCode || `CUST-${c.customerId}`).toLowerCase();
+    const name = (c.fullName || '').toLowerCase();
+    const email = (c.email || '').toLowerCase();
+    const phone = (c.mobileNumber || '').toLowerCase();
+    const id = String(c.customerId);
+    return code.includes(q) || name.includes(q) || email.includes(q) || phone.includes(q) || id.includes(q);
+  });
 
   const set = k => e => setForm(f => ({ ...f, [k]: e.target.value }));
 
   const loadScenario = (s) => {
+    setSelectedCustObj(null);
+    setSearchQuery('');
     setForm(f => ({
       ...f,
       ...s.data,
@@ -257,30 +318,163 @@ export default function ApplyPage() {
           <FileText size={18} /> Loan Application Form
         </div>
 
-        {/* Customer Selector from Database */}
-        <div style={{ marginBottom: 20, padding: '16px', background: 'rgba(255,255,255,0.03)', borderRadius: 10, border: '1px solid rgba(255,255,255,0.08)' }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 10, color: 'var(--accent)', fontWeight: 600, fontSize: '.85rem' }}>
-            <Users size={16} /> Select Applicant from Database (Customers Table)
-          </div>
-          <div className="form-group" style={{ marginBottom: 0 }}>
-            <select
-              className="form-select"
-              value={form.selectedCustomer}
-              onChange={handleCustomerChange}
-              style={{ background: '#13182e', borderColor: 'rgba(0, 210, 255, 0.4)' }}
+        {/* Customer Search & Autocomplete Box */}
+        <div style={{ marginBottom: 24, padding: '18px', background: 'rgba(255,255,255,0.03)', borderRadius: 12, border: '1px solid rgba(0, 210, 255, 0.25)', position: 'relative' }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12, flexWrap: 'wrap', gap: 8 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--accent)', fontWeight: 600, fontSize: '.9rem' }}>
+              <Users size={18} /> Search & Auto-Populate Applicant (Customers Table)
+            </div>
+            <button
+              type="button"
+              className="btn btn-ghost"
+              style={{ fontSize: '.78rem', padding: '4px 10px', height: 'auto', display: 'flex', alignItems: 'center', gap: 6 }}
+              onClick={() => selectCustomer(null)}
             >
-              <option value="new">➕ Register / Enter New Customer</option>
-              {customers.map(c => (
-                <option key={c.customerId} value={String(c.customerId)}>
-                  {c.customerCode || `CUST-${c.customerId}`} — {c.fullName} ({c.email}) [Status: {c.onboardingStatus}]
-                </option>
-              ))}
-            </select>
+              <UserPlus size={14} /> + Enter New / Unregistered Customer
+            </button>
           </div>
-          <div style={{ fontSize: '.75rem', color: 'var(--muted)', marginTop: 6 }}>
-            {form.selectedCustomer === 'new'
-              ? '✨ Enter applicant details below. A new customer profile will be automatically saved in the database Customers table.'
-              : `✅ Using existing database profile linked to ${form.customerId}.`}
+
+          {/* Search Box Input */}
+          <div style={{ position: 'relative' }}>
+            <input
+              type="text"
+              className="form-input"
+              value={searchQuery}
+              onChange={handleSearchChange}
+              onFocus={() => setIsDropdownOpen(true)}
+              placeholder="🔍 Type Customer ID (e.g. CUST-12), Name, Email or Phone to auto-populate..."
+              style={{
+                background: '#10162a',
+                borderColor: selectedCustObj ? 'var(--green)' : 'rgba(0, 210, 255, 0.4)',
+                paddingRight: '36px',
+                fontSize: '.9rem',
+              }}
+            />
+            {searchQuery && (
+              <button
+                type="button"
+                onClick={() => selectCustomer(null)}
+                style={{
+                  position: 'absolute',
+                  right: 10,
+                  top: '50%',
+                  transform: 'translateY(-50%)',
+                  background: 'transparent',
+                  border: 'none',
+                  color: 'var(--muted)',
+                  cursor: 'pointer',
+                  fontSize: '1.1rem',
+                  lineHeight: 1,
+                }}
+                title="Clear search"
+              >
+                ×
+              </button>
+            )}
+
+            {/* Live Autocomplete Dropdown Popup */}
+            {isDropdownOpen && (
+              <>
+                <div
+                  style={{
+                    position: 'fixed',
+                    inset: 0,
+                    zIndex: 99,
+                  }}
+                  onClick={() => setIsDropdownOpen(false)}
+                />
+                <div
+                  style={{
+                    position: 'absolute',
+                    top: '100%',
+                    left: 0,
+                    right: 0,
+                    marginTop: 6,
+                    background: '#161d36',
+                    border: '1px solid rgba(0, 210, 255, 0.4)',
+                    borderRadius: 10,
+                    boxShadow: '0 12px 32px rgba(0,0,0,0.6)',
+                    maxHeight: 280,
+                    overflowY: 'auto',
+                    zIndex: 100,
+                  }}
+                >
+                  <div
+                    style={{
+                      padding: '10px 14px',
+                      borderBottom: '1px solid rgba(255,255,255,0.06)',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: 8,
+                      color: 'var(--accent)',
+                      fontSize: '.85rem',
+                      fontWeight: 600,
+                    }}
+                    onMouseDown={(e) => { e.preventDefault(); selectCustomer(null); }}
+                  >
+                    <UserPlus size={16} /> ➕ Register / Enter New Custom Customer
+                  </div>
+
+                  {filteredCustomers.length === 0 ? (
+                    <div style={{ padding: '14px', textAlign: 'center', color: 'var(--muted)', fontSize: '.85rem' }}>
+                      No matching registered customers found for "{searchQuery}".
+                    </div>
+                  ) : (
+                    filteredCustomers.map(c => {
+                      const code = c.customerCode || `CUST-${c.customerId}`;
+                      const isSelected = selectedCustObj && selectedCustObj.customerId === c.customerId;
+                      return (
+                        <div
+                          key={c.customerId}
+                          style={{
+                            padding: '10px 14px',
+                            borderBottom: '1px solid rgba(255,255,255,0.04)',
+                            cursor: 'pointer',
+                            background: isSelected ? 'rgba(0, 210, 255, 0.12)' : 'transparent',
+                            transition: 'background 0.15s',
+                          }}
+                          onMouseEnter={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.08)'; }}
+                          onMouseLeave={e => { e.currentTarget.style.background = isSelected ? 'rgba(0, 210, 255, 0.12)' : 'transparent'; }}
+                          onMouseDown={(e) => {
+                            e.preventDefault();
+                            selectCustomer(c);
+                          }}
+                        >
+                          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                            <span style={{ fontWeight: 600, color: 'var(--accent)', fontSize: '.88rem' }}>
+                              {code} — {c.fullName}
+                            </span>
+                            <span style={{ fontSize: '.75rem', padding: '2px 8px', borderRadius: 6, background: 'rgba(255,255,255,0.08)', color: 'var(--muted)' }}>
+                              {c.onboardingStatus || 'REGISTERED'}
+                            </span>
+                          </div>
+                          <div style={{ fontSize: '.78rem', color: 'var(--muted)', marginTop: 4, display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+                            <span>✉️ {c.email}</span>
+                            <span>📞 {c.mobileNumber}</span>
+                            <span>💰 ₹{c.incomeDetails ? Number(c.incomeDetails).toLocaleString('en-IN') : '0'}/mo</span>
+                            <span>👔 {c.employmentDetails || 'SALARIED'}</span>
+                          </div>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+              </>
+            )}
+          </div>
+
+          {/* Active Status Hint */}
+          <div style={{ fontSize: '.78rem', color: selectedCustObj ? 'var(--green)' : 'var(--muted)', marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+            {selectedCustObj ? (
+              <>
+                <UserCheck size={14} /> Linked: <strong>{selectedCustObj.customerCode || `CUST-${selectedCustObj.customerId}`}</strong> ({selectedCustObj.fullName}). Fields below have been auto-populated from database.
+              </>
+            ) : (
+              <>
+                <span>✨ New customer mode. Fill details below or search above to link an existing database profile.</span>
+              </>
+            )}
           </div>
         </div>
 
