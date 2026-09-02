@@ -32,7 +32,7 @@ spring:
   jpa:
     database-platform: org.hibernate.dialect.SQLServerDialect
     hibernate:
-      ddl-auto: validate
+      ddl-auto: update
     open-in-view: false
     show-sql: false
     properties:
@@ -40,12 +40,7 @@ spring:
         format_sql: false
 
   flyway:
-    enabled: true
-    baseline-on-migrate: true
-    # Baseline at 0 so V1 still runs when pointed at an already-populated database
-    # (the shared DB already holds loan-service / report-service tables).
-    baseline-version: 0
-    locations: classpath:db/migration
+    enabled: false
 
 server:
   port: ${PORT:8080}
