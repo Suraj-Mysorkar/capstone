@@ -40,6 +40,10 @@ HELP.md
 .env.local
 *.properties.local
 *.yml.local
+secrets.properties
+**/secrets.properties
+node_modules/
+dist/
 
 # =========================================================================
 # IDE Specific Files
