@@ -275,7 +275,7 @@ export const submitManagerCallback = (id, body) =>
     return r.json();
   });
 
-// ── Document Uploaded Notification ───────────────────────────────────
+// ── Document Uploaded & Request Notifications ─────────────────────────
 export const notifyDocumentUploaded = (id, body) =>
   fetch(`${BASE}/applications/${id}/document-uploaded`, {
     method: 'POST',
@@ -283,6 +283,16 @@ export const notifyDocumentUploaded = (id, body) =>
     body: JSON.stringify(body),
   }).then(r => {
     if (!r.ok) throw new Error(`Document notification failed (${r.status})`);
+    return r.json();
+  });
+
+export const requestDocumentsFromCustomer = (id, body = {}) =>
+  fetch(`${BASE}/applications/${id}/request-documents`, {
+    method: 'POST',
+    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+    body: JSON.stringify(body),
+  }).then(r => {
+    if (!r.ok) throw new Error(`Request documents email failed (${r.status})`);
     return r.json();
   });
 

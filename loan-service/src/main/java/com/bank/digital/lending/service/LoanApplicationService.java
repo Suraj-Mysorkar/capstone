@@ -448,4 +448,112 @@ public class LoanApplicationService {
                 ))
                 .toList();
     }
+
+    /**
+     * Dispatches an email to the customer with the list of mandatory verification documents required for loan processing.
+     */
+    @Transactional
+    public DocumentRequestEmailResponse sendDocumentRequestEmail(String applicationId, DocumentRequestEmailRequest request) {
+        LoanApplication app = applicationRepository.findById(applicationId)
+                .orElseThrow(() -> new IllegalArgumentException("Loan application not found with ID: " + applicationId));
+
+        String customerEmail = app.getCustomerEmail();
+        if (customerEmail == null || customerEmail.isBlank()) {
+            throw new IllegalStateException("Customer email is missing for application " + applicationId);
+        }
+
+        List<String> docList = (request != null && request.requiredDocumentTypes() != null && !request.requiredDocumentTypes().isEmpty())
+                ? request.requiredDocumentTypes()
+                : List.of(
+                    "Government Photo Identity Proof (PAN Card - Mandatory)",
+                    "Address Proof (Aadhaar Card / Passport / Recent Utility Bill)",
+                    "Income Verification (Salary Slips for Last 3 Months or Latest Form 16 / ITR)",
+                    "Banking Statement (Operational Bank Account Statement for Last 6 Months)"
+                );
+
+        StringBuilder docHtmlList = new StringBuilder();
+        for (String doc : docList) {
+            docHtmlList.append("<li style=\"margin-bottom: 8px; font-weight: 600; color: #1e293b;\">").append(doc).append("</li>");
+        }
+
+        String notes = (request != null && request.customNotes() != null && !request.customNotes().isBlank())
+                ? "<p style=\"background: #f1f5f9; padding: 12px; border-radius: 6px;\"><strong>Underwriter Notes:</strong> " + request.customNotes() + "</p>"
+                : "";
+
+        String subject = "Action Required: Verification Documents Needed for Loan Application " + app.getApplicationId();
+        String body = String.format(
+                "<html><body style=\"font-family: Arial, sans-serif; font-size: 14px; color: #333333; line-height: 1.6;\">"
+                + "<p>Dear %s,</p>"
+                + "<p>Thank you for choosing Digital Lending. We are currently processing your <strong>%s</strong> application (ID: <strong>%s</strong>) for <strong>₹%s</strong>.</p>"
+                + "<p>To proceed with underwriting verification and loan sanctioning, please upload the following mandatory verification documents:</p>"
+                + "<ul style=\"background: #f8fafc; padding: 16px 32px; border-left: 4px solid #00d2ff; border-radius: 6px;\">%s</ul>"
+                + "%s"
+                + "<p>Please log in to the Digital Banking portal to upload these documents or reply to this email.</p>"
+                + "<p>If you have any questions, please contact our Customer Support team.</p>"
+                + "<p>Kind regards,<br><strong>Digital Lending Underwriting & Operations Team</strong></p>"
+                + "</body></html>",
+                app.getCustomerName() != null ? app.getCustomerName() : "Valued Customer",
+                app.getLoanType() != null ? app.getLoanType().name() : "Loan",
+                app.getApplicationId(),
+                app.getLoanAmount() != null ? app.getLoanAmount().toString() : "0",
+                docHtmlList.toString(),
+                notes
+        );
+
+        // 1. Dispatch Email via Azure Logic Apps Webhook
+        boolean emailSent = dispatchEmailViaLogicApp(customerEmail, subject, body);
+
+        // 2. Publish status event to Azure Service Bus
+        eventBusPublisher.publishLoanStatusEvent(app, "LOAN_DOCUMENT_REVIEW_PENDING",
+                "Document requirement checklist email sent to applicant " + customerEmail);
+
+        // 3. Dispatch Live Notification to Employee markj
+        notificationService.sendNotification(new NotificationDTO(
+                "markj",
+                "Document Request Sent: " + app.getCustomerName(),
+                "Document requirement checklist email successfully sent to " + app.getCustomerName() + " (" + customerEmail + ") for application " + applicationId + ".",
+                "DOCUMENT_REQUEST_SENT",
+                app.getCustomerId(),
+                app.getCustomerName(),
+                applicationId
+        ));
+
+        // 4. Record Audit Log
+        recordAuditLog(applicationId, app.getStatus(), app.getStatus(),
+                "MANAGER:markj", "Sent required documents checklist email to " + customerEmail);
+
+        return new DocumentRequestEmailResponse(
+                applicationId,
+                app.getCustomerId(),
+                app.getCustomerName(),
+                customerEmail,
+                docList,
+                "Verification document request email sent successfully to " + customerEmail,
+                emailSent
+        );
+    }
+
+    private boolean dispatchEmailViaLogicApp(String to, String subject, String htmlBody) {
+        String logicAppUrl = "https://prod-17.southindia.logic.azure.com:443/workflows/a4b29c1d5e814824900b41a17fa24844/triggers/When_a_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_a_HTTP_request_is_received%2Frun&sv=1.0&sig=F--JabvW3Uwr-JsZU76HgaWWTcekahkC6HBwTEImtys";
+        try {
+            String payload = String.format("{\"emailTo\":\"%s\",\"emailSubject\":\"%s\",\"emailBody\":\"%s\"}",
+                    to.replace("\"", "\\\""),
+                    subject.replace("\"", "\\\""),
+                    htmlBody.replace("\"", "\\\"").replace("\n", "").replace("\r", ""));
+
+            java.net.http.HttpClient client = java.net.http.HttpClient.newHttpClient();
+            java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder()
+                    .uri(java.net.URI.create(logicAppUrl))
+                    .header("Content-Type", "application/json")
+                    .POST(java.net.http.HttpRequest.BodyPublishers.ofString(payload, java.nio.charset.StandardCharsets.UTF_8))
+                    .build();
+
+            java.net.http.HttpResponse<String> resp = client.send(req, java.net.http.HttpResponse.BodyHandlers.ofString());
+            log.info("[LOAN-SERVICE] Logic App email dispatch response code: {}", resp.statusCode());
+            return resp.statusCode() >= 200 && resp.statusCode() < 300;
+        } catch (Exception ex) {
+            log.warn("[LOAN-SERVICE] Could not deliver email directly via Logic App: {}. Email logged for verification.", ex.getMessage());
+            return false;
+        }
+    }
 }

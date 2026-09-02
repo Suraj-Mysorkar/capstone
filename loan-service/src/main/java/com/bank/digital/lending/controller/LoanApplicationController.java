@@ -35,6 +35,16 @@ public class LoanApplicationController {
         return ResponseEntity.ok(applicationService.listCustomers());
     }
 
+    @PostMapping("/applications/{id}/request-documents")
+    @Operation(summary = "Send Document Request Email to Customer",
+               description = "Dispatches an email checklist of required documents to the customer for verification")
+    public ResponseEntity<DocumentRequestEmailResponse> sendDocumentRequestEmail(
+            @PathVariable("id") String applicationId,
+            @RequestBody(required = false) DocumentRequestEmailRequest request) {
+        DocumentRequestEmailResponse response = applicationService.sendDocumentRequestEmail(applicationId, request);
+        return ResponseEntity.ok(response);
+    }
+
     // Endpoint to receive document upload notification and advance workflow
     @PostMapping("/applications/{id}/document-uploaded")
     @Operation(summary = "Notify service that documents have been uploaded",
