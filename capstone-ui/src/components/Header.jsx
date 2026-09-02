@@ -130,22 +130,31 @@ export default function Header() {
 
               {/* Notification Popover Tray */}
               {isOpen && (
-                <div
-                  style={{
-                    position: 'absolute',
-                    top: 'calc(100% + 8px)',
-                    right: 0,
-                    width: 380,
-                    maxWidth: '90vw',
-                    background: '#13182e',
-                    border: '1px solid rgba(0, 210, 255, 0.35)',
-                    borderRadius: 14,
-                    boxShadow: '0 16px 40px rgba(0, 0, 0, 0.7)',
-                    zIndex: 10000,
-                    overflow: 'hidden',
-                    animation: 'slideInRight 0.2s ease',
-                  }}
-                >
+                <>
+                  <div
+                    style={{
+                      position: 'fixed',
+                      inset: 0,
+                      zIndex: 99998,
+                    }}
+                    onClick={() => setIsOpen(false)}
+                  />
+                  <div
+                    style={{
+                      position: 'absolute',
+                      top: 'calc(100% + 10px)',
+                      right: 0,
+                      width: 400,
+                      maxWidth: '92vw',
+                      background: '#0e1326',
+                      border: '1px solid rgba(0, 210, 255, 0.45)',
+                      borderRadius: 14,
+                      boxShadow: '0 24px 60px rgba(0, 0, 0, 0.9), 0 0 25px rgba(0, 210, 255, 0.25)',
+                      zIndex: 99999,
+                      overflow: 'hidden',
+                      animation: 'slideInRight 0.2s cubic-bezier(0.16, 1, 0.3, 1)',
+                    }}
+                  >
                   <div
                     style={{
                       padding: '12px 16px',
@@ -247,7 +256,8 @@ export default function Header() {
                     )}
                   </div>
                 </div>
-              )}
+              </>
+            )}
             </div>
 
             {/* Profile Info */}

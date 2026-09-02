@@ -107,6 +107,8 @@ body {
   border-bottom: 1px solid var(--border);
   background: rgba(8,11,22,.8);
   backdrop-filter: blur(10px);
+  position: relative;
+  z-index: 1000;
 }
 .header-title { font-size: 1.2rem; font-weight: 700; }
 .header-right { display: flex; align-items: center; gap: 20px; }
