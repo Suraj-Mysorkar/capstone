@@ -449,3 +449,42 @@ tbody tr:last-child td { border-bottom: none; }
 .p-6 { padding: 24px; }
 .text-muted { color: var(--muted); font-size: .82rem; }
 .font-mono { font-family: monospace; }
+
+/* ── Live Toast & Notification Animations ───────────────── */
+@keyframes slideInRight {
+  from {
+    transform: translateX(120%) scale(0.95);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0) scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes toastProgress {
+  from {
+    width: 100%;
+  }
+  to {
+    width: 0%;
+  }
+}
+
+@keyframes bellRing {
+  0% { transform: rotate(0); }
+  10% { transform: rotate(14deg); }
+  20% { transform: rotate(-14deg); }
+  30% { transform: rotate(10deg); }
+  40% { transform: rotate(-10deg); }
+  50% { transform: rotate(6deg); }
+  60% { transform: rotate(-6deg); }
+  70% { transform: rotate(2deg); }
+  80% { transform: rotate(-2deg); }
+  100% { transform: rotate(0); }
+}
+
+.bell-animated {
+  animation: bellRing 1.8s ease infinite;
+  transform-origin: top center;
+}

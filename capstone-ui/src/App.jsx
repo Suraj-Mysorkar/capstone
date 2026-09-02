@@ -12,6 +12,8 @@ import ApplicationDetailPage from './pages/ApplicationDetailPage';
 import EmployeeLoginPage    from './pages/EmployeeLoginPage';
 import ProtectedRoute       from './components/ProtectedRoute';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { NotificationProvider } from './context/NotificationContext';
+import { NotificationToastContainer } from './components/NotificationToast';
 import './index.css';
 
 function AppLayout() {
@@ -32,6 +34,7 @@ function AppLayout() {
           <Route path="*"                         element={<Navigate to="/dashboard" replace />} />
         </Routes>
       </div>
+      <NotificationToastContainer />
     </div>
   );
 }
@@ -59,9 +62,11 @@ function RootNavigator() {
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <RootNavigator />
-      </BrowserRouter>
+      <NotificationProvider>
+        <BrowserRouter>
+          <RootNavigator />
+        </BrowserRouter>
+      </NotificationProvider>
     </AuthProvider>
   );
 }

@@ -59,6 +59,16 @@ export default function ApplicationsPage() {
 
   useEffect(() => { load(); }, [filter]);
 
+  // Live auto-refresh when real-time WebSocket/SSE notifications arrive
+  useEffect(() => {
+    const handleDataUpdate = () => {
+      console.log('Real-time notification received: refreshing applications queue without page reload');
+      load();
+    };
+    window.addEventListener('loan-data-updated', handleDataUpdate);
+    return () => window.removeEventListener('loan-data-updated', handleDataUpdate);
+  }, [filter]);
+
   return (
     <div className="page">
       <div className="filter-bar">

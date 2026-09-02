@@ -311,3 +311,38 @@ export const employeeLogin = async (username, password) => {
 
   return data;
 };
+
+// ── Live Notifications (SSE / WebSockets) ─────────────────────────────
+const NOTIF_ROOT = BASE.replace(/\/loans\/?$/, '/notifications');
+
+export const getNotificationStreamUrl = (username = 'markj') => {
+  return `${NOTIF_ROOT}/stream?username=${encodeURIComponent(username)}`;
+};
+
+export const fetchNotifications = (username = 'markj') =>
+  fetch(`${NOTIF_ROOT}?username=${encodeURIComponent(username)}`, {
+    headers: getAuthHeaders()
+  }).then(r => {
+    if (!r.ok) return [];
+    return r.json();
+  }).catch(() => []);
+
+export const markNotificationAsRead = (id) =>
+  fetch(`${NOTIF_ROOT}/${id}/read`, {
+    method: 'POST',
+    headers: getAuthHeaders()
+  }).then(r => r.json()).catch(() => ({ success: false }));
+
+export const markAllNotificationsAsRead = (username = 'markj') =>
+  fetch(`${NOTIF_ROOT}/read-all?username=${encodeURIComponent(username)}`, {
+    method: 'POST',
+    headers: getAuthHeaders()
+  }).then(r => r.json()).catch(() => ({ success: false }));
+
+export const sendTestNotification = (params = {}) => {
+  const q = new URLSearchParams(params).toString();
+  return fetch(`${NOTIF_ROOT}/test?${q}`, {
+    method: 'POST',
+    headers: getAuthHeaders()
+  }).then(r => r.json());
+};

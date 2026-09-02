@@ -42,6 +42,7 @@ public class LoanApplicationService {
     private final DocumentStorageProxyService documentStorageProxy;
     private final LoanDurableOrchestrator durableOrchestrator;
     private final AzureEventBusPublisherService eventBusPublisher;
+    private final NotificationService notificationService;
 
     public LoanApplicationService(LoanApplicationRepository applicationRepository,
                                   LoanSchemeRepository schemeRepository,
@@ -51,7 +52,8 @@ public class LoanApplicationService {
                                   EMICalculatorProxyService emiCalculatorProxy,
                                   DocumentStorageProxyService documentStorageProxy,
                                   LoanDurableOrchestrator durableOrchestrator,
-                                  AzureEventBusPublisherService eventBusPublisher) {
+                                  AzureEventBusPublisherService eventBusPublisher,
+                                  NotificationService notificationService) {
         this.applicationRepository = applicationRepository;
         this.schemeRepository = schemeRepository;
         this.auditLogRepository = auditLogRepository;
@@ -61,6 +63,7 @@ public class LoanApplicationService {
         this.documentStorageProxy = documentStorageProxy;
         this.durableOrchestrator = durableOrchestrator;
         this.eventBusPublisher = eventBusPublisher;
+        this.notificationService = notificationService;
     }
 
     @Transactional
@@ -140,12 +143,24 @@ public class LoanApplicationService {
         app.setInterestRate(scheme.getBaseInterestRate());
         app.setCalculatedEMI(emi);
         app.setStatus(LoanStatus.SUBMITTED);
+        app.setAssignedManager("markj"); // Auto-assign to credit manager markj
 
         boolean hasDocs = request.documentIds() != null && !request.documentIds().isEmpty();
         app.setDocumentProvided(hasDocs);
 
         LoanApplication savedApp = applicationRepository.save(app);
-        recordAuditLog(applicationId, null, LoanStatus.SUBMITTED, "APPLICANT", "Initial loan application submitted.");
+        recordAuditLog(applicationId, null, LoanStatus.SUBMITTED, "APPLICANT", "Initial loan application submitted. Assigned to markj.");
+
+        // Dispatch Real-time Notification to Employee markj
+        notificationService.sendNotification(new NotificationDTO(
+                "markj",
+                "New Case Assigned: " + app.getCustomerName(),
+                "New loan application " + applicationId + " submitted by " + app.getCustomerName() + " (" + app.getCustomerId() + ") for ₹" + app.getLoanAmount() + ".",
+                "NEW_CASE_ASSIGNED",
+                app.getCustomerId(),
+                app.getCustomerName(),
+                applicationId
+        ));
 
         // 3. Link uploaded documents
         if (hasDocs) {
@@ -200,6 +215,17 @@ public class LoanApplicationService {
 
         // Publish Completion Event to Azure Service Bus
         eventBusPublisher.publishLoanCompletedEvent(finalizedApp);
+
+        // Dispatch Real-time Notification
+        notificationService.sendNotification(new NotificationDTO(
+                "markj",
+                "Decision Processed: " + applicationId,
+                "Application " + applicationId + " for " + finalizedApp.getCustomerName() + " was marked " + request.decision() + " by " + request.managerId() + ".",
+                "DECISION_RECORDED",
+                finalizedApp.getCustomerId(),
+                finalizedApp.getCustomerName(),
+                applicationId
+        ));
 
         return mapToResponse(finalizedApp);
     }
@@ -390,6 +416,18 @@ public class LoanApplicationService {
         }
 
         LoanApplication saved = applicationRepository.save(app);
+
+        // Dispatch Real-time Notification for Document Upload to Employee markj
+        notificationService.sendNotification(new NotificationDTO(
+                "markj",
+                "Document Uploaded: " + saved.getCustomerName(),
+                "Customer " + saved.getCustomerName() + " (" + saved.getCustomerId() + ") has uploaded " + fileName + " (" + docType.name() + ").",
+                "DOCUMENT_UPLOADED",
+                saved.getCustomerId(),
+                saved.getCustomerName(),
+                applicationId
+        ));
+
         return mapToResponse(saved);
     }
 
