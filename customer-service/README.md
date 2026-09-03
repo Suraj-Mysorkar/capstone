@@ -81,6 +81,27 @@ contains other services' tables.
 | PATCH  | `/api/customers/{id}/onboarding-status`| `customers.write`                | Transition onboarding status        |
 | DELETE | `/api/customers/{id}`                  | `customer_admin`                 | Delete a customer profile           |
 | GET    | `/api/customers/ping`                  | none                              | Liveness check                      |
+| POST   | `/api/customers/loan-manager-assignments` | none (server-to-server)      | Assign a loan manager to a customer's loan application & notify the customer |
+| GET    | `/api/customers/loan-manager-assignments?customerId=` | none              | List a customer's loan manager assignments |
+
+### Loan manager assignment
+
+When a customer applies for a loan, the **loan-service** calls
+`POST /api/customers/loan-manager-assignments` with the customer id (and the
+application id / loan details). customer-service then:
+
+1. picks the loan manager carrying the fewest current assignments from the pool
+   in the shared `Users` table (`user_role = 'manager'`, seeded at startup by
+   `LoanManagerSeeder` — `mgr.arjun` / `mgr.meera` / `mgr.karan` / `mgr.divya`,
+   password `Manager@123`),
+2. records the assignment in `loan_manager_assignments` (idempotent per
+   `applicationId`),
+3. publishes `com.bank.customer.loanmanagerassigned` to Event Grid so the
+   **notification service** emails the customer who is handling their application.
+
+Request body: `{ "customerId": "<uuid>", "applicationId": "APP-…", "loanType": "PERSONAL_LOAN", "loanAmount": 500000 }`
+(`customerEmail` / `customerName` are accepted as a fallback when the profile is
+not known here).
 
 Onboarding status follows a fixed state machine (see
 `OnboardingStatusTransitionValidator`):
@@ -94,14 +115,32 @@ Any state → SUSPENDED
 
 ## Events published
 
-| Event type                          | Trigger                          |
-|--------------------------------------|-----------------------------------|
-| `com.bank.customer.registered`      | New customer registration         |
-| `com.bank.customer.statuschanged`   | Onboarding status transition      |
+| Event type                              | Trigger                          |
+|-----------------------------------------|-----------------------------------|
+| `com.bank.customer.registered`          | New customer registration         |
+| `com.bank.customer.statuschanged`       | Onboarding status transition      |
+| `com.bank.customer.loanmanagerassigned` | Loan manager assigned on loan application |
 
 Events are published as CloudEvents to the shared Event Grid topic. Publish
 failures are logged but do not fail the originating request (the SQL write
 has already committed).
+
+`com.bank.customer.loanmanagerassigned` data payload:
+
+```json
+{
+  "customerId": "…", "customerEmail": "…", "customerName": "…",
+  "applicationId": "APP-…", "loanType": "PERSONAL_LOAN", "loanAmount": 500000,
+  "managerName": "Arjun Rao", "managerLogin": "mgr.arjun", "managerEmail": "…",
+  "message": "A relationship manager (Arjun Rao) has been assigned to your loan application APP-… …",
+  "occurredAt": "2026-09-03T…Z"
+}
+```
+
+> **notification-service:** add a branch in `NotificationFunction.handleGenericEvent`
+> for `com.bank.customer.loanmanagerassigned` that emails `customerEmail` using
+> `message` / `managerName`. Until then the existing generic loan-event routing
+> still sends the customer a loan notification email for this event.
 
 ## Build & test
 

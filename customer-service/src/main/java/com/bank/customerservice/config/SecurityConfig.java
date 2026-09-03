@@ -41,6 +41,9 @@ public class SecurityConfig {
     private static final String[] PUBLIC_PATHS = {
             "/actuator/health/**", "/actuator/info", "/api/customers/ping",
             "/api/customers/auth/**",
+            // Server-to-server loan-manager assignment (called by loan-service on
+            // loan application). Same trust model as the portal auth endpoints.
+            "/api/customers/loan-manager-assignments", "/api/customers/loan-manager-assignments/**",
             "/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/h2-console/**"
     };
 

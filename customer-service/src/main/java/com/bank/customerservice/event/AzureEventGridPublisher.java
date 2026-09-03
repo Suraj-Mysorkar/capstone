@@ -16,6 +16,7 @@ import java.util.List;
  * Event types:
  *  - com.bank.customer.registered
  *  - com.bank.customer.statuschanged
+ *  - com.bank.customer.loanmanagerassigned
  */
 @Component
 @RequiredArgsConstructor
@@ -25,6 +26,7 @@ public class AzureEventGridPublisher implements EventPublisher {
     private static final String SOURCE = "/customer-service";
     private static final String TYPE_REGISTERED = "com.bank.customer.registered";
     private static final String TYPE_STATUS_CHANGED = "com.bank.customer.statuschanged";
+    private static final String TYPE_LOAN_MANAGER_ASSIGNED = "com.bank.customer.loanmanagerassigned";
 
     private final EventGridPublisherClient<CloudEvent> eventGridClient;
 
@@ -54,15 +56,46 @@ public class AzureEventGridPublisher implements EventPublisher {
         publish(cloudEvent, TYPE_STATUS_CHANGED, event.customerId().toString());
     }
 
-    private void publish(CloudEvent cloudEvent, String type, String correlationId) {
+    @Override
+    public void publishLoanManagerAssigned(LoanManagerAssignedEvent event) {
+        String correlationId = event.customerId() != null
+                ? event.customerId().toString()
+                : (event.applicationId() != null ? event.applicationId() : event.customerEmail());
+
+        CloudEvent cloudEvent = new CloudEvent(
+                SOURCE,
+                TYPE_LOAN_MANAGER_ASSIGNED,
+                com.azure.core.util.BinaryData.fromObject(event),
+                CloudEventDataFormat.JSON,
+                "application/json"
+        ).setSubject("customer/" + correlationId);
+
+        // Let a failure propagate so the caller can record that the customer was
+        // NOT notified (the assignment itself is already committed).
+        if (!publish(cloudEvent, TYPE_LOAN_MANAGER_ASSIGNED, correlationId)) {
+            throw new EventPublishException(TYPE_LOAN_MANAGER_ASSIGNED, correlationId);
+        }
+    }
+
+    /** @return {@code true} if the event was accepted by Event Grid. */
+    private boolean publish(CloudEvent cloudEvent, String type, String correlationId) {
         try {
             eventGridClient.sendEvents(List.of(cloudEvent));
             log.info("Published event type={} correlationId={} to Event Grid", type, correlationId);
+            return true;
         } catch (Exception ex) {
             // Publishing failures should not fail the customer-facing request; the write
             // to Azure SQL has already committed. Log for alerting / manual replay.
             log.error("Failed to publish event type={} correlationId={}: {}",
                     type, correlationId, ex.getMessage(), ex);
+            return false;
+        }
+    }
+
+    /** Thrown by {@link #publishLoanManagerAssigned} when Event Grid rejects the event. */
+    static class EventPublishException extends RuntimeException {
+        EventPublishException(String type, String correlationId) {
+            super("Event Grid rejected event type=" + type + " correlationId=" + correlationId);
         }
     }
 }

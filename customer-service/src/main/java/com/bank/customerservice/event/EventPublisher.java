@@ -10,4 +10,6 @@ public interface EventPublisher {
     void publishCustomerRegistered(CustomerRegisteredEvent event);
 
     void publishCustomerStatusChanged(CustomerStatusChangedEvent event);
+
+    void publishLoanManagerAssigned(LoanManagerAssignedEvent event);
 }
