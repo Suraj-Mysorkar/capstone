@@ -3,23 +3,39 @@ import { KeyRound, Plug, CheckCircle2, XCircle } from 'lucide-react';
 import {
   apiBase, apiBaseSource, setApiBase, getToken, setToken, ping,
 } from '../services/api';
+import {
+  loanBase, loanBaseSource, setLoanBase,
+  docBase, docBaseSource, setDocBase,
+} from '../services/loanApi';
+
+function UrlRow({ label, value, source, onChange }) {
+  const [v, setV] = useState(value);
+  const [saved, setSaved] = useState(false);
+  return (
+    <div className="form-group" style={{ marginBottom: 14 }}>
+      <label className="form-label">
+        {label} <span className="text-muted">— from {source}</span>
+      </label>
+      <div className="flex-row" style={{ gap: 8 }}>
+        <input className="form-input" style={{ flex: 1 }} value={v} onChange={(e) => setV(e.target.value)} />
+        <button
+          className="btn btn-primary"
+          onClick={() => { onChange(v); setSaved(true); setTimeout(() => setSaved(false), 2000); }}
+        >
+          Save
+        </button>
+        <button className="btn btn-ghost" onClick={() => { onChange(''); setV(''); }}>Reset</button>
+      </div>
+      {saved && <span style={{ fontSize: '.75rem', color: 'var(--green)' }}>Saved to this browser.</span>}
+    </div>
+  );
+}
 
 export default function SettingsPage() {
-  const [base, setBaseValue] = useState(apiBase());
-  const [baseSaved, setBaseSaved] = useState(false);
-
   const [token, setTokenValue] = useState(getToken());
   const [tokenSaved, setTokenSaved] = useState(false);
-
-  const [test, setTest] = useState(null); // null | 'ok' | 'fail'
+  const [test, setTest] = useState(null);
   const [testMsg, setTestMsg] = useState('');
-
-  const saveBase = () => {
-    setApiBase(base);
-    setBaseValue(apiBase());
-    setBaseSaved(true);
-    setTimeout(() => setBaseSaved(false), 2500);
-  };
 
   const saveToken = () => {
     setToken(token);
@@ -28,12 +44,11 @@ export default function SettingsPage() {
   };
 
   const runPing = async () => {
-    setTest(null);
-    setTestMsg('');
+    setTest(null); setTestMsg('');
     try {
       const res = await ping();
       setTest('ok');
-      setTestMsg(`${res.service} · ${res.status} · ${res.timestamp}`);
+      setTestMsg(`${res.service} · ${res.status}`);
     } catch (e) {
       setTest('fail');
       setTestMsg(e.message);
@@ -42,68 +57,43 @@ export default function SettingsPage() {
 
   return (
     <div className="page">
-      {/* ── API connection ─────────────────────────────────── */}
       <div className="card p-6">
         <div className="card-header-title" style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <Plug size={18} /> API Connection
+          <Plug size={18} /> Service Endpoints
         </div>
-        <div className="text-muted" style={{ marginBottom: 14 }}>
-          Point the console at a running customer-service. Set once here (stored in this
-          browser) or bake it into the build with{' '}
-          <span className="font-mono">VITE_CUSTOMER_API_URL</span>.
+        <div className="text-muted" style={{ marginBottom: 16 }}>
+          Point the portal at the running backend services. Stored in this browser
+          only; build-time env vars (<span className="font-mono">VITE_CUSTOMER_API_URL</span>,{' '}
+          <span className="font-mono">VITE_LOAN_API_URL</span>,{' '}
+          <span className="font-mono">VITE_DOC_API_URL</span>) are used otherwise.
         </div>
 
-        {baseSaved && <div className="success-box">API base URL saved to this browser.</div>}
-
-        <div className="form-group">
-          <label className="form-label">
-            API base URL <span className="text-muted">— currently from {apiBaseSource()}</span>
-          </label>
-          <input
-            className="form-input"
-            value={base}
-            onChange={(e) => setBaseValue(e.target.value)}
-            placeholder="https://team6-customer-service.azurewebsites.net/api/customers"
-          />
-        </div>
+        <UrlRow label="customer-service (registration & onboarding)" value={apiBase()} source={apiBaseSource()} onChange={(v) => { setApiBase(v); }} />
+        <UrlRow label="loan-service (schemes, EMI, apply, applications)" value={loanBase()} source={loanBaseSource()} onChange={(v) => { setLoanBase(v); }} />
+        <UrlRow label="document-service (uploads & document status)" value={docBase()} source={docBaseSource()} onChange={(v) => { setDocBase(v); }} />
 
         <div className="mt-4 flex-row">
-          <button className="btn btn-primary" onClick={saveBase}>Save URL</button>
-          <button className="btn btn-ghost" onClick={() => { setApiBase(''); setBaseValue(apiBase()); }}>
-            Reset to default
-          </button>
-          <button className="btn btn-ghost" onClick={runPing}>Test /ping</button>
-          {test === 'ok' && (
-            <span className="badge-server" style={{ color: 'var(--green)' }}>
-              <CheckCircle2 size={14} /> {testMsg}
-            </span>
-          )}
-          {test === 'fail' && (
-            <span className="badge-server" style={{ color: 'var(--red)' }}>
-              <XCircle size={14} /> {testMsg}
-            </span>
-          )}
+          <button className="btn btn-ghost" onClick={runPing}>Test customer-service /ping</button>
+          {test === 'ok' && <span className="badge-server" style={{ color: 'var(--green)' }}><CheckCircle2 size={14} /> {testMsg}</span>}
+          {test === 'fail' && <span className="badge-server" style={{ color: 'var(--red)' }}><XCircle size={14} /> {testMsg}</span>}
         </div>
       </div>
 
-      {/* ── Bearer token ───────────────────────────────────── */}
       <div className="card p-6 mt-4">
         <div className="card-header-title" style={{ marginBottom: 8, display: 'flex', alignItems: 'center', gap: 8 }}>
-          <KeyRound size={18} /> Bearer Token
+          <KeyRound size={18} /> Bearer Token (customer-service only)
         </div>
         <div className="text-muted" style={{ marginBottom: 14 }}>
-          Every endpoint except <span className="font-mono">/ping</span> requires a Microsoft Entra ID
-          JWT. Paste an access token — it is stored only in this browser's{' '}
-          <span className="font-mono">localStorage</span> and sent as{' '}
-          <span className="font-mono">Authorization: Bearer …</span>.
-          (Not needed when the service runs with the <span className="font-mono">local</span> profile.)
+          Only needed if customer-service runs with Entra ID auth (not the{' '}
+          <span className="font-mono">local</span> profile). Paste an access token —
+          stored in this browser's <span className="font-mono">localStorage</span>.
         </div>
         {tokenSaved && <div className="success-box">Token saved to this browser.</div>}
         <div className="form-group">
           <label className="form-label">Access token (JWT)</label>
           <textarea
             className="form-input"
-            style={{ minHeight: 120, resize: 'vertical', fontFamily: 'monospace', fontSize: '.75rem' }}
+            style={{ minHeight: 100, resize: 'vertical', fontFamily: 'monospace', fontSize: '.75rem' }}
             value={token}
             onChange={(e) => setTokenValue(e.target.value)}
             placeholder="eyJ0eXAiOiJKV1QiLCJhbGci…"

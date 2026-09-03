@@ -1,54 +1,45 @@
-import React, { useEffect, useState } from 'react';
-import { useLocation, Link } from 'react-router-dom';
-import { KeyRound } from 'lucide-react';
-import { ping, getToken } from '../services/api';
+import React from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { LogOut } from 'lucide-react';
+import { useAuth } from '../context/AuthContext';
 
 const titles = {
-  '/':          'Dashboard',
-  '/customers': 'Customer Directory',
-  '/register':  'Register Customer',
-  '/lookup':    'Customer Lookup',
-  '/settings':  'Settings',
+  '/': 'Home',
+  '/emi': 'EMI Calculator',
+  '/documents': 'My Documents',
+  '/apply': 'Apply for Loan',
+  '/applications': 'My Applications',
+  '/settings': 'Settings',
 };
 
 export default function Header() {
   const { pathname } = useLocation();
+  const navigate = useNavigate();
+  const { currentUser, logout } = useAuth();
   const base = '/' + pathname.split('/')[1];
-  const title = pathname.startsWith('/customers/') ? 'Customer Detail' : (titles[base] || 'Dashboard');
+  const title = pathname.startsWith('/applications/') ? 'Application Detail' : (titles[base] || 'Everyday Bank');
 
-  const [health, setHealth] = useState('checking'); // checking | up | down
-  const hasToken = !!getToken();
-
-  useEffect(() => {
-    let alive = true;
-    ping()
-      .then(() => alive && setHealth('up'))
-      .catch(() => alive && setHealth('down'));
-    return () => { alive = false; };
-  }, [pathname]);
+  const initials = (currentUser?.name || currentUser?.email || '?')
+    .split(/[\s@.]+/).filter(Boolean).slice(0, 2).map((s) => s[0]?.toUpperCase()).join('');
 
   return (
     <header className="header">
       <div className="header-title">{title}</div>
       <div className="header-right">
-        <span
-          className="badge-server"
-          style={{ color: health === 'up' ? 'var(--green)' : health === 'down' ? 'var(--red)' : 'var(--muted)' }}
-        >
-          {health === 'up' ? 'customer-service · UP' : health === 'down' ? 'customer-service · unreachable' : 'checking…'}
-        </span>
-
-        <Link
-          to="/settings"
-          className="badge-server"
-          style={{ color: hasToken ? 'var(--accent)' : 'var(--muted)', textDecoration: 'none' }}
-          title={hasToken ? 'Bearer token is set' : 'No bearer token — protected calls will 401'}
-        >
-          <KeyRound size={14} />
-          {hasToken ? 'Token set' : 'No token'}
-        </Link>
-
-        <div className="avatar">CS</div>
+        <span className="badge-server">Online</span>
+        {currentUser && (
+          <>
+            <div className="avatar"><div className="avatar-initials">{initials}</div></div>
+            <span className="user-name" style={{ fontSize: '.82rem' }}>{currentUser.name || currentUser.email}</span>
+            <button
+              className="btn btn-ghost"
+              style={{ padding: '5px 10px', fontSize: '.75rem' }}
+              onClick={() => { logout(); navigate('/login'); }}
+            >
+              <LogOut size={13} /> Sign out
+            </button>
+          </>
+        )}
       </div>
     </header>
   );

@@ -1,149 +1,249 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import {
-  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell,
+  PieChart, Pie, Cell, Legend, Tooltip, ResponsiveContainer,
 } from 'recharts';
-import { Users, UserCheck, ShieldAlert, Clock, RefreshCw } from 'lucide-react';
-import { listCustomers, getToken } from '../services/api';
-import { ONBOARDING_STATUSES, prettyStatus, statusBadgeClass } from '../lib/onboarding';
+import {
+  FileText, CheckCircle2, Clock, ShieldAlert, FolderUp, Calculator, RefreshCw, ArrowRight,
+} from 'lucide-react';
+import { fetchApplications, fetchCustomerDocuments, fetchSchemes } from '../services/loanApi';
+import { getCustomerByEmail } from '../services/api';
+import { useSession, docCustomerId } from '../lib/session';
+import { HAPPY_PATH, prettyStatus } from '../lib/onboarding';
 
-const BAR_COLORS = {
-  REGISTERED: '#00d2ff',
-  DOCUMENTS_PENDING: '#f1c40f',
-  DOCUMENTS_SUBMITTED: '#f1c40f',
-  KYC_IN_REVIEW: '#9d4edd',
-  KYC_APPROVED: '#2ecc71',
-  KYC_REJECTED: '#e74c3c',
-  ONBOARDING_COMPLETE: '#2ecc71',
-  SUSPENDED: '#e74c3c',
-};
+const PIE_COLORS = ['#10b981', '#f59e0b', '#f97316', '#ef4444', '#6366f1'];
 
-function StatCard({ label, value, icon: Icon }) {
+const TYPE_ICONS = { PERSONAL_LOAN: '👤', HOME_LOAN: '🏡', VEHICLE_LOAN: '🚗', EDUCATION_LOAN: '🎓' };
+const TYPE_LABEL = { PERSONAL_LOAN: 'Personal Loan', HOME_LOAN: 'Home Loan', VEHICLE_LOAN: 'Vehicle Loan', EDUCATION_LOAN: 'Education Loan' };
+
+function fmt(n) {
+  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n || 0);
+}
+function fmtShort(n) {
+  if (n >= 10000000) return '₹' + (n / 10000000).toFixed(1) + ' Cr';
+  if (n >= 100000) return '₹' + (n / 100000).toFixed(1) + ' L';
+  return '₹' + Number(n || 0).toLocaleString('en-IN');
+}
+
+function statusBadge(s) {
+  if (s === 'APPROVED') return <span className="badge badge-approved">Approved</span>;
+  if (s === 'REJECTED') return <span className="badge badge-rejected">Rejected</span>;
+  if (s === 'MANUAL_REVIEW_REQUIRED') return <span className="badge badge-review">Under Review</span>;
+  if (s === 'DOCUMENT_REVIEW_PENDING') return <span className="badge badge-warning">Awaiting Docs</span>;
+  return <span className="badge badge-default">{(s || '').replace(/_/g, ' ')}</span>;
+}
+
+function LifecycleStrip({ current }) {
+  const idx = HAPPY_PATH.indexOf(current);
   return (
-    <div className="card stat-card">
-      <div>
-        <div className="stat-label">{label}</div>
-        <div className="stat-value">{value}</div>
-      </div>
-      <div className="stat-icon"><Icon size={22} /></div>
+    <div className="lifecycle">
+      {HAPPY_PATH.map((s, i) => {
+        const state = current === s ? 'current' : idx > -1 && i < idx ? 'done' : 'todo';
+        return (
+          <React.Fragment key={s}>
+            <div className={`lifecycle-node ${state}`}>{prettyStatus(s)}</div>
+            {i < HAPPY_PATH.length - 1 && <div className="lifecycle-arrow">→</div>}
+          </React.Fragment>
+        );
+      })}
     </div>
   );
 }
 
 export default function Dashboard() {
-  const [customers, setCustomers] = useState([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState('');
+  const { session, update } = useSession();
   const navigate = useNavigate();
+  const [apps, setApps] = useState([]);
+  const [docs, setDocs] = useState([]);
+  const [schemes, setSchemes] = useState([]);
+  const [loading, setLoading] = useState(true);
 
   const load = async () => {
     setLoading(true);
-    setError('');
+    const email = (session?.email || '').toLowerCase();
     try {
-      // Pull a wide page for the overview; the directory page does real pagination.
-      const page = await listCustomers({ size: 200, sort: 'createdAt,desc' });
-      setCustomers(page?.content ?? []);
-    } catch (e) {
-      setError(e.status === 401
-        ? 'Not authorized — set a bearer token on the Settings page.'
-        : e.message);
-      setCustomers([]);
+      const all = await fetchApplications();
+      const mine = (Array.isArray(all) ? all : []).filter(
+        (a) => (a.customerEmail || '').toLowerCase() === email || (session?.loanCustomerId && a.customerId === session.loanCustomerId),
+      );
+      setApps(mine);
+    } catch { setApps([]); }
+
+    const cid = docCustomerId(session);
+    if (cid) {
+      try { setDocs(await fetchCustomerDocuments(cid)); } catch { setDocs([]); }
     }
+
+    try {
+      const profile = await getCustomerByEmail(email);
+      if (profile?.onboardingStatus && profile.onboardingStatus !== session.onboardingStatus) {
+        update({ onboardingStatus: profile.onboardingStatus, customerServiceId: profile.id });
+      }
+    } catch { /* no profile */ }
+
     setLoading(false);
   };
 
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    fetchSchemes().then((d) => setSchemes(Array.isArray(d) ? d : [])).catch(() => setSchemes([]));
+  }, []);
 
-  const counts = ONBOARDING_STATUSES.map((s) => ({
-    status: s,
-    label: prettyStatus(s),
-    count: customers.filter((c) => c.onboardingStatus === s).length,
-  }));
+  useEffect(() => { load(); /* eslint-disable-next-line */ }, [session?.email, session?.loanCustomerId]);
 
-  const total = customers.length;
-  const complete = counts.find((c) => c.status === 'ONBOARDING_COMPLETE')?.count ?? 0;
-  const inReview = counts.find((c) => c.status === 'KYC_IN_REVIEW')?.count ?? 0;
-  const suspended = counts.find((c) => c.status === 'SUSPENDED')?.count ?? 0;
+  const approved = apps.filter((a) => a.status === 'APPROVED').length;
+  const review = apps.filter((a) => a.status === 'MANUAL_REVIEW_REQUIRED').length;
+  const docPending = apps.filter((a) => a.status === 'DOCUMENT_REVIEW_PENDING').length;
+  const rejected = apps.filter((a) => a.status === 'REJECTED').length;
+
+  const pie = [
+    { name: 'Approved', value: approved },
+    { name: 'Under Review', value: review },
+    { name: 'Awaiting Docs', value: docPending },
+    { name: 'Rejected', value: rejected },
+    { name: 'In Progress', value: apps.length - approved - review - docPending - rejected },
+  ].filter((p) => p.value > 0);
 
   return (
     <div className="page">
-      {!getToken() && (
-        <div className="info-box">
-          No bearer token set — the customer-service API rejects unauthenticated calls.
-          Add an Entra ID JWT on the <strong>Settings</strong> page to load data.
+      <div className="card p-6" style={{ marginBottom: 20, display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+        <div>
+          <div style={{ fontSize: '1.2rem', fontWeight: 800 }}>
+            Welcome{session?.name ? `, ${session.name}` : ''} 👋
+          </div>
+          <div className="text-muted" style={{ marginTop: 4 }}>{session?.email}</div>
+        </div>
+        <button className="btn btn-ghost" onClick={load}><RefreshCw size={14} /> Refresh</button>
+      </div>
+
+      {session?.onboardingStatus && (
+        <div className="card p-6" style={{ marginBottom: 20 }}>
+          <div className="card-header-title" style={{ marginBottom: 16 }}>Your Onboarding Status</div>
+          <LifecycleStrip current={session.onboardingStatus} />
         </div>
       )}
-      {error && <div className="error-box">{error}</div>}
 
       <div className="stats-grid">
-        <StatCard label="Total Customers" value={loading ? '—' : total} icon={Users} />
-        <StatCard label="Onboarding Complete" value={loading ? '—' : complete} icon={UserCheck} />
-        <StatCard label="KYC In Review" value={loading ? '—' : inReview} icon={Clock} />
-        <StatCard label="Suspended" value={loading ? '—' : suspended} icon={ShieldAlert} />
+        {[
+          { label: 'My Applications', value: apps.length, icon: FileText, color: '#6366f1' },
+          { label: 'Approved', value: approved, icon: CheckCircle2, color: '#10b981' },
+          { label: 'Under Review', value: review, icon: Clock, color: '#f59e0b' },
+          { label: 'Awaiting Documents', value: docPending, icon: ShieldAlert, color: '#f97316' },
+          { label: 'My Documents', value: docs.length, icon: FolderUp, color: '#0ea5e9' },
+        ].map(({ label, value, icon: Icon, color }) => (
+          <div key={label} className="card stat-card">
+            <div>
+              <div className="stat-label">{label}</div>
+              <div className="stat-value" style={{ fontSize: '1.55rem' }}>{loading ? '—' : value}</div>
+            </div>
+            <div className="stat-icon" style={{ background: color + '18', color }}><Icon size={20} /></div>
+          </div>
+        ))}
       </div>
 
-      <div className="card p-6 mt-4">
-        <div className="card-header-title" style={{ marginBottom: 16 }}>
-          Onboarding Status Distribution
+      {/* ── Loan Schemes (centre of the homepage) ─────────────────────── */}
+      <div className="card p-6" style={{ marginBottom: 24 }}>
+        <div className="card-header" style={{ padding: 0, marginBottom: 16, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+          <div>
+            <div className="card-header-title">Loan Schemes</div>
+            <div className="text-muted" style={{ fontSize: '.8rem', marginTop: 2 }}>Pick a product to start an application</div>
+          </div>
+          <button className="btn btn-primary" onClick={() => navigate('/apply')}>Apply for a Loan <ArrowRight size={15} /></button>
         </div>
-        {loading ? <div className="spinner" /> : (
-          <ResponsiveContainer width="100%" height={280}>
-            <BarChart data={counts} margin={{ top: 8, right: 8, left: -18, bottom: 40 }}>
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,.06)" />
-              <XAxis
-                dataKey="label" tick={{ fill: '#7b7f9e', fontSize: 11 }}
-                angle={-25} textAnchor="end" interval={0} height={60}
-              />
-              <YAxis allowDecimals={false} tick={{ fill: '#7b7f9e', fontSize: 11 }} />
-              <Tooltip
-                contentStyle={{ background: '#0d1225', border: '1px solid rgba(255,255,255,.1)', borderRadius: 8 }}
-                labelStyle={{ color: '#eef0f7' }}
-              />
-              <Bar dataKey="count" radius={[4, 4, 0, 0]}>
-                {counts.map((c) => <Cell key={c.status} fill={BAR_COLORS[c.status] || '#7b7f9e'} />)}
-              </Bar>
-            </BarChart>
-          </ResponsiveContainer>
-        )}
-      </div>
 
-      <div className="card mt-4">
-        <div className="card-header">
-          <div className="card-header-title">Recent Customers</div>
-          <button className="btn btn-ghost" style={{ padding: '7px 16px', fontSize: '.8rem' }} onClick={load}>
-            <RefreshCw size={14} /> Refresh
-          </button>
-        </div>
-        {loading ? <div className="spinner" /> : customers.length === 0 ? (
-          <div className="empty">No customers yet.</div>
+        {schemes.length === 0 ? (
+          <div className="empty">Loading loan products…</div>
         ) : (
-          <div className="table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Name</th><th>Email</th><th>City</th><th>Status</th><th>Created</th>
-                </tr>
-              </thead>
-              <tbody>
-                {customers.slice(0, 8).map((c) => (
-                  <tr key={c.id} onClick={() => navigate(`/customers/${c.id}`)}>
-                    <td style={{ fontWeight: 600 }}>{c.firstName} {c.lastName}</td>
-                    <td className="text-muted">{c.email}</td>
-                    <td className="text-muted">{c.city || '—'}</td>
-                    <td>
-                      <span className={`badge ${statusBadgeClass(c.onboardingStatus)}`}>
-                        {prettyStatus(c.onboardingStatus)}
-                      </span>
-                    </td>
-                    <td className="text-muted">
-                      {c.createdAt ? new Date(c.createdAt).toLocaleDateString() : '—'}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+          <div className="scheme-grid">
+            {schemes.map((s) => (
+              <div
+                key={s.schemeId}
+                className="card scheme-card"
+                onClick={() => navigate('/apply', { state: { schemeId: s.schemeId } })}
+              >
+                <div className="flex-row">
+                  <span style={{ fontSize: '1.7rem' }}>{TYPE_ICONS[s.loanType] || '💳'}</span>
+                  <span className="scheme-type-pill">{TYPE_LABEL[s.loanType] || s.loanType}</span>
+                </div>
+                <div className="scheme-title">{s.schemeName || s.schemeId}</div>
+                <div className="scheme-interest">
+                  {s.baseInterestRate?.toFixed(2) ?? s.interestRate}%
+                  <span style={{ fontSize: '.72rem', color: 'var(--muted)', fontWeight: 400 }}> p.a.</span>
+                </div>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, marginTop: 2 }}>
+                  <div className="scheme-row">
+                    <span className="scheme-row-label">Amount</span>
+                    <span>{fmtShort(s.minAmount)} – {fmtShort(s.maxAmount)}</span>
+                  </div>
+                  <div className="scheme-row">
+                    <span className="scheme-row-label">Tenure</span>
+                    <span>{s.minTenureMonths} – {s.maxTenureMonths} mo</span>
+                  </div>
+                </div>
+              </div>
+            ))}
           </div>
         )}
+      </div>
+
+      <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr', gap: 20, marginBottom: 24 }}>
+        <div className="card">
+          <div className="card-header" style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+            <div className="card-header-title">My Recent Applications</div>
+            <button className="btn btn-ghost" style={{ fontSize: '.8rem' }} onClick={() => navigate('/applications')}>View All →</button>
+          </div>
+          {loading ? <div className="spinner" /> : apps.length === 0 ? (
+            <div className="empty">
+              No applications yet.{' '}
+              <a onClick={() => navigate('/apply')} style={{ color: 'var(--accent)', cursor: 'pointer' }}>Apply now →</a>
+            </div>
+          ) : (
+            <div className="table-wrap p-4">
+              <table>
+                <thead>
+                  <tr><th>Application ID</th><th>Scheme</th><th>Amount</th><th>EMI</th><th>Status</th></tr>
+                </thead>
+                <tbody>
+                  {apps.slice(0, 6).map((a) => (
+                    <tr key={a.applicationId} onClick={() => navigate(`/applications/${a.applicationId}`)} style={{ cursor: 'pointer' }}>
+                      <td className="font-mono" style={{ fontSize: '.78rem', color: 'var(--accent)', fontWeight: 600 }}>{a.applicationId}</td>
+                      <td>{a.schemeName || a.schemeId}</td>
+                      <td style={{ fontWeight: 600 }}>{fmt(a.loanAmount)}</td>
+                      <td>{a.calculatedEMI != null ? fmt(a.calculatedEMI) : '—'}</td>
+                      <td>{statusBadge(a.status)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+
+        <div className="card p-6">
+          <div className="card-header-title" style={{ marginBottom: 4 }}>Application Status</div>
+          <div style={{ fontSize: '.78rem', color: 'var(--muted)', marginBottom: 16 }}>Your loan pipeline</div>
+          {pie.length === 0 ? (
+            <div className="empty">Nothing to show yet</div>
+          ) : (
+            <ResponsiveContainer width="100%" height={240}>
+              <PieChart>
+                <Pie data={pie} cx="50%" cy="45%" innerRadius={55} outerRadius={82} dataKey="value" paddingAngle={3}>
+                  {pie.map((_, i) => <Cell key={i} fill={PIE_COLORS[i % PIE_COLORS.length]} />)}
+                </Pie>
+                <Legend iconType="circle" wrapperStyle={{ fontSize: 11, color: 'var(--muted)' }} />
+                <Tooltip contentStyle={{ background: 'var(--panel-solid)', border: '1px solid var(--border)', borderRadius: 8 }} />
+              </PieChart>
+            </ResponsiveContainer>
+          )}
+        </div>
+      </div>
+
+      <div className="card p-6">
+        <div className="card-header-title" style={{ marginBottom: 16 }}>Quick Actions</div>
+        <div className="flex-row" style={{ flexWrap: 'wrap', gap: 12 }}>
+          <button className="btn btn-primary" onClick={() => navigate('/apply')}><FileText size={15} /> Apply for a Loan</button>
+          <button className="btn btn-ghost" onClick={() => navigate('/emi')}><Calculator size={15} /> EMI Calculator</button>
+          <button className="btn btn-ghost" onClick={() => navigate('/documents')}><FolderUp size={15} /> Upload Documents</button>
+        </div>
       </div>
     </div>
   );

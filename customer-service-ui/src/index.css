@@ -1,20 +1,26 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap');
 
-/* ── CSS Variables ───────────────────────────────────────── */
+/* ══════════════════════════════════════════════════════════
+   "Everyday Bank" theme — deliberately distinct from capstone-ui.
+   Warm aubergine surface + amber/emerald accents, rounder cards,
+   pill navigation. Same class names, different skin only.
+   ══════════════════════════════════════════════════════════ */
 :root {
-  --bg:            #080b16;
-  --bg2:           #0d1225;
-  --panel:         rgba(16, 22, 44, 0.65);
-  --border:        rgba(255,255,255,0.07);
-  --text:          #eef0f7;
-  --muted:         #7b7f9e;
-  --accent:        #00d2ff;
-  --accent2:       #9d4edd;
-  --green:         #2ecc71;
-  --red:           #e74c3c;
-  --yellow:        #f1c40f;
-  --radius:        12px;
-  --sidebar-w:     240px;
+  --bg:            #17131f;
+  --bg2:           #1e1826;
+  --panel:         rgba(38, 30, 48, 0.72);
+  --panel-solid:   #241d2e;
+  --border:        rgba(255,255,255,0.09);
+  --text:          #f4eef7;
+  --muted:         #a99fb4;
+  --accent:        #f5a524;
+  --accent-strong: #e0870f;
+  --accent2:       #34d399;
+  --green:         #34d399;
+  --red:           #fb7185;
+  --yellow:        #fbbf24;
+  --radius:        16px;
+  --sidebar-w:     244px;
   --header-h:      68px;
 }
 
@@ -22,12 +28,12 @@
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body, #root { height: 100%; }
 body {
-  font-family: 'Inter', sans-serif;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
   background: var(--bg);
   color: var(--text);
   background-image:
-    radial-gradient(ellipse at 10% 60%, rgba(157,78,221,.07), transparent 40%),
-    radial-gradient(ellipse at 90% 20%, rgba(0,210,255,.06), transparent 40%);
+    radial-gradient(ellipse at 12% 0%, rgba(245,165,36,.10), transparent 45%),
+    radial-gradient(ellipse at 92% 100%, rgba(52,211,153,.08), transparent 45%);
   background-attachment: fixed;
 }
 
@@ -42,12 +48,12 @@ body {
 .sidebar {
   width: var(--sidebar-w);
   flex-shrink: 0;
-  background: rgba(6,9,20,0.9);
+  background: #120e18;
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
-  padding: 24px 12px;
-  gap: 8px;
+  padding: 24px 14px;
+  gap: 6px;
 }
 .sidebar-logo {
   display: flex;
@@ -66,21 +72,20 @@ body {
   align-items: center;
   gap: 12px;
   padding: 11px 14px;
-  border-radius: 9px;
+  border-radius: 999px;
   cursor: pointer;
   color: var(--muted);
   font-size: .9rem;
-  font-weight: 500;
+  font-weight: 600;
   text-decoration: none;
   transition: all .18s;
 }
-.nav-link:hover { color: var(--text); background: rgba(255,255,255,.04); }
+.nav-link:hover { color: var(--text); background: rgba(255,255,255,.05); }
 .nav-link.active {
-  color: var(--accent);
-  background: rgba(0,210,255,.08);
-  border-left: 3px solid var(--accent);
-  padding-left: 11px;
+  color: #1a1206;
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
 }
+.nav-link.active svg { color: #1a1206; }
 .nav-divider {
   height: 1px;
   background: var(--border);
@@ -105,7 +110,7 @@ body {
   justify-content: space-between;
   padding: 0 32px;
   border-bottom: 1px solid var(--border);
-  background: rgba(8,11,22,.8);
+  background: rgba(18,14,24,.82);
   backdrop-filter: blur(10px);
 }
 .header-title { font-size: 1.2rem; font-weight: 700; }
@@ -145,7 +150,7 @@ body {
   backdrop-filter: blur(12px);
   border: 1px solid var(--border);
   border-radius: var(--radius);
-  box-shadow: 0 8px 32px rgba(0,0,0,.28);
+  box-shadow: 0 10px 30px rgba(10,6,16,.35);
 }
 
 /* ── Stats grid ──────────────────────────────────────────── */
@@ -223,19 +228,19 @@ tbody tr:last-child td { border-bottom: none; }
 .form-group { display: flex; flex-direction: column; gap: 6px; }
 .form-label { font-size: .8rem; font-weight: 600; color: var(--muted); }
 .form-input, .form-select {
-  background: rgba(0,0,0,.3);
+  background: rgba(0,0,0,.22);
   border: 1px solid var(--border);
   border-radius: 8px;
   padding: 10px 14px;
   color: var(--text);
-  font-family: 'Inter', sans-serif;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
   font-size: .88rem;
   outline: none;
   transition: border-color .18s;
 }
 .form-input:focus, .form-select:focus { border-color: var(--accent); }
 .form-input::placeholder { color: var(--muted); }
-.form-select option { background: #1a1f35; }
+.form-select option { background: #241d2e; }
 
 /* ── Buttons ─────────────────────────────────────────────── */
 .btn {
@@ -243,17 +248,17 @@ tbody tr:last-child td { border-bottom: none; }
   align-items: center;
   gap: 8px;
   padding: 10px 22px;
-  border-radius: 8px;
-  font-family: 'Inter', sans-serif;
+  border-radius: 999px;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
   font-size: .88rem;
-  font-weight: 600;
+  font-weight: 700;
   cursor: pointer;
   transition: all .18s;
   border: none;
 }
 .btn-primary {
-  background: linear-gradient(135deg, var(--accent), #0099cc);
-  color: #000;
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong));
+  color: #1a1206;
 }
 .btn-primary:hover { opacity: .88; transform: translateY(-1px); }
 .btn-primary:disabled { opacity: .4; cursor: not-allowed; transform: none; }
@@ -408,7 +413,7 @@ tbody tr:last-child td { border-bottom: none; }
   border: 1px solid var(--border);
   background: transparent;
   color: var(--muted);
-  font-family: 'Inter', sans-serif;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
   font-size: .8rem;
   font-weight: 600;
   cursor: pointer;
@@ -428,7 +433,7 @@ tbody tr:last-child td { border-bottom: none; }
   border: none;
   border-bottom: 2px solid transparent;
   color: var(--muted);
-  font-family: 'Inter', sans-serif;
+  font-family: 'Plus Jakarta Sans', system-ui, sans-serif;
   font-size: .88rem;
   font-weight: 600;
   cursor: pointer;
@@ -451,12 +456,44 @@ tbody tr:last-child td { border-bottom: none; }
 .font-mono { font-family: monospace; }
 
 /* ══════════════════════════════════════════════════════════
-   customer-service-ui additions
+   Everyday Bank portal — theme accents & components
    ══════════════════════════════════════════════════════════ */
 
 /* Header status pills: let the pulsing dot follow the text colour */
-.badge-server { text-decoration: none; }
+.badge-server { text-decoration: none; color: var(--accent2); }
 .badge-server::before { background: currentColor; box-shadow: 0 0 6px currentColor; }
+
+/* Re-tint stat-icon default + badges for the warm palette */
+.stat-icon { background: rgba(245,165,36,.14); color: var(--accent); border-radius: 12px; }
+.badge-approved  { background: rgba(52,211,153,.16); color: var(--green);  border: 1px solid rgba(52,211,153,.34); }
+.badge-rejected  { background: rgba(251,113,133,.16); color: var(--red);   border: 1px solid rgba(251,113,133,.34); }
+.badge-review    { background: rgba(251,191,36,.16); color: var(--yellow); border: 1px solid rgba(251,191,36,.34); }
+.badge-under-review { background: rgba(99,102,241,.18); color: #a5b4fc; border: 1px solid rgba(99,102,241,.4); }
+.badge-warning   { background: rgba(249,115,22,.16); color: #fb923c; border: 1px solid rgba(249,115,22,.4); }
+
+.scheme-type-pill { background: rgba(52,211,153,.14); color: var(--accent2); border: 1px solid rgba(52,211,153,.3); }
+.scheme-interest { color: var(--accent); }
+.scheme-card:hover { border-color: rgba(245,165,36,.4); }
+.info-box { background: rgba(245,165,36,.08); border-color: rgba(245,165,36,.28); color: #fcd9a0; }
+.filter-btn:hover, .filter-btn.active {
+  background: rgba(245,165,36,.14); color: var(--accent); border-color: rgba(245,165,36,.4);
+}
+.tab-btn.active { color: var(--accent); border-bottom-color: var(--accent); }
+.emi-box-value { color: var(--accent); }
+.timeline-dot { background: var(--accent); }
+.avatar { color: #1a1206; }
+
+/* Auth (login / register) card */
+.auth-card { padding: 34px 30px; }
+.auth-brand { display: flex; align-items: center; gap: 14px; margin-bottom: 22px; }
+.auth-brand-mark {
+  display: inline-flex; align-items: center; justify-content: center;
+  width: 46px; height: 46px; border-radius: 14px; flex-shrink: 0;
+  background: linear-gradient(135deg, var(--accent), var(--accent-strong)); color: #1a1206;
+}
+.auth-brand h2 { font-size: 1.3rem; font-weight: 800; margin: 0; }
+.auth-brand p { font-size: .82rem; color: var(--muted); margin: 2px 0 0; }
+.auth-card .form-label { display: flex; align-items: center; gap: 6px; }
 
 /* Pagination */
 .pager {
@@ -484,10 +521,34 @@ tbody tr:last-child td { border-bottom: none; }
   color: var(--muted);
   white-space: nowrap;
 }
-.lifecycle-node.done    { color: var(--green); border-color: rgba(46,204,113,.35); background: rgba(46,204,113,.08); }
-.lifecycle-node.current { color: var(--accent); border-color: rgba(0,210,255,.45); background: rgba(0,210,255,.12); }
+.lifecycle-node.done    { color: var(--green); border-color: rgba(52,211,153,.4); background: rgba(52,211,153,.1); }
+.lifecycle-node.current { color: var(--accent); border-color: rgba(245,165,36,.5); background: rgba(245,165,36,.14); }
 .lifecycle-node.todo    { opacity: .6; }
 .lifecycle-arrow { color: var(--muted); font-size: .8rem; }
 
 /* Multiline token box reuses .form-input */
 textarea.form-input { width: 100%; }
+
+/* ══════════════════════════════════════════════════════════
+   Loan self-service portal additions
+   ══════════════════════════════════════════════════════════ */
+
+/* Auth (login / register) — no sidebar, centered */
+.auth-shell {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 32px 16px;
+}
+.auth-body { width: 100%; max-width: 420px; }
+.auth-body-wide { max-width: 860px; }
+.auth-body .page { padding: 0; overflow: visible; }
+
+/* Header identity */
+.avatar-initials { font-weight: 700; font-size: .8rem; color: #1a1206; }
+.user-name { font-weight: 600; color: var(--text); }
+
+/* Spinning icon (lucide) */
+.spin { animation: spin .8s linear infinite; }
+

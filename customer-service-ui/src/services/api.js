@@ -10,7 +10,8 @@
 
 const DEFAULT_BASE = 'http://localhost:8081/api/customers';
 const BASE_KEY = 'cs_ui_api_base';
-const TOKEN_KEY = 'cs_ui_token';
+const TOKEN_KEY = 'cs_ui_token';   // legacy manual override (Settings page)
+const AUTH_TOKEN_KEY = 'csp_token'; // JWT from the portal login (AuthContext)
 
 function readLS(key) {
   try {
@@ -46,21 +47,23 @@ export function apiBaseSource() {
   return 'default (localhost)';
 }
 
-// ── Bearer token (Microsoft Entra ID JWT) ────────────────────────────
-// Every endpoint except /ping validates a JWT. The token is kept in this
-// browser's localStorage and sent as Authorization: Bearer …
+// ── Bearer token ─────────────────────────────────────────────────────
+// The portal login (AuthContext) stores a JWT under `csp_token`; a manual
+// override can still be set on the Settings page under `cs_ui_token`.
 export function getToken() {
-  return readLS(TOKEN_KEY);
+  return readLS(AUTH_TOKEN_KEY) || readLS(TOKEN_KEY);
 }
 
 export function setToken(token) {
   writeLS(TOKEN_KEY, token);
 }
 
-function headers(extra = {}) {
+export function getAuthHeaders(extra = {}) {
   const token = getToken();
   return token ? { ...extra, Authorization: `Bearer ${token}` } : extra;
 }
+
+const headers = getAuthHeaders;
 
 async function handle(res) {
   const text = await res.text();
@@ -85,6 +88,21 @@ async function handle(res) {
 
 // ── Health ───────────────────────────────────────────────────────────
 export const ping = () => fetch(`${apiBase()}/ping`).then(handle);
+
+// ── Portal auth (username / password, backed by the shared Users table) ──
+export const authLogin = (username, password) =>
+  fetch(`${apiBase()}/auth/login`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ username, password }),
+  }).then(handle);
+
+export const authRegister = (payload) =>
+  fetch(`${apiBase()}/auth/register`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  }).then(handle);
 
 // ── Customers ────────────────────────────────────────────────────────
 export const registerCustomer = (payload) =>
