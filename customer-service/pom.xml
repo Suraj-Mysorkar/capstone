@@ -124,10 +124,13 @@
             <artifactId>spring-security-test</artifactId>
             <scope>test</scope>
         </dependency>
+        <!-- Embedded DB: used by tests, and by the `local` Spring profile for a
+             zero-infrastructure run (see application-local.yml). Azure SQL
+             (mssql-jdbc) is still the default at runtime. -->
         <dependency>
             <groupId>com.h2database</groupId>
             <artifactId>h2</artifactId>
-            <scope>test</scope>
+            <scope>runtime</scope>
         </dependency>
     </dependencies>
 

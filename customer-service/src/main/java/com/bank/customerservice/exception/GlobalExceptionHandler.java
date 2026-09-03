@@ -34,6 +34,12 @@ public class GlobalExceptionHandler {
                 .body(ApiError.of(422, "Unprocessable Entity", ex.getMessage(), req.getRequestURI()));
     }
 
+    @ExceptionHandler(InvalidCredentialsException.class)
+    public ResponseEntity<ApiError> handleInvalidCredentials(InvalidCredentialsException ex, HttpServletRequest req) {
+        return ResponseEntity.status(HttpStatus.UNAUTHORIZED)
+                .body(ApiError.of(401, "Unauthorized", ex.getMessage(), req.getRequestURI()));
+    }
+
     /**
      * A method-security ({@code @PreAuthorize}) denial on an authenticated request
      * is thrown during controller dispatch and would otherwise be swallowed by

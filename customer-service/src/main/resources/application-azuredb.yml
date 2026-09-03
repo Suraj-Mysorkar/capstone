@@ -1,0 +1,35 @@
+# Test/demo profile: run against the shared Azure SQL database while keeping the
+# open ("local") security chain, so the portal auth endpoints can be exercised
+# without an Entra tenant.
+#
+#   ./mvnw spring-boot:run -Dspring-boot.run.profiles=local,azuredb
+#   java -jar target/customer-service-1.0.0.jar --spring.profiles.active=local,azuredb
+#
+# It exercises the real schema: Flyway V2 runs (guarded no-op if Users exists)
+# and Hibernate ddl-auto=validate checks the entity mappings against the real
+# customer_profiles / Users tables. Same DB the deployed loan-service uses.
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:sqlserver://smzen-capstone.database.windows.net:1433;database=smzen-capstone-db;encrypt=true;trustServerCertificate=false;hostNameInCertificate=*.database.windows.net;loginTimeout=30;}
+    username: ${DB_USERNAME:cs_admin}
+    password: ${DB_PASSWORD:Capstone@}
+    driver-class-name: com.microsoft.sqlserver.jdbc.SQLServerDriver
+    hikari:
+      maximum-pool-size: 5
+      minimum-idle: 1
+
+  jpa:
+    database-platform: org.hibernate.dialect.SQLServerDialect
+    hibernate:
+      ddl-auto: none
+    show-sql: true
+
+  flyway:
+    enabled: true
+    baseline-on-migrate: true
+    baseline-version: 0
+    locations: classpath:db/migration
+
+  h2:
+    console:
+      enabled: false
