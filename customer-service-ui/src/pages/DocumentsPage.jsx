@@ -247,10 +247,11 @@ export default function DocumentsPage() {
                         <span style={{ fontSize: '1rem' }}>{isPdf(doc) ? '📄' : '🖼️'}</span>
                         <div style={{ overflow: 'hidden' }}>
                           <div style={{ fontSize: '.78rem', fontWeight: 600, color: isSel ? 'var(--accent)' : 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                            ID: {doc.documentId || doc.id} — {doc.documentName || doc.originalFileName || doc.documentType}
+                            {doc.applicationId ? <span className="badge" style={{ fontSize: '.65rem', marginRight: 6, background: 'rgba(0, 210, 255, 0.12)', color: 'var(--accent)' }}>{doc.applicationId}</span> : null}
+                            {doc.documentName || doc.originalFileName || doc.documentType}
                           </div>
                           <div style={{ fontSize: '.7rem', color: 'var(--muted)' }}>
-                            {doc.documentType || doc.docType}{doc.fileSizeBytes ? ` • ${(doc.fileSizeBytes / 1024).toFixed(1)} KB` : ''}
+                            ID: {doc.documentId || doc.id} • {doc.documentType || doc.docType}{doc.fileSizeBytes ? ` • ${(doc.fileSizeBytes / 1024).toFixed(1)} KB` : ''}
                           </div>
                         </div>
                       </div>
@@ -306,15 +307,12 @@ export default function DocumentsPage() {
 
             {/* STATUS ALERT NOTIFICATION BANNER */}
             {selectedDoc && (selectedDoc.status === 'REJECTED' || selectedDoc.status === 'ACTION_REQUIRED') && (
-              <div style={{ padding: '10px 16px', background: 'rgba(239, 68, 68, 0.15)', borderBottom: '1px solid rgba(239, 68, 68, 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexShrink: 0 }}>
+              <div style={{ padding: '8px 16px', background: 'rgba(239, 68, 68, 0.12)', borderBottom: '1px solid rgba(239, 68, 68, 0.3)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexShrink: 0 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <AlertTriangle color="#ef4444" size={18} />
-                  <div>
-                    <strong style={{ fontSize: '.84rem', color: '#ef4444' }}>This document was Rejected by your manager</strong>
-                    <div style={{ fontSize: '.76rem', color: '#fca5a5', marginTop: 1 }}>
-                      Remarks: {selectedDoc.remarks || 'Document image unreadable or invalid. Please upload a new image/document.'}
-                    </div>
-                  </div>
+                  <AlertTriangle color="#ef4444" size={16} />
+                  <span style={{ fontSize: '.82rem', color: '#ef4444', fontWeight: 600 }}>
+                    Document Rejected: {selectedDoc.remarks || 'Please upload a clearer copy to continue loan review.'}
+                  </span>
                 </div>
                 <button
                   className="btn btn-primary"
@@ -395,8 +393,24 @@ export default function DocumentsPage() {
                 <input className="form-input" value={activeCustomerId} readOnly style={{ opacity: 0.8, background: 'rgba(255,255,255,0.04)' }} />
               </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Application ID (optional)</label>
-                <input className="form-input" value={uploadAppId} onChange={(e) => setUploadAppId(e.target.value)} placeholder="e.g. APP-1D2BDA62" style={{ padding: '7px 12px', fontSize: '.85rem' }} />
+                <label className="form-label">Associated Loan Application *</label>
+                {activeApps.length > 0 ? (
+                  <select
+                    className="form-select"
+                    value={uploadAppId}
+                    onChange={(e) => setUploadAppId(e.target.value)}
+                    style={{ padding: '7px 12px', fontSize: '.85rem' }}
+                  >
+                    <option value="">Select a loan application…</option>
+                    {activeApps.map((a) => (
+                      <option key={a.applicationId || a.id} value={a.applicationId || a.id}>
+                        {a.applicationId || a.id} — {a.schemeName || a.loanType || 'Loan'} ({a.status})
+                      </option>
+                    ))}
+                  </select>
+                ) : (
+                  <input className="form-input" value={uploadAppId} onChange={(e) => setUploadAppId(e.target.value)} placeholder="e.g. APP-1D2BDA62" style={{ padding: '7px 12px', fontSize: '.85rem' }} />
+                )}
               </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Document Type *</label>

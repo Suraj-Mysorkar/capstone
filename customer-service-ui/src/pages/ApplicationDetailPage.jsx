@@ -7,6 +7,7 @@ import {
   fetchApplicationById,
   fetchAuditLogs,
   notifyDocumentUploaded,
+  fetchApplicationDocuments,
   fetchCustomerDocuments,
 } from '../services/loanApi';
 
@@ -43,9 +44,27 @@ export default function ApplicationDetailPage() {
       const [a, l] = await Promise.all([fetchApplicationById(id), fetchAuditLogs(id)]);
       setApp(a);
       setLogs(Array.isArray(l) ? l : []);
-      if (a?.customerId) {
-        const docs = await fetchCustomerDocuments(a.customerId);
-        setCustomerDocs(Array.isArray(docs) ? docs : []);
+      const targetAppId = a?.applicationId || a?.id || id;
+      if (targetAppId) {
+        try {
+          const docs = await fetchApplicationDocuments(targetAppId);
+          if (Array.isArray(docs) && docs.length > 0) {
+            setCustomerDocs(docs);
+          } else if (Array.isArray(a?.documents) && a.documents.length > 0) {
+            setCustomerDocs(a.documents);
+          } else if (a?.customerId) {
+            const allCustDocs = await fetchCustomerDocuments(a.customerId);
+            const filtered = (Array.isArray(allCustDocs) ? allCustDocs : []).filter(
+              d => d.applicationId === targetAppId || String(d.applicationId).toUpperCase() === String(targetAppId).toUpperCase()
+            );
+            setCustomerDocs(filtered);
+          } else {
+            setCustomerDocs([]);
+          }
+        } catch (docErr) {
+          console.warn('Could not fetch application documents:', docErr);
+          setCustomerDocs(Array.isArray(a?.documents) ? a.documents : []);
+        }
       }
     } catch (e) {
       console.error('Error loading application data', e);

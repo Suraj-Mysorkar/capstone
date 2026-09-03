@@ -452,12 +452,9 @@ public class LoanApplicationService {
 
         LoanStatus previousStatus = app.getStatus();
 
-        // ── 3. Check if ALL required documents have been uploaded ────────────────
+        // ── 3. Check if ALL required documents have been uploaded for THIS specific application ────
         List<LoanDocument> appDocs = loanDocumentRepository.findByApplicationId(applicationId);
-        if ((appDocs == null || appDocs.isEmpty()) && customerId != null) {
-            appDocs = loanDocumentRepository.findByCustomerId(customerId);
-        }
-        int totalUploaded = appDocs != null ? appDocs.size() : 1;
+        int totalUploaded = appDocs != null ? appDocs.size() : 0;
         int requiredDocCount = 3; // Mandatory 3 documents: Identity Proof, Income Verification, Bank Statement
 
         int score = app.getRiskScore() != null ? app.getRiskScore() : 50;
@@ -468,21 +465,22 @@ public class LoanApplicationService {
             app.setDocumentProvided(true);
             app.setStatus(LoanStatus.DOCUMENTS_SUBMITTED);
             app.setDecisionRemarks(
-                    "📄 All required verification documents (" + totalUploaded + "/" + requiredDocCount + ") submitted by applicant (" + fileName + ") (Risk Score: " + score + "/100, DTI: " + dti + "%). "
+                    "📄 All required verification documents (" + totalUploaded + "/" + requiredDocCount + ") submitted for application " + applicationId + " (" + fileName + ") (Risk Score: " + score + "/100, DTI: " + dti + "%). "
                     + "Awaiting Credit Manager (" + manager + ") document verification and review.");
             recordAuditLog(applicationId, previousStatus, LoanStatus.DOCUMENTS_SUBMITTED,
                     "DOC_UPLOAD_SERVICE",
-                    "All required documents received (" + totalUploaded + "/" + requiredDocCount + "). Application advanced to DOCUMENTS_SUBMITTED queue.");
+                    "All required documents received (" + totalUploaded + "/" + requiredDocCount + ") for application " + applicationId + ". Advanced to DOCUMENTS_SUBMITTED queue.");
             eventBusPublisher.publishLoanStatusEvent(app, "LOAN_DOCUMENTS_SUBMITTED", app.getDecisionRemarks());
         } else {
             // Under mandatory requirement: keep status as DOCUMENT_REVIEW_PENDING
+            app.setDocumentProvided(false);
             app.setStatus(LoanStatus.DOCUMENT_REVIEW_PENDING);
             app.setDecisionRemarks(
-                    "⏳ Incomplete documents: Applicant submitted " + totalUploaded + " of " + requiredDocCount + " required documents (" + fileName + ", " + docType.name() + "). "
-                    + "Application remains in DOCUMENT_REVIEW_PENDING until all required documents are received.");
+                    "⏳ Incomplete documents for application " + applicationId + ": Applicant submitted " + totalUploaded + " of " + requiredDocCount + " required documents (" + fileName + ", " + docType.name() + "). "
+                    + "Application remains in DOCUMENT_REVIEW_PENDING until all required documents for this loan are received.");
             recordAuditLog(applicationId, previousStatus, LoanStatus.DOCUMENT_REVIEW_PENDING,
                     "DOC_UPLOAD_SERVICE",
-                    "Document uploaded (" + fileName + "). Status remains DOCUMENT_REVIEW_PENDING (" + totalUploaded + "/" + requiredDocCount + " received).");
+                    "Document uploaded (" + fileName + "). Status remains DOCUMENT_REVIEW_PENDING (" + totalUploaded + "/" + requiredDocCount + " received for application " + applicationId + ").");
             eventBusPublisher.publishLoanStatusEvent(app, "LOAN_DOCUMENT_REVIEW_PENDING", app.getDecisionRemarks());
         }
 

@@ -6,6 +6,7 @@ import {
   submitManagerCallback,
   notifyDocumentUploaded,
   requestDocumentsFromCustomer,
+  fetchApplicationDocuments,
   fetchCustomerDocuments
 } from '../services/api';
 import {
@@ -84,12 +85,26 @@ export default function ApplicationDetailPage() {
       setApp(a);
       setLogs(Array.isArray(l) ? l : []);
 
-      if (a?.customerId) {
+      const targetAppId = a?.applicationId || a?.id || id;
+      if (targetAppId) {
         try {
-          const docs = await fetchCustomerDocuments(a.customerId);
-          setCustomerDocs(Array.isArray(docs) ? docs : []);
+          const appSpecificDocs = await fetchApplicationDocuments(targetAppId);
+          if (Array.isArray(appSpecificDocs) && appSpecificDocs.length > 0) {
+            setCustomerDocs(appSpecificDocs);
+          } else if (Array.isArray(a?.documents) && a.documents.length > 0) {
+            setCustomerDocs(a.documents);
+          } else if (a?.customerId) {
+            const allCustDocs = await fetchCustomerDocuments(a.customerId);
+            const filtered = (Array.isArray(allCustDocs) ? allCustDocs : []).filter(
+              d => d.applicationId === targetAppId || String(d.applicationId).toUpperCase() === String(targetAppId).toUpperCase()
+            );
+            setCustomerDocs(filtered);
+          } else {
+            setCustomerDocs([]);
+          }
         } catch (docErr) {
-          console.warn('Could not fetch customer documents:', docErr);
+          console.warn('Could not fetch application documents:', docErr);
+          setCustomerDocs(Array.isArray(a?.documents) ? a.documents : []);
         }
       }
     } catch (e) {
