@@ -152,6 +152,25 @@ export default function ApplicationDetailPage() {
     }
   };
 
+  const doUploadDocuments = async () => {
+    if (uploadingDoc) return;
+    setUploadingDoc(true);
+    try {
+      const docIds = customerDocs.length > 0
+        ? customerDocs.map(d => String(d.documentId || d.id || '1'))
+        : ['1'];
+      await notifyDocumentUploaded(id, {
+        documentIds: docIds,
+        customerId: app?.customerId || 'CUST-DEFAULT'
+      });
+      await load();
+    } catch (err) {
+      console.error('Failed to notify document uploaded:', err);
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
+
   if (loading) return <div className="page"><div className="spinner"/></div>;
   if (!app)    return <div className="page"><div className="error-box">Application not found.</div></div>;
 
