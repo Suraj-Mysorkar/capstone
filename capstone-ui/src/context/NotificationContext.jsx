@@ -49,6 +49,24 @@ function playBellChime() {
   }
 }
 
+const getSeenManagerAlerts = () => {
+  try {
+    return new Set(JSON.parse(localStorage.getItem('manager_seen_alerts') || '[]'));
+  } catch (e) {
+    return new Set();
+  }
+};
+
+const recordSeenManagerAlert = (id) => {
+  try {
+    const current = Array.from(getSeenManagerAlerts());
+    if (!current.includes(id)) {
+      current.push(id);
+      localStorage.setItem('manager_seen_alerts', JSON.stringify(current.slice(-150)));
+    }
+  } catch (e) {}
+};
+
 export function NotificationProvider({ children }) {
   const { currentUser, isAuthenticated } = useAuth();
   const [notifications, setNotifications] = useState([]);
@@ -72,14 +90,18 @@ export function NotificationProvider({ children }) {
   }, [isAuthenticated, username]);
 
   const addToast = useCallback((notif) => {
-    // Play bell sound
-    playBellChime();
-
-    // Add to toasts list (auto-dismisses after 7s)
     const toastId = notif.id || `toast-${Date.now()}-${Math.random()}`;
-    const newToast = { ...notif, toastId, createdAt: new Date() };
+    const seen = getSeenManagerAlerts();
 
-    setToasts(prev => [newToast, ...prev.slice(0, 4)]);
+    if (!seen.has(toastId)) {
+      recordSeenManagerAlert(toastId);
+      // Play bell sound
+      playBellChime();
+
+      // Add to toasts list (auto-dismisses after 7s)
+      const newToast = { ...notif, toastId, createdAt: new Date() };
+      setToasts(prev => [newToast, ...prev.slice(0, 4)]);
+    }
 
     // Update notifications list
     setNotifications(prev => {

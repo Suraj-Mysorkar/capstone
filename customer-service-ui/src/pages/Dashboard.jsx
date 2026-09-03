@@ -29,6 +29,7 @@ function statusBadge(s) {
   if (s === 'APPROVED') return <span className="badge badge-approved">Approved</span>;
   if (s === 'REJECTED') return <span className="badge badge-rejected">Rejected</span>;
   if (s === 'MANUAL_REVIEW_REQUIRED') return <span className="badge badge-review">Under Review</span>;
+  if (s === 'DOCUMENTS_SUBMITTED') return <span className="badge" style={{ background: 'rgba(0, 210, 255, 0.15)', color: 'var(--accent)', border: '1px solid var(--accent)' }}>Documents Submitted</span>;
   if (s === 'DOCUMENT_REVIEW_PENDING') return <span className="badge badge-warning">Awaiting Docs</span>;
   return <span className="badge badge-default">{(s || '').replace(/_/g, ' ')}</span>;
 }
@@ -221,7 +222,7 @@ export default function Dashboard() {
             <div className="table-wrap p-4">
               <table>
                 <thead>
-                  <tr><th>Application ID</th><th>Scheme</th><th>Amount</th><th>EMI</th><th>Status</th></tr>
+                  <tr><th>Application ID</th><th>Scheme</th><th>Amount</th><th>EMI</th><th>Assigned Manager</th><th>Status</th></tr>
                 </thead>
                 <tbody>
                   {apps.slice(0, 6).map((a) => (
@@ -230,6 +231,11 @@ export default function Dashboard() {
                       <td>{a.schemeName || a.schemeId}</td>
                       <td style={{ fontWeight: 600 }}>{fmt(a.loanAmount)}</td>
                       <td>{a.calculatedEMI != null ? fmt(a.calculatedEMI) : '—'}</td>
+                      <td>
+                        <div style={{ fontSize: '.8rem', fontWeight: 600, color: '#fff' }}>
+                          {a.assignedManagerName || (a.assignedManager === 'markj' ? 'Mark Johnson' : a.assignedManager || 'Assigned Officer')}
+                        </div>
+                      </td>
                       <td>{statusBadge(a.status)}</td>
                     </tr>
                   ))}

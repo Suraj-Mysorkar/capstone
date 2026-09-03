@@ -28,8 +28,9 @@ function statusBadge(s) {
   if (s === 'APPROVED')                 return <span className="badge badge-approved">Approved</span>;
   if (s === 'REJECTED')                 return <span className="badge badge-rejected">Rejected</span>;
   if (s === 'MANUAL_REVIEW_REQUIRED')    return <span className="badge badge-review">Manual Review</span>;
+  if (s === 'DOCUMENTS_SUBMITTED')       return <span className="badge" style={{ background: 'rgba(0, 210, 255, 0.15)', color: 'var(--accent)', border: '1px solid var(--accent)' }}>Documents Submitted</span>;
   if (s === 'DOCUMENT_REVIEW_PENDING')   return <span className="badge badge-warning" style={{ background: '#f59e0b20', color: '#d97706', border: '1px solid #d97706' }}>Awaiting Documents</span>;
-  return <span className="badge badge-default">{s}</span>;
+  return <span className="badge badge-default">{(s || '').replace(/_/g, ' ')}</span>;
 }
 
 function fmt(n) {

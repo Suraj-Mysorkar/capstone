@@ -151,17 +151,21 @@ public class LoanApplicationService {
         app.setInterestRate(scheme.getBaseInterestRate());
         app.setCalculatedEMI(emi);
         app.setStatus(LoanStatus.SUBMITTED);
-        app.setAssignedManager("markj"); // Auto-assign to credit manager markj
+
+        // Load-balanced manager assignment across available managers pool
+        ManagerInfo chosenManager = selectLeastLoadedManager();
+        app.setAssignedManager(chosenManager.loginId());
 
         boolean hasDocs = request.documentIds() != null && !request.documentIds().isEmpty();
         app.setDocumentProvided(hasDocs);
 
         LoanApplication savedApp = applicationRepository.save(app);
-        recordAuditLog(applicationId, null, LoanStatus.SUBMITTED, "APPLICANT", "Initial loan application submitted. Assigned to markj.");
+        recordAuditLog(applicationId, null, LoanStatus.SUBMITTED, "APPLICANT",
+                "Initial loan application submitted. Assigned to " + chosenManager.name() + " (" + chosenManager.loginId() + ").");
 
-        // Dispatch Real-time Notification to Employee markj
+        // Dispatch Real-time Notification to Assigned Employee
         notificationService.sendNotification(new NotificationDTO(
-                "markj",
+                chosenManager.loginId(),
                 "New Case Assigned: " + app.getCustomerName(),
                 "New loan application " + applicationId + " submitted by " + app.getCustomerName() + " (" + app.getCustomerId() + ") for ₹" + app.getLoanAmount() + ".",
                 "NEW_CASE_ASSIGNED",
@@ -169,6 +173,9 @@ public class LoanApplicationService {
                 app.getCustomerName(),
                 applicationId
         ));
+
+        // Dispatch instant confirmation email with manager contact details to Customer
+        dispatchLoanApplicationReceivedEmail(savedApp, chosenManager);
 
         // 3. Link uploaded documents
         if (hasDocs) {
@@ -204,8 +211,10 @@ public class LoanApplicationService {
         LoanApplication app = applicationRepository.findById(applicationId)
                 .orElseThrow(() -> new IllegalArgumentException("Loan application not found with ID: " + applicationId));
 
-        if (app.getStatus() != LoanStatus.MANUAL_REVIEW_REQUIRED && app.getStatus() != LoanStatus.DOCUMENT_REVIEW_PENDING) {
-            throw new IllegalStateException("Application is not in a reviewable status. Current status: " + app.getStatus());
+        if (app.getStatus() != LoanStatus.MANUAL_REVIEW_REQUIRED && app.getStatus() != LoanStatus.DOCUMENT_REVIEW_PENDING && app.getStatus() != LoanStatus.DOCUMENTS_SUBMITTED) {
+            throw new IllegalStateException(
+                    "Cannot process decision for application in status: " + app.getStatus() +
+                            ". Decisions can only be made on applications in MANUAL_REVIEW_REQUIRED, DOCUMENT_REVIEW_PENDING, or DOCUMENTS_SUBMITTED status.");
         }
 
         if (request.decision() == com.bank.digital.lending.model.enums.ApprovalDecision.APPROVE && !app.isDocumentProvided()) {
@@ -251,7 +260,8 @@ public class LoanApplicationService {
                 case VALIDATING -> "Validating applicant demographic and eligibility details.";
                 case CREDIT_ASSESSMENT -> "Performing automated risk assessment and credit scoring.";
                 case MANUAL_REVIEW_REQUIRED -> "Under review by Senior Underwriting Manager.";
-                case DOCUMENT_REVIEW_PENDING -> "Document review pending; awaiting manager decision.";
+                case DOCUMENT_REVIEW_PENDING -> "Document review pending; awaiting document submission or manager review.";
+                case DOCUMENTS_SUBMITTED -> "All required verification documents submitted. Awaiting manager review.";
                 case APPROVED -> "Loan approved! Ready for sanction letter generation and disbursement.";
                 case REJECTED -> "Loan application rejected based on underwriting criteria.";
             };
@@ -305,8 +315,61 @@ public class LoanApplicationService {
                 : callbackBaseUrl.replaceAll("/+$", "") + path;
     }
 
+    public record ManagerInfo(String loginId, String name, String email, String phone) {}
+
+    public static final List<ManagerInfo> MANAGERS_POOL = List.of(
+            new ManagerInfo("mgr.arjun", "Arjun Rao", "arjun.rao@bank.example.com", "+91 98765 43211"),
+            new ManagerInfo("mgr.meera", "Meera Iyer", "meera.iyer@bank.example.com", "+91 98765 43212"),
+            new ManagerInfo("mgr.karan", "Karan Malhotra", "karan.malhotra@bank.example.com", "+91 98765 43213"),
+            new ManagerInfo("mgr.divya", "Divya Nair", "divya.nair@bank.example.com", "+91 98765 43214"),
+            new ManagerInfo("markj", "Mark Johnson", "mark.johnson@bank.com", "+1 (555) 019-2834")
+    );
+
+    public static ManagerInfo getManagerInfo(String loginId) {
+        if (loginId == null || loginId.isBlank()) {
+            return MANAGERS_POOL.get(0);
+        }
+        return MANAGERS_POOL.stream()
+                .filter(m -> m.loginId().equalsIgnoreCase(loginId.trim()))
+                .findFirst()
+                .orElse(new ManagerInfo(loginId, loginId, loginId + "@bank.com", "+1 (555) 019-2834"));
+    }
+
+    private ManagerInfo selectLeastLoadedManager() {
+        try {
+            java.util.Map<String, Long> activeCounts = new java.util.HashMap<>();
+            for (ManagerInfo m : MANAGERS_POOL) {
+                activeCounts.put(m.loginId().toLowerCase(), 0L);
+            }
+            List<LoanApplication> activeApps = applicationRepository.findByStatusIn(List.of(
+                    LoanStatus.SUBMITTED,
+                    LoanStatus.DOCUMENT_REVIEW_PENDING,
+                    LoanStatus.MANUAL_REVIEW_REQUIRED,
+                    LoanStatus.CREDIT_ASSESSMENT
+            ));
+            for (LoanApplication a : activeApps) {
+                if (a.getAssignedManager() != null) {
+                    String mgr = a.getAssignedManager().toLowerCase();
+                    activeCounts.put(mgr, activeCounts.getOrDefault(mgr, 0L) + 1);
+                }
+            }
+            return MANAGERS_POOL.stream()
+                    .min(java.util.Comparator.comparingLong(m -> activeCounts.getOrDefault(m.loginId().toLowerCase(), 0L)))
+                    .orElse(MANAGERS_POOL.get(0));
+        } catch (Exception ex) {
+            log.warn("Manager load balancing exception: {}. Defaulting to first manager.", ex.getMessage());
+            return MANAGERS_POOL.get(0);
+        }
+    }
+
     private LoanApplicationResponse mapToResponse(LoanApplication app) {
         List<DocumentUploadResponse> docs = documentStorageProxy.getDocumentsByApplicationId(app.getApplicationId());
+        ManagerInfo mgr = getManagerInfo(app.getAssignedManager());
+        List<String> requestedDocs = List.of(
+                "Identity Proof (Aadhaar Card / Passport / Voter ID)",
+                "Income Verification (Salary Slips for Last 3 Months or Latest Form 16)",
+                "Bank Account Statement (Operational Account Statement for Last 6 Months)"
+        );
 
         return new LoanApplicationResponse(
                 app.getApplicationId(),
@@ -329,10 +392,14 @@ public class LoanApplicationService {
                 app.getDtiRatio(),
                 app.getOrchestrationInstanceId(),
                 app.getAssignedManager(),
+                mgr.name(),
+                mgr.email(),
+                mgr.phone(),
                 app.getDecisionRemarks(),
                 app.getCreatedAt(),
                 app.getUpdatedAt(),
-                docs
+                docs,
+                requestedDocs
         );
     }
     
@@ -385,20 +452,20 @@ public class LoanApplicationService {
 
         LoanStatus previousStatus = app.getStatus();
 
-        // ── 3. Keep application in DOCUMENT_REVIEW_PENDING for Manager Review ─────────
-        if (app.getStatus() == LoanStatus.DOCUMENT_REVIEW_PENDING || app.getStatus() == LoanStatus.SUBMITTED) {
+        // ── 3. Update application to DOCUMENTS_SUBMITTED for Manager Review ─────────
+        if (app.getStatus() == LoanStatus.DOCUMENT_REVIEW_PENDING || app.getStatus() == LoanStatus.SUBMITTED || app.getStatus() == LoanStatus.DOCUMENTS_SUBMITTED) {
             int score = app.getRiskScore() != null ? app.getRiskScore() : 50;
             String dti  = app.getDtiRatio() != null ? app.getDtiRatio().toString() : "—";
             String manager = app.getAssignedManager() != null ? app.getAssignedManager() : "markj";
 
-            app.setStatus(LoanStatus.DOCUMENT_REVIEW_PENDING);
+            app.setStatus(LoanStatus.DOCUMENTS_SUBMITTED);
             app.setDecisionRemarks(
-                    "📄 Documents uploaded by applicant (Risk Score: " + score + "/100, DTI: " + dti + "%). "
-                    + "Awaiting Credit Manager (" + manager + ") document review and underwriting decision.");
-            recordAuditLog(applicationId, previousStatus, LoanStatus.DOCUMENT_REVIEW_PENDING,
+                    "📄 Verification documents submitted by applicant (" + fileName + ", " + docType.name() + ") (Risk Score: " + score + "/100, DTI: " + dti + "%). "
+                    + "Awaiting Credit Manager (" + manager + ") document verification and review.");
+            recordAuditLog(applicationId, previousStatus, LoanStatus.DOCUMENTS_SUBMITTED,
                     "DOC_UPLOAD_SERVICE",
-                    "Documents uploaded (" + fileName + "). Application in Document Review queue for Manager decision.");
-            eventBusPublisher.publishLoanStatusEvent(app, "LOAN_DOCUMENT_REVIEW_PENDING", app.getDecisionRemarks());
+                    "Documents submitted (" + fileName + "). Application in Document Review queue for Manager decision.");
+            eventBusPublisher.publishLoanStatusEvent(app, "LOAN_DOCUMENTS_SUBMITTED", app.getDecisionRemarks());
         } else {
             // Additional documents on an already-processed application
             recordAuditLog(applicationId, app.getStatus(), app.getStatus(),
@@ -407,12 +474,76 @@ public class LoanApplicationService {
 
         LoanApplication saved = applicationRepository.save(app);
 
-        // Dispatch Real-time Notification for Document Upload to Employee markj
+        // Dispatch Real-time Notification for Document Upload to Employee manager
+        String targetManager = saved.getAssignedManager() != null ? saved.getAssignedManager() : "markj";
         notificationService.sendNotification(new NotificationDTO(
-                "markj",
-                "Document Uploaded: " + saved.getCustomerName(),
-                "Customer " + saved.getCustomerName() + " (" + saved.getCustomerId() + ") has uploaded " + fileName + " (" + docType.name() + "). Ready for Document Review.",
+                targetManager,
+                "Documents Submitted: " + saved.getCustomerName(),
+                "Customer " + saved.getCustomerName() + " (" + saved.getCustomerId() + ") has submitted " + fileName + " (" + docType.name() + "). Ready for Document Review.",
                 "DOCUMENT_UPLOADED",
+                saved.getCustomerId(),
+                saved.getCustomerName(),
+                applicationId
+        ));
+
+        return mapToResponse(saved);
+    }
+
+    /**
+     * Handles document review callback (when Manager Approves or Rejects a document).
+     * If all documents are verified:
+     *   - Low Risk (Score ≤ 30): DOCUMENT_REVIEW_PENDING / DOCUMENTS_SUBMITTED → APPROVED (Auto-Approved by Credit Engine)
+     *   - Medium Risk (31–69):   DOCUMENT_REVIEW_PENDING / DOCUMENTS_SUBMITTED → MANUAL_REVIEW_REQUIRED (Underwriter Review)
+     * If document is rejected:
+     *   - Transitions to DOCUMENT_REVIEW_PENDING (Action Required: Re-upload needed).
+     */
+    @Transactional
+    public LoanApplicationResponse handleDocumentReviewed(String applicationId,
+                                                          com.bank.digital.lending.model.dto.DocumentReviewedRequest request) {
+        LoanApplication app = applicationRepository.findById(applicationId)
+                .orElseThrow(() -> new IllegalArgumentException("Loan application not found with ID: " + applicationId));
+
+        String status = request.status() != null ? request.status().toUpperCase() : "VERIFIED";
+        String docId = request.documentId() != null ? request.documentId() : "DOC";
+        String docType = request.documentType() != null ? request.documentType() : "Document";
+        String remarks = request.remarks() != null ? request.remarks() : "";
+        String reviewer = request.verifiedBy() != null ? request.verifiedBy() : (app.getAssignedManager() != null ? app.getAssignedManager() : "Operations Manager");
+
+        LoanStatus previousStatus = app.getStatus();
+
+        if ("VERIFIED".equalsIgnoreCase(status) || "APPROVED".equalsIgnoreCase(status)) {
+            // Level 1: Document Review Passed!
+            int score = app.getRiskScore() != null ? app.getRiskScore() : 30;
+            if (score <= 30) {
+                // Low Risk -> Auto Approved after Document Verification
+                app.setStatus(LoanStatus.APPROVED);
+                app.setDecisionRemarks("✅ Level 1 (Document Review) passed: Document " + docId + " (" + docType + ") verified by " + reviewer + ". Low-risk application auto-approved.");
+                recordAuditLog(applicationId, previousStatus, LoanStatus.APPROVED, "SYSTEM_CREDIT_ENGINE", app.getDecisionRemarks());
+                eventBusPublisher.publishLoanStatusEvent(app, "LOAN_APPROVED", app.getDecisionRemarks());
+            } else {
+                // Moderate Risk -> Route to Manager Underwriter Review
+                app.setStatus(LoanStatus.MANUAL_REVIEW_REQUIRED);
+                app.setDecisionRemarks("✅ Level 1 (Document Review) passed: Document " + docId + " (" + docType + ") verified by " + reviewer + ". Application routed to Underwriter (" + app.getAssignedManager() + ") for final loan decision.");
+                recordAuditLog(applicationId, previousStatus, LoanStatus.MANUAL_REVIEW_REQUIRED, "DOC_REVIEW_SERVICE", app.getDecisionRemarks());
+                eventBusPublisher.publishLoanStatusEvent(app, "LOAN_MANUAL_REVIEW_REQUIRED", app.getDecisionRemarks());
+            }
+        } else if ("REJECTED".equalsIgnoreCase(status) || "ACTION_REQUIRED".equalsIgnoreCase(status)) {
+            // Document Rejected -> Move back to DOCUMENT_REVIEW_PENDING (Action Required)
+            app.setStatus(LoanStatus.DOCUMENT_REVIEW_PENDING);
+            app.setDecisionRemarks("❌ Document Action Required: " + docType + " (" + docId + ") was rejected by " + reviewer + ". Reason: " + remarks + ". Awaiting new document upload from applicant.");
+            recordAuditLog(applicationId, previousStatus, LoanStatus.DOCUMENT_REVIEW_PENDING, "DOC_REVIEW_SERVICE", app.getDecisionRemarks());
+            eventBusPublisher.publishLoanStatusEvent(app, "LOAN_DOCUMENT_REVIEW_PENDING", app.getDecisionRemarks());
+        }
+
+        LoanApplication saved = applicationRepository.save(app);
+
+        // Notify manager & customer
+        String targetManager = saved.getAssignedManager() != null ? saved.getAssignedManager() : "markj";
+        notificationService.sendNotification(new NotificationDTO(
+                targetManager,
+                "Document Review: " + docType + " (" + status + ")",
+                "Application " + applicationId + " document " + docId + " review was marked " + status + " by " + reviewer + ".",
+                "DOCUMENT_REVIEW",
                 saved.getCustomerId(),
                 saved.getCustomerName(),
                 applicationId
@@ -471,6 +602,22 @@ public class LoanApplicationService {
         Customer saved = customerRepository.save(customer);
         log.info("[LOAN-SERVICE] Customer upserted from portal registration: id={}, email={}, externalRef={}",
                 saved.getCustomerId(), saved.getEmail(), request.externalRef());
+
+        // Dispatch welcome registration email to customer
+        if (saved.getEmail() != null && !saved.getEmail().isBlank()) {
+            String welcomeSubject = "Welcome to Digital Banking - Account Registered";
+            String welcomeHtml = String.format(
+                    "<html><body style=\"font-family: Arial, sans-serif; font-size: 14px; color: #333333; line-height: 1.6;\">"
+                    + "<p>Dear %s,</p>"
+                    + "<p>Welcome to Digital Banking! Your customer account (Customer ID: <strong>CUST-%d</strong>) has been successfully created.</p>"
+                    + "<p>You can now apply for flexible loans, calculate EMIs, and upload documents directly through the customer portal.</p>"
+                    + "<p>Kind regards,<br><strong>Digital Banking Lending Team</strong></p>"
+                    + "</body></html>",
+                    saved.getFullName() != null ? saved.getFullName() : "Customer",
+                    saved.getCustomerId()
+            );
+            dispatchEmailViaLogicApp(saved.getEmail(), welcomeSubject, welcomeHtml);
+        }
 
         return new com.bank.digital.lending.model.dto.CustomerResponse(
                 saved.getCustomerId(),
@@ -586,6 +733,44 @@ public class LoanApplicationService {
                 "Verification document request email sent successfully to " + customerEmail,
                 emailSent
         );
+    }
+
+    private void dispatchLoanApplicationReceivedEmail(LoanApplication app, ManagerInfo mgr) {
+        if (app.getCustomerEmail() == null || app.getCustomerEmail().isBlank()) return;
+        String subject = "Loan Application Received (ID: " + app.getApplicationId() + ") - Assigned Manager: " + mgr.name();
+        String body = String.format(
+                "<html><body style=\"font-family: Arial, sans-serif; font-size: 14px; color: #333333; line-height: 1.6;\">"
+                + "<p>Dear %s,</p>"
+                + "<p>Thank you for submitting your loan application with Digital Banking. We are pleased to confirm that your application has been received and registered under Customer ID: <strong>%s</strong>.</p>"
+                + "<h3>Application Details</h3>"
+                + "<table style=\"border-collapse: collapse; width: 100%%; max-width: 600px; margin-bottom: 16px;\">"
+                + "<tr><td style=\"padding: 8px; border: 1px solid #ddd; font-weight: bold;\">Application ID</td><td style=\"padding: 8px; border: 1px solid #ddd;\">%s</td></tr>"
+                + "<tr><td style=\"padding: 8px; border: 1px solid #ddd; font-weight: bold;\">Loan Type</td><td style=\"padding: 8px; border: 1px solid #ddd;\">%s</td></tr>"
+                + "<tr><td style=\"padding: 8px; border: 1px solid #ddd; font-weight: bold;\">Requested Amount</td><td style=\"padding: 8px; border: 1px solid #ddd;\">₹%s</td></tr>"
+                + "<tr><td style=\"padding: 8px; border: 1px solid #ddd; font-weight: bold;\">Tenure</td><td style=\"padding: 8px; border: 1px solid #ddd;\">%s Months</td></tr>"
+                + "</table>"
+                + "<h3>Dedicated Loan Relationship Manager</h3>"
+                + "<p>A dedicated Credit &amp; Relationship Manager has been assigned to assist and review your loan application:</p>"
+                + "<table style=\"border-collapse: collapse; width: 100%%; max-width: 600px; margin-bottom: 16px; background: #f0fdf4;\">"
+                + "<tr><td style=\"padding: 8px; border: 1px solid #bbf7d0; font-weight: bold;\">Manager Name</td><td style=\"padding: 8px; border: 1px solid #bbf7d0;\">%s (%s)</td></tr>"
+                + "<tr><td style=\"padding: 8px; border: 1px solid #bbf7d0; font-weight: bold;\">Contact Mobile</td><td style=\"padding: 8px; border: 1px solid #bbf7d0;\">%s</td></tr>"
+                + "<tr><td style=\"padding: 8px; border: 1px solid #bbf7d0; font-weight: bold;\">Official Email</td><td style=\"padding: 8px; border: 1px solid #bbf7d0;\">%s</td></tr>"
+                + "</table>"
+                + "<p>You can securely log in to the Customer Portal at any time to track your progress and upload any requested verification documents.</p>"
+                + "<p>Kind regards,<br><strong>Digital Banking Lending Team</strong></p>"
+                + "</body></html>",
+                app.getCustomerName() != null ? app.getCustomerName() : "Applicant",
+                app.getCustomerId() != null ? app.getCustomerId() : "N/A",
+                app.getApplicationId(),
+                app.getLoanType() != null ? app.getLoanType().name() : "Loan",
+                app.getLoanAmount() != null ? app.getLoanAmount().toString() : "0",
+                app.getTenureMonths() != null ? app.getTenureMonths().toString() : "24",
+                mgr.name(),
+                mgr.loginId(),
+                mgr.phone(),
+                mgr.email()
+        );
+        dispatchEmailViaLogicApp(app.getCustomerEmail(), subject, body);
     }
 
     private boolean dispatchEmailViaLogicApp(String to, String subject, String htmlBody) {

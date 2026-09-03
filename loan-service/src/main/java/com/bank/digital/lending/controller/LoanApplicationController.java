@@ -45,13 +45,21 @@ public class LoanApplicationController {
         return ResponseEntity.ok(response);
     }
 
-    // Endpoint to receive document upload notification and advance workflow
     @PostMapping("/applications/{id}/document-uploaded")
     @Operation(summary = "Notify service that documents have been uploaded",
-               description = "Sets the documentProvided flag, links documents, and advances workflow (Auto-Approves if low risk, or routes to Manager if moderate risk)")
+               description = "Sets the documentProvided flag, links documents, and transitions status to DOCUMENTS_SUBMITTED")
     public ResponseEntity<LoanApplicationResponse> documentUploaded(@PathVariable("id") String applicationId,
                                                                     @Valid @RequestBody com.bank.digital.lending.model.dto.DocumentUploadedRequest request) {
         LoanApplicationResponse response = applicationService.handleDocumentUploaded(applicationId, request);
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/applications/{id}/document-reviewed")
+    @Operation(summary = "Notify service that document review decision was recorded",
+               description = "Advances workflow upon document verification: auto-approves if low risk, or routes to Underwriter if moderate risk")
+    public ResponseEntity<LoanApplicationResponse> documentReviewed(@PathVariable("id") String applicationId,
+                                                                    @RequestBody com.bank.digital.lending.model.dto.DocumentReviewedRequest request) {
+        LoanApplicationResponse response = applicationService.handleDocumentReviewed(applicationId, request);
         return ResponseEntity.ok(response);
     }
 

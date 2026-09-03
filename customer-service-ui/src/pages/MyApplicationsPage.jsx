@@ -4,12 +4,13 @@ import { RefreshCw } from 'lucide-react';
 import { fetchApplications } from '../services/loanApi';
 import { useSession } from '../lib/session';
 
-const STATUSES = ['ALL', 'APPROVED', 'REJECTED', 'MANUAL_REVIEW_REQUIRED', 'DOCUMENT_REVIEW_PENDING', 'SUBMITTED'];
+const STATUSES = ['ALL', 'APPROVED', 'REJECTED', 'MANUAL_REVIEW_REQUIRED', 'DOCUMENTS_SUBMITTED', 'DOCUMENT_REVIEW_PENDING', 'SUBMITTED'];
 
 function statusBadge(s) {
   if (s === 'APPROVED') return <span className="badge badge-approved">Approved</span>;
   if (s === 'REJECTED') return <span className="badge badge-rejected">Rejected</span>;
   if (s === 'MANUAL_REVIEW_REQUIRED') return <span className="badge badge-review">Under Review</span>;
+  if (s === 'DOCUMENTS_SUBMITTED') return <span className="badge" style={{ background: 'rgba(0, 210, 255, 0.15)', color: 'var(--accent)', border: '1px solid var(--accent)' }}>Documents Submitted</span>;
   if (s === 'DOCUMENT_REVIEW_PENDING') return <span className="badge badge-warning">Awaiting Documents</span>;
   return <span className="badge badge-default">{(s || '').replace(/_/g, ' ')}</span>;
 }
@@ -73,7 +74,7 @@ export default function MyApplicationsPage() {
               <thead>
                 <tr>
                   <th>Application ID</th><th>Scheme</th><th>Loan Type</th>
-                  <th>Amount</th><th>Tenure</th><th>EMI</th><th>Status</th><th>Applied</th>
+                  <th>Amount</th><th>Tenure</th><th>EMI</th><th>Assigned Manager</th><th>Status</th><th>Applied</th>
                 </tr>
               </thead>
               <tbody>
@@ -88,6 +89,14 @@ export default function MyApplicationsPage() {
                     <td>{fmt(a.loanAmount)}</td>
                     <td>{a.tenureMonths}m</td>
                     <td>{a.calculatedEMI != null ? fmt(a.calculatedEMI) : '—'}</td>
+                    <td>
+                      <div style={{ fontSize: '.82rem', fontWeight: 600, color: '#fff' }}>
+                        {a.assignedManagerName || (a.assignedManager === 'markj' ? 'Mark Johnson' : a.assignedManager || 'Assigned Officer')}
+                      </div>
+                      <div style={{ fontSize: '.7rem', color: 'var(--muted)' }}>
+                        {a.assignedManagerPhone || a.assignedManagerEmail || ''}
+                      </div>
+                    </td>
                     <td>{statusBadge(a.status)}</td>
                     <td className="text-muted">
                       {a.createdAt ? new Date(a.createdAt).toLocaleDateString('en-IN', { day: '2-digit', month: '2-digit', year: 'numeric' }) : '—'}

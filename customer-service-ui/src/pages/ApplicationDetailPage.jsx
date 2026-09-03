@@ -14,6 +14,7 @@ function statusBadge(s) {
   if (s === 'APPROVED') return <span className="badge badge-approved">Approved</span>;
   if (s === 'REJECTED') return <span className="badge badge-rejected">Rejected</span>;
   if (s === 'MANUAL_REVIEW_REQUIRED') return <span className="badge badge-review">Under Review</span>;
+  if (s === 'DOCUMENTS_SUBMITTED') return <span className="badge" style={{ background: 'rgba(0, 210, 255, 0.15)', color: 'var(--accent)', border: '1px solid var(--accent)' }}>Documents Submitted</span>;
   if (s === 'DOCUMENT_REVIEW_PENDING') return <span className="badge badge-warning">Awaiting Documents</span>;
   return <span className="badge badge-default">{(s || '').replace(/_/g, ' ')}</span>;
 }
@@ -145,15 +146,21 @@ export default function ApplicationDetailPage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
               <div style={{ background: 'rgba(0,0,0,0.3)', padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
                 <div style={{ fontSize: '.72rem', color: 'var(--muted)' }}>Manager Name</div>
-                <div style={{ fontSize: '.9rem', fontWeight: 700, color: '#fff' }}>Mark Johnson ({app.assignedManager || 'markj'})</div>
+                <div style={{ fontSize: '.9rem', fontWeight: 700, color: '#fff' }}>
+                  {app.assignedManagerName || (app.assignedManager === 'markj' ? 'Mark Johnson' : app.assignedManager || 'Dedicated Officer')} ({app.assignedManager})
+                </div>
               </div>
               <div style={{ background: 'rgba(0,0,0,0.3)', padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
                 <div style={{ fontSize: '.72rem', color: 'var(--muted)' }}>Contact Mobile</div>
-                <div style={{ fontSize: '.9rem', fontWeight: 700, color: 'var(--green)' }}>+1 (555) 019-2834</div>
+                <div style={{ fontSize: '.9rem', fontWeight: 700, color: 'var(--green)' }}>
+                  {app.assignedManagerPhone || '+1 (555) 019-2834'}
+                </div>
               </div>
               <div style={{ background: 'rgba(0,0,0,0.3)', padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
                 <div style={{ fontSize: '.72rem', color: 'var(--muted)' }}>Official Email</div>
-                <div style={{ fontSize: '.9rem', fontWeight: 700, color: 'var(--accent)' }}>mark.johnson@bank.com</div>
+                <div style={{ fontSize: '.9rem', fontWeight: 700, color: 'var(--accent)' }}>
+                  {app.assignedManagerEmail || 'manager@bank.com'}
+                </div>
               </div>
             </div>
           </div>
@@ -163,12 +170,29 @@ export default function ApplicationDetailPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
                 <AlertTriangle color="#d97706" size={24} />
                 <div>
-                  <h4 style={{ margin: 0, color: '#d97706' }}>Action Required: Submit Verification Documents</h4>
+                  <h4 style={{ margin: 0, color: '#d97706' }}>Action Required: Verification Documents Requested</h4>
                   <p style={{ margin: '4px 0 0', fontSize: '.88rem', color: 'var(--muted)' }}>
-                    Upload your KYC & income documents on the <strong>My Documents</strong> page,
-                    then enter their Document IDs below to advance your application.
+                    Your assigned manager has requested the following mandatory verification documents:
                   </p>
                 </div>
+              </div>
+
+              {/* LIST OF REQUESTED DOCUMENTS */}
+              <div style={{ background: 'rgba(0,0,0,0.25)', padding: '12px 16px', borderRadius: 8, marginBottom: 14, border: '1px solid rgba(245, 158, 11, 0.2)' }}>
+                <div style={{ fontSize: '.8rem', fontWeight: 700, color: '#fbbf24', marginBottom: 6 }}>
+                  Required Document Checklist:
+                </div>
+                <ul style={{ margin: 0, paddingLeft: 20, fontSize: '.84rem', color: 'var(--text)', lineHeight: 1.6 }}>
+                  {(app.requestedDocuments && app.requestedDocuments.length > 0 ? app.requestedDocuments : [
+                    'Identity Proof (Aadhaar Card / Passport / Voter ID)',
+                    'Income Verification (Salary Slips for Last 3 Months or Latest Form 16)',
+                    'Bank Account Statement (Operational Account Statement for Last 6 Months)'
+                  ]).map((docName, idx) => (
+                    <li key={idx} style={{ marginBottom: 4 }}>
+                      <strong>{docName}</strong>
+                    </li>
+                  ))}
+                </ul>
               </div>
               {docUploadMsg && <div style={{ marginBottom: 12, fontWeight: 600, fontSize: '.9rem' }}>{docUploadMsg}</div>}
               <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>

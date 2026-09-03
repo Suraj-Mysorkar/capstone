@@ -53,6 +53,7 @@
 .wf-status-chip.wf-chip-rejected           { background: rgba(231,76,60,.15); border-color: var(--red); color: var(--red); }
 .wf-status-chip.wf-chip-manual_review_required { background: rgba(0,210,255,.12); border-color: var(--accent); color: var(--accent); }
 .wf-status-chip.wf-chip-document_review_pending { background: rgba(241,196,15,.15); border-color: var(--yellow); color: var(--yellow); }
+.wf-status-chip.wf-chip-documents_submitted     { background: rgba(0,210,255,.18); border-color: var(--accent); color: var(--accent); }
 
 .wf-risk-chip {
   padding: 5px 12px;

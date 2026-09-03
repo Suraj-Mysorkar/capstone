@@ -4,12 +4,13 @@ import {
   fetchDocumentTypes,
   fetchDocumentBlobUrl,
   fetchCustomerDocuments,
+  fetchApplications,
   deleteDocumentById,
 } from '../services/loanApi';
 import { useSession, docCustomerId } from '../lib/session';
 import {
   FolderUp, FileText, Image as ImageIcon, ExternalLink, Download,
-  Eye, CheckCircle, AlertCircle, RefreshCw, Layers, X,
+  Eye, CheckCircle, AlertCircle, RefreshCw, Layers, X, AlertTriangle, ArrowRight,
 } from 'lucide-react';
 
 export default function DocumentsPage() {
@@ -21,6 +22,7 @@ export default function DocumentsPage() {
 
   const [customerDocs, setCustomerDocs] = useState([]);
   const [loadingDocs, setLoadingDocs] = useState(false);
+  const [activeApps, setActiveApps] = useState([]);
 
   const [selectedDoc, setSelectedDoc] = useState(null);
   const [docLoading, setDocLoading] = useState(false);
@@ -61,15 +63,22 @@ export default function DocumentsPage() {
   };
 
   const loadDocs = async () => {
-    if (!activeCustomerId) return;
     setLoadingDocs(true);
     setDocError('');
     try {
-      const list = await fetchCustomerDocuments(activeCustomerId);
-      const arr = Array.isArray(list) ? list : [];
-      setCustomerDocs(arr);
-      if (arr.length > 0) selectAndPreviewDoc(arr[0]);
-      else { setSelectedDoc(null); setPreviewBlobUrl(null); }
+      if (activeCustomerId) {
+        const list = await fetchCustomerDocuments(activeCustomerId);
+        const arr = Array.isArray(list) ? list : [];
+        setCustomerDocs(arr);
+        if (arr.length > 0) selectAndPreviewDoc(arr[0]);
+        else { setSelectedDoc(null); setPreviewBlobUrl(null); }
+      }
+      const email = (session?.email || '').toLowerCase();
+      const apps = await fetchApplications();
+      const mine = (Array.isArray(apps) ? apps : []).filter(
+        (a) => (a.customerEmail || '').toLowerCase() === email || (activeCustomerId && a.customerId === activeCustomerId)
+      );
+      setActiveApps(mine);
     } catch (e) {
       setDocError(e.message || 'Failed to load your documents.');
     } finally {
@@ -78,9 +87,9 @@ export default function DocumentsPage() {
   };
 
   useEffect(() => {
-    if (activeCustomerId) loadDocs();
+    loadDocs();
     // eslint-disable-next-line
-  }, [activeCustomerId]);
+  }, [activeCustomerId, session?.email]);
 
   const handleDelete = async (e, doc) => {
     e.stopPropagation();
@@ -172,6 +181,45 @@ export default function DocumentsPage() {
         </button>
       </div>
 
+      {/* MANAGER REQUESTED DOCUMENTS BANNER */}
+      {activeApps.some((a) => a.status === 'DOCUMENT_REVIEW_PENDING' || a.status === 'MANUAL_REVIEW_REQUIRED') && (
+        <div style={{ marginBottom: 12, padding: '12px 16px', borderRadius: 10, background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.12) 0%, rgba(13, 20, 44, 0.95) 100%)', border: '1.5px solid #f59e0b', flexShrink: 0 }}>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10 }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <AlertTriangle color="#f59e0b" size={20} />
+              <div>
+                <div style={{ fontSize: '.88rem', fontWeight: 700, color: '#fbbf24' }}>
+                  Action Required: Documents Requested by Your Loan Manager ({activeApps[0]?.assignedManagerName || (activeApps[0]?.assignedManager === 'markj' ? 'Mark Johnson' : activeApps[0]?.assignedManager || 'Dedicated Officer')})
+                </div>
+                <div style={{ fontSize: '.78rem', color: 'var(--muted)', marginTop: 2 }}>
+                  Application: <strong style={{ color: '#fff' }}>{activeApps[0]?.applicationId}</strong> · Please upload the required documents to advance your application:
+                </div>
+              </div>
+            </div>
+            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+              {[
+                { label: '🪪 Identity Proof (Aadhaar/Passport)', type: 'IDENTITY_PROOF' },
+                { label: '💵 Income Proof (Salary Slips)', type: 'INCOME_PROOF' },
+                { label: '🏦 Bank Statement (Last 6 Months)', type: 'BANK_STATEMENT' },
+              ].map((btn) => (
+                <button
+                  key={btn.type}
+                  className="btn btn-ghost"
+                  style={{ fontSize: '.75rem', padding: '4px 10px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(245, 158, 11, 0.4)', color: '#fff' }}
+                  onClick={() => {
+                    setUploadDocType(btn.type);
+                    if (activeApps[0]?.applicationId) setUploadAppId(activeApps[0].applicationId);
+                    setTab('upload');
+                  }}
+                >
+                  {btn.label} →
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       {tab === 'list' && (
         <div style={{ display: 'grid', gridTemplateColumns: '420px 1fr', gap: 16, flex: 1, minHeight: 0, overflow: 'hidden' }}>
           <div className="card p-4" style={{ display: 'flex', flexDirection: 'column', gap: 12, overflowY: 'auto' }}>
@@ -225,9 +273,27 @@ export default function DocumentsPage() {
               <div style={{ display: 'flex', alignItems: 'center', gap: 8, fontSize: '.88rem', fontWeight: 600 }}>
                 {isPdf(selectedDoc) ? <FileText size={17} color="var(--accent)" /> : <ImageIcon size={17} color="var(--accent2)" />}
                 <span>{selectedDoc ? `${selectedDoc.documentName || selectedDoc.originalFileName || 'Document'} (ID: ${selectedDoc.documentId || selectedDoc.id})` : 'Document Viewer'}</span>
+                {selectedDoc && (
+                  <span className={`badge ${selectedDoc.status === 'VERIFIED' || selectedDoc.status === 'APPROVED' ? 'badge-approved' : selectedDoc.status === 'REJECTED' || selectedDoc.status === 'ACTION_REQUIRED' ? 'badge-rejected' : 'badge-under-review'}`} style={{ fontSize: '.72rem', marginLeft: 6 }}>
+                    {selectedDoc.status === 'VERIFIED' || selectedDoc.status === 'APPROVED' ? '✅ Approved' : selectedDoc.status === 'REJECTED' || selectedDoc.status === 'ACTION_REQUIRED' ? '❌ Rejected' : '⏳ ' + (selectedDoc.status || 'Under Review')}
+                  </span>
+                )}
               </div>
               {selectedDoc && previewBlobUrl && (
                 <div className="flex-row" style={{ gap: 6 }}>
+                  {(selectedDoc.status === 'REJECTED' || selectedDoc.status === 'ACTION_REQUIRED') && (
+                    <button
+                      className="btn btn-primary"
+                      style={{ fontSize: '.72rem', padding: '3px 10px', background: '#ef4444', borderColor: '#ef4444', color: '#fff' }}
+                      onClick={() => {
+                        setUploadDocType(selectedDoc.documentType || 'IDENTITY_PROOF');
+                        if (selectedDoc.applicationId) setUploadAppId(selectedDoc.applicationId);
+                        setTab('upload');
+                      }}
+                    >
+                      <FolderUp size={12} /> Re-upload Image
+                    </button>
+                  )}
                   <a href={previewBlobUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost" style={{ fontSize: '.72rem', padding: '3px 8px' }}>
                     <ExternalLink size={12} /> Open
                   </a>
@@ -237,6 +303,42 @@ export default function DocumentsPage() {
                 </div>
               )}
             </div>
+
+            {/* STATUS ALERT NOTIFICATION BANNER */}
+            {selectedDoc && (selectedDoc.status === 'REJECTED' || selectedDoc.status === 'ACTION_REQUIRED') && (
+              <div style={{ padding: '10px 16px', background: 'rgba(239, 68, 68, 0.15)', borderBottom: '1px solid rgba(239, 68, 68, 0.4)', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 12, flexShrink: 0 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                  <AlertTriangle color="#ef4444" size={18} />
+                  <div>
+                    <strong style={{ fontSize: '.84rem', color: '#ef4444' }}>This document was Rejected by your manager</strong>
+                    <div style={{ fontSize: '.76rem', color: '#fca5a5', marginTop: 1 }}>
+                      Remarks: {selectedDoc.remarks || 'Document image unreadable or invalid. Please upload a new image/document.'}
+                    </div>
+                  </div>
+                </div>
+                <button
+                  className="btn btn-primary"
+                  style={{ fontSize: '.75rem', padding: '4px 10px', background: '#ef4444', borderColor: '#dc2626', color: '#fff', whiteSpace: 'nowrap' }}
+                  onClick={() => {
+                    setUploadDocType(selectedDoc.documentType || 'IDENTITY_PROOF');
+                    if (selectedDoc.applicationId) setUploadAppId(selectedDoc.applicationId);
+                    setTab('upload');
+                  }}
+                >
+                  🔄 Upload New Image / Document →
+                </button>
+              </div>
+            )}
+
+            {selectedDoc && (selectedDoc.status === 'VERIFIED' || selectedDoc.status === 'APPROVED') && (
+              <div style={{ padding: '8px 16px', background: 'rgba(16, 185, 129, 0.12)', borderBottom: '1px solid rgba(16, 185, 129, 0.3)', display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
+                <CheckCircle color="#10b981" size={16} />
+                <span style={{ fontSize: '.82rem', color: '#10b981', fontWeight: 600 }}>
+                  Document Verified &amp; Approved: No further action required.
+                </span>
+              </div>
+            )}
+
             <div style={{ flex: 1, minHeight: 0, position: 'relative', overflow: 'hidden' }}>
               {docLoading ? (
                 <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', color: 'var(--muted)' }}>

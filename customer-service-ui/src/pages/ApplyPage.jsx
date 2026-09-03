@@ -6,11 +6,13 @@ import {
   fetchDocumentTypes, uploadDocument, notifyDocumentUploaded, deleteDocumentById,
 } from '../services/loanApi';
 import { useSession } from '../lib/session';
+import { useNotifications } from '../context/NotificationContext';
 
 const EMP_TYPES = ['SALARIED', 'SELF_EMPLOYED', 'BUSINESS', 'STUDENT'];
 
 export default function ApplyPage() {
   const { session, update } = useSession();
+  const { addNotification } = useNotifications();
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -151,6 +153,21 @@ export default function ApplyPage() {
       const loanCust = await resolveLoanCustomer(session.email);
       if (loanCust?.customerCode) update({ loanCustomerId: loanCust.customerCode });
       else if (res.customerId) update({ loanCustomerId: res.customerId });
+
+      // Trigger real-time customer alert popup and chime
+      const mgrName = res.assignedManagerName || (res.assignedManager === 'markj' ? 'Mark Johnson' : res.assignedManager || 'Dedicated Manager');
+      const mgrPhone = res.assignedManagerPhone || '+1 (555) 019-2834';
+      const mgrEmail = res.assignedManagerEmail || 'manager@bank.com';
+
+      if (addNotification) {
+        addNotification({
+          id: `apply-mgr-${res.applicationId}`,
+          title: `🎉 Case Assigned: ${mgrName}`,
+          message: `Application ${res.applicationId} registered! Dedicated Manager ${mgrName} (📞 ${mgrPhone}, 📧 ${mgrEmail}) has been assigned to your loan case.`,
+          type: 'MANAGER_ASSIGNED',
+          link: `/applications/${res.applicationId}`,
+        });
+      }
     } catch (e) {
       setError(e.message);
     } finally {
@@ -159,6 +176,10 @@ export default function ApplyPage() {
   };
 
   const statusColor = (s) => (s === 'APPROVED' ? 'var(--green)' : s === 'REJECTED' ? 'var(--red)' : 'var(--yellow)');
+
+  const mgrName = result?.assignedManagerName || (result?.assignedManager === 'markj' ? 'Mark Johnson' : result?.assignedManager || 'Dedicated Officer');
+  const mgrPhone = result?.assignedManagerPhone || '+1 (555) 019-2834';
+  const mgrEmail = result?.assignedManagerEmail || 'manager@bank.com';
 
   return (
     <div className="page">
@@ -196,15 +217,15 @@ export default function ApplyPage() {
             <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginTop: 12 }}>
               <div style={{ background: 'rgba(0,0,0,0.35)', padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
                 <div style={{ fontSize: '.72rem', color: 'var(--muted)' }}>Manager Name</div>
-                <div style={{ fontSize: '.9rem', fontWeight: 700, color: '#fff' }}>Mark Johnson ({result.assignedManager || 'markj'})</div>
+                <div style={{ fontSize: '.9rem', fontWeight: 700, color: '#fff' }}>{mgrName} ({result.assignedManager})</div>
               </div>
               <div style={{ background: 'rgba(0,0,0,0.35)', padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
                 <div style={{ fontSize: '.72rem', color: 'var(--muted)' }}>Contact Mobile</div>
-                <div style={{ fontSize: '.9rem', fontWeight: 700, color: 'var(--green)' }}>+1 (555) 019-2834</div>
+                <div style={{ fontSize: '.9rem', fontWeight: 700, color: 'var(--green)' }}>{mgrPhone}</div>
               </div>
               <div style={{ background: 'rgba(0,0,0,0.35)', padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
                 <div style={{ fontSize: '.72rem', color: 'var(--muted)' }}>Official Email</div>
-                <div style={{ fontSize: '.9rem', fontWeight: 700, color: 'var(--accent)' }}>mark.johnson@bank.com</div>
+                <div style={{ fontSize: '.9rem', fontWeight: 700, color: 'var(--accent)' }}>{mgrEmail}</div>
               </div>
             </div>
           </div>

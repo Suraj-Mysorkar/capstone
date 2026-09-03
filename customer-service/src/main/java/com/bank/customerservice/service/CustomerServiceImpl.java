@@ -66,25 +66,45 @@ public class CustomerServiceImpl implements CustomerService {
     }
 
     private void dispatchWelcomeNotification(Customer saved) {
+        if (saved.getEmail() == null || saved.getEmail().isBlank()) return;
+        String name = (saved.getFirstName() + " " + (saved.getLastName() != null ? saved.getLastName() : "")).trim();
+        String subject = "Welcome to Digital Banking - Registration Successful";
+        String body = String.format(
+                "<html><body style=\"font-family: Arial, sans-serif; font-size: 14px; color: #333333; line-height: 1.6;\">"
+                + "<p>Dear %s,</p>"
+                + "<p>Welcome to Digital Banking! We are pleased to confirm that your customer profile has been successfully registered.</p>"
+                + "<h3>Account Information</h3>"
+                + "<table style=\"border-collapse: collapse; width: 100%%; max-width: 600px; margin-bottom: 16px;\">"
+                + "<tr><td style=\"padding: 8px; border: 1px solid #ddd; font-weight: bold;\">Customer Name</td><td style=\"padding: 8px; border: 1px solid #ddd;\">%s</td></tr>"
+                + "<tr><td style=\"padding: 8px; border: 1px solid #ddd; font-weight: bold;\">Registered Email</td><td style=\"padding: 8px; border: 1px solid #ddd;\">%s</td></tr>"
+                + "<tr><td style=\"padding: 8px; border: 1px solid #ddd; font-weight: bold;\">Account Status</td><td style=\"padding: 8px; border: 1px solid #ddd;\">ACTIVE</td></tr>"
+                + "</table>"
+                + "<p>You can now securely access the Digital Banking customer portal to calculate EMIs, apply for loans, and upload required documents.</p>"
+                + "<p>Kind regards,<br><strong>Digital Banking Customer Experience Team</strong></p>"
+                + "</body></html>",
+                name,
+                name,
+                saved.getEmail()
+        );
+
+        String logicAppUrl = "https://prod-17.southindia.logic.azure.com:443/workflows/a4b29c1d5e814824900b41a17fa24844/triggers/When_a_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_a_HTTP_request_is_received%2Frun&sv=1.0&sig=F--JabvW3Uwr-JsZU76HgaWWTcekahkC6HBwTEImtys";
         try {
-            org.springframework.web.client.RestClient restClient = org.springframework.web.client.RestClient.create();
-            java.util.Map<String, Object> payload = java.util.Map.of(
-                    "eventType", "CUSTOMER_REGISTERED",
-                    "data", java.util.Map.of(
-                            "customerName", saved.getFirstName() + " " + saved.getLastName(),
-                            "email", saved.getEmail(),
-                            "status", "REGISTERED"
-                    )
-            );
-            restClient.post()
-                    .uri("https://team6-notification-service.azurewebsites.net/api/notify")
-                    .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
-                    .body(payload)
-                    .retrieve()
-                    .toBodilessEntity();
-            log.info("[CUSTOMER-SERVICE] ✅ Direct welcome email triggered for: {}", saved.getEmail());
-        } catch (Exception e) {
-            log.warn("[CUSTOMER-SERVICE] Direct welcome notification fallback (Event Grid active): {}", e.getMessage());
+            String payload = String.format("{\"emailTo\":\"%s\",\"emailSubject\":\"%s\",\"emailBody\":\"%s\"}",
+                    saved.getEmail().replace("\"", "\\\""),
+                    subject.replace("\"", "\\\""),
+                    body.replace("\"", "\\\"").replace("\n", "").replace("\r", ""));
+
+            java.net.http.HttpClient client = java.net.http.HttpClient.newHttpClient();
+            java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder()
+                    .uri(java.net.URI.create(logicAppUrl))
+                    .header("Content-Type", "application/json")
+                    .POST(java.net.http.HttpRequest.BodyPublishers.ofString(payload, java.nio.charset.StandardCharsets.UTF_8))
+                    .build();
+
+            java.net.http.HttpResponse<String> resp = client.send(req, java.net.http.HttpResponse.BodyHandlers.ofString());
+            log.info("[CUSTOMER-SERVICE] ✅ Welcome email sent to {} - Logic App status: {}", saved.getEmail(), resp.statusCode());
+        } catch (Exception ex) {
+            log.warn("[CUSTOMER-SERVICE] Welcome email dispatch note: {}", ex.getMessage());
         }
     }
 

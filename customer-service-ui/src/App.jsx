@@ -4,6 +4,7 @@ import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import ProtectedRoute from './components/ProtectedRoute';
 import { AuthProvider, useAuth } from './context/AuthContext';
+import { NotificationProvider } from './context/NotificationContext';
 import Dashboard from './pages/Dashboard';
 import EmiPage from './pages/EmiPage';
 import DocumentsPage from './pages/DocumentsPage';
@@ -69,9 +70,11 @@ function RootNavigator() {
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
-        <RootNavigator />
-      </BrowserRouter>
+      <NotificationProvider>
+        <BrowserRouter>
+          <RootNavigator />
+        </BrowserRouter>
+      </NotificationProvider>
     </AuthProvider>
   );
 }

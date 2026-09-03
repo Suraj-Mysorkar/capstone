@@ -72,23 +72,25 @@ function OutcomeNode({ icon, title, desc, color }) {
 // ── Main WorkflowDiagram Component ──────────────────────────────────────────
 
 export default function WorkflowDiagram({
-  currentStatus,
-  riskScore,
-  decisionRemarks,
-  onDecision,
-  onUploadDocs,
+  currentStatus = 'SUBMITTED',
+  riskScore = null,
+  decisionRemarks = '',
+  onDecision = null,
+  onUploadDocs = null,
   isProcessing = false
 }) {
-  const isDocPending    = currentStatus === 'DOCUMENT_REVIEW_PENDING';
-  const isManualReview  = currentStatus === 'MANUAL_REVIEW_REQUIRED';
-  const isApproved      = currentStatus === 'APPROVED';
-  const isRejected      = currentStatus === 'REJECTED';
-  const isEarlyStage    = !isDocPending && !isManualReview && !isApproved && !isRejected;
+  const safeStatus = String(currentStatus || 'SUBMITTED').toUpperCase();
+  const isDocPending    = safeStatus === 'DOCUMENT_REVIEW_PENDING';
+  const isDocSubmitted  = safeStatus === 'DOCUMENTS_SUBMITTED';
+  const isManualReview  = safeStatus === 'MANUAL_REVIEW_REQUIRED';
+  const isApproved      = safeStatus === 'APPROVED';
+  const isRejected      = safeStatus === 'REJECTED';
+  const isEarlyStage    = !isDocPending && !isDocSubmitted && !isManualReview && !isApproved && !isRejected;
 
   // Which risk branch is this app on?
   const isHighRisk = riskScore != null ? riskScore >= 70 : isRejected;
   const isLowRisk  = riskScore != null ? riskScore <= 30 : false;
-  const isMedRisk  = riskScore != null ? (riskScore > 30 && riskScore < 70) : isManualReview;
+  const isMedRisk  = riskScore != null ? (riskScore > 30 && riskScore < 70) : (isManualReview || isDocSubmitted || isDocPending);
 
   // Early stages state
   const submittedState       = 'done';
@@ -106,8 +108,8 @@ export default function WorkflowDiagram({
           </div>
         </div>
         <div className="wf-header-right">
-          <div className={`wf-status-chip wf-chip-${currentStatus?.toLowerCase()}`}>
-            {currentStatus?.replace(/_/g, ' ')}
+          <div className={`wf-status-chip wf-chip-${safeStatus.toLowerCase()}`}>
+            {safeStatus.replace(/_/g, ' ')}
           </div>
           {riskScore != null && (
             <div className="wf-risk-chip">

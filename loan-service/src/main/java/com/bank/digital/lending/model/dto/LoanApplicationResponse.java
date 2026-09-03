@@ -28,8 +28,12 @@ public record LoanApplicationResponse(
     BigDecimal dtiRatio,
     String orchestrationInstanceId,
     String assignedManager,
+    String assignedManagerName,
+    String assignedManagerEmail,
+    String assignedManagerPhone,
     String decisionRemarks,
     LocalDateTime createdAt,
     LocalDateTime updatedAt,
-    List<DocumentUploadResponse> documents
+    List<DocumentUploadResponse> documents,
+    List<String> requestedDocuments
 ) {}
