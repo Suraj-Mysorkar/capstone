@@ -231,20 +231,21 @@ export default function ApplicationDetailPage() {
             </div>
           </div>
 
-          {/* Conditional Document Request Email Action Card */}
-          {app.status === 'DOCUMENT_REVIEW_PENDING' && (
-            <div className="card p-6" style={{ background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(20, 26, 50, 0.9) 100%)', borderColor: '#f59e0b', borderWidth: 1.5, borderRadius: 14 }}>
+          {/* Document Request & Pending Checklist Card (Always available during underwriting) */}
+          {app.status !== 'APPROVED' && app.status !== 'REJECTED' && (
+            <div className="card p-6" style={{ background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(20, 26, 50, 0.9) 100%)', borderColor: isDocReviewCompleted ? 'var(--green)' : '#f59e0b', borderWidth: 1.5, borderRadius: 14 }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ padding: 10, borderRadius: 10, background: 'rgba(245, 158, 11, 0.15)', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ padding: 10, borderRadius: 10, background: isDocReviewCompleted ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)', color: isDocReviewCompleted ? 'var(--green)' : '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <Mail size={24} />
                   </div>
                   <div>
-                    <h4 style={{ margin: 0, color: '#f59e0b', fontSize: '1.05rem', fontWeight: 700 }}>
-                      Action Required: Send Verification Documents Request Email
+                    <h4 style={{ margin: 0, color: isDocReviewCompleted ? 'var(--green)' : '#f59e0b', fontSize: '1.05rem', fontWeight: 700 }}>
+                      {isDocReviewCompleted ? 'Document Requirements Complete (All Verified)' : 'Underwriter Action: Pending Documents & Request Email'}
                     </h4>
                     <p style={{ margin: '4px 0 0', fontSize: '.84rem', color: 'var(--text-muted)' }}>
-                      Notify applicant <strong>{app.customerName}</strong> ({app.customerEmail}) with the list of mandatory documents required for loan underwriting.
+                      Applicant <strong>{app.customerName}</strong> ({app.customerEmail}) · Status: <span style={{ fontWeight: 600, color: 'var(--accent)' }}>{app.status}</span>
+                      {customerDocs.length > 0 ? ` · Received: ${customerDocs.length}/3 documents` : ' · Awaiting initial documents'}
                     </p>
                   </div>
                 </div>
@@ -258,10 +259,32 @@ export default function ApplicationDetailPage() {
                 </button>
               </div>
 
+              {/* Pending Documents Summary Strip */}
+              <div style={{ marginBottom: 14, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
+                <span style={{ fontSize: '.82rem', fontWeight: 600, color: 'var(--text)' }}>
+                  Customer File:
+                </span>
+                {customerDocs.length > 0 ? (
+                  customerDocs.map(d => (
+                    <span
+                      key={d.documentId || d.id}
+                      className={`badge ${d.status === 'VERIFIED' || d.status === 'APPROVED' ? 'badge-approved' : d.status === 'REJECTED' ? 'badge-rejected' : 'badge-warning'}`}
+                      style={{ fontSize: '.72rem', padding: '4px 8px' }}
+                    >
+                      {d.documentType || d.documentName || 'Document'}: {d.status || 'UPLOADED'}
+                    </span>
+                  ))
+                ) : (
+                  <span className="badge badge-warning" style={{ fontSize: '.72rem' }}>
+                    No documents uploaded yet (3 mandatory documents required)
+                  </span>
+                )}
+              </div>
+
               {/* Required Document Checklist Selector */}
               <div style={{ marginBottom: 16, background: 'rgba(0,0,0,0.25)', padding: '14px 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)' }}>
                 <div style={{ fontSize: '.84rem', fontWeight: 600, color: 'var(--text)', marginBottom: 10 }}>
-                  Select Document Requirements Checklist to include in email:
+                  Select Document Requirements to include in customer notification email:
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 10 }}>
                   {DEFAULT_REQUIRED_DOCS.map(doc => {
@@ -298,6 +321,21 @@ export default function ApplicationDetailPage() {
                       </label>
                     );
                   })}
+                </div>
+
+                {/* Custom Notes from Underwriter */}
+                <div style={{ marginTop: 12 }}>
+                  <label style={{ fontSize: '.78rem', color: 'var(--muted)', display: 'block', marginBottom: 4 }}>
+                    Custom Underwriter Notes to include in email (optional):
+                  </label>
+                  <input
+                    type="text"
+                    className="form-input"
+                    placeholder="e.g. Please provide clear colored scan of front & back sides with valid date."
+                    value={customNotes}
+                    onChange={e => setCustomNotes(e.target.value)}
+                    style={{ fontSize: '.84rem', padding: '8px 12px', background: 'rgba(0,0,0,0.3)' }}
+                  />
                 </div>
               </div>
 
