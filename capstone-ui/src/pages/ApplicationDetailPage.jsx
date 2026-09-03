@@ -64,6 +64,7 @@ export default function ApplicationDetailPage() {
   const [remarks, setRemarks]     = useState('');
   const [managerId, setManagerId] = useState('senior.underwriter@bank.com');
   const [cbLoading, setCbLoading] = useState(false);
+  const [uploadingDoc, setUploadingDoc] = useState(false);
   const [cbResult, setCbResult]   = useState(null);
   const [cbError, setCbError]     = useState('');
 
