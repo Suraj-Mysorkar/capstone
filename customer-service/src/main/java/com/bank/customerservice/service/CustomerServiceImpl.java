@@ -59,7 +59,33 @@ public class CustomerServiceImpl implements CustomerService {
         eventPublisher.publishCustomerRegistered(
                 CustomerRegisteredEvent.of(saved.getId(), saved.getEmail(), saved.getFirstName() + " " +  saved.getLastName(), "Register"));
 
+        // Dispatch Welcome Email directly to Notification Service
+        dispatchWelcomeNotification(saved);
+
         return CustomerResponse.from(saved);
+    }
+
+    private void dispatchWelcomeNotification(Customer saved) {
+        try {
+            org.springframework.web.client.RestClient restClient = org.springframework.web.client.RestClient.create();
+            java.util.Map<String, Object> payload = java.util.Map.of(
+                    "eventType", "CUSTOMER_REGISTERED",
+                    "data", java.util.Map.of(
+                            "customerName", saved.getFirstName() + " " + saved.getLastName(),
+                            "email", saved.getEmail(),
+                            "status", "REGISTERED"
+                    )
+            );
+            restClient.post()
+                    .uri("https://team6-notification-service.azurewebsites.net/api/notify")
+                    .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                    .body(payload)
+                    .retrieve()
+                    .toBodilessEntity();
+            log.info("[CUSTOMER-SERVICE] ✅ Direct welcome email triggered for: {}", saved.getEmail());
+        } catch (Exception e) {
+            log.warn("[CUSTOMER-SERVICE] Direct welcome notification fallback (Event Grid active): {}", e.getMessage());
+        }
     }
 
     @Override

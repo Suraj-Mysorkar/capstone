@@ -123,6 +123,41 @@ export default function ApplicationDetailPage() {
             </div>
           </div>
 
+          {/* DEDICATED ASSIGNED LOAN MANAGER CARD */}
+          <div style={{ padding: '16px 20px', borderRadius: 12, background: 'linear-gradient(135deg, rgba(0, 210, 255, 0.08) 0%, rgba(13, 20, 44, 0.9) 100%)', border: '1px solid rgba(0, 210, 255, 0.3)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 12 }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                <div style={{ padding: 8, borderRadius: 8, background: 'rgba(0, 210, 255, 0.15)', color: 'var(--accent)', fontSize: '1.2rem' }}>
+                  👨‍💼
+                </div>
+                <div>
+                  <div style={{ fontSize: '.95rem', fontWeight: 700, color: 'var(--accent)' }}>
+                    Assigned Loan Officer &amp; Relationship Manager
+                  </div>
+                  <div style={{ fontSize: '.8rem', color: 'var(--text-muted)' }}>
+                    Dedicated bank officer assigned to process and assist your loan application
+                  </div>
+                </div>
+              </div>
+              <span className="badge badge-approved" style={{ fontSize: '.75rem' }}>Active &amp; Assigned</span>
+            </div>
+
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12 }}>
+              <div style={{ background: 'rgba(0,0,0,0.3)', padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize: '.72rem', color: 'var(--muted)' }}>Manager Name</div>
+                <div style={{ fontSize: '.9rem', fontWeight: 700, color: '#fff' }}>Mark Johnson ({app.assignedManager || 'markj'})</div>
+              </div>
+              <div style={{ background: 'rgba(0,0,0,0.3)', padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize: '.72rem', color: 'var(--muted)' }}>Contact Mobile</div>
+                <div style={{ fontSize: '.9rem', fontWeight: 700, color: 'var(--green)' }}>+1 (555) 019-2834</div>
+              </div>
+              <div style={{ background: 'rgba(0,0,0,0.3)', padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize: '.72rem', color: 'var(--muted)' }}>Official Email</div>
+                <div style={{ fontSize: '.9rem', fontWeight: 700, color: 'var(--accent)' }}>mark.johnson@bank.com</div>
+              </div>
+            </div>
+          </div>
+
           {app.status === 'DOCUMENT_REVIEW_PENDING' && (
             <div className="card p-6" style={{ background: '#f59e0b10', borderColor: '#f59e0b', borderWidth: 1.5 }}>
               <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>

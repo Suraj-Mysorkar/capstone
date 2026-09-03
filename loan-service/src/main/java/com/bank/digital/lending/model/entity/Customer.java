@@ -57,14 +57,14 @@ public class Customer {
 
     public Customer(String fullName, String email, String mobileNumber, BigDecimal incomeDetails, String employmentDetails) {
         this();
-        this.fullName = fullName;
-        this.email = email;
-        this.mobileNumber = mobileNumber;
+        this.fullName = fullName != null ? fullName : "Applicant";
+        this.email = email != null ? email : "customer@bank.com";
+        this.mobileNumber = (mobileNumber != null && !mobileNumber.isBlank()) ? mobileNumber : "N/A";
         this.incomeDetails = incomeDetails;
-        this.employmentDetails = employmentDetails;
+        this.employmentDetails = employmentDetails != null ? employmentDetails : "SALARIED";
         this.dob = LocalDate.of(1990, 1, 1);
         this.nationalId = "NAT-" + (System.currentTimeMillis() % 1000000);
-        this.loginId = (email != null && !email.isBlank()) ? email : ("user_" + java.util.UUID.randomUUID().toString().substring(0, 8));
+        this.loginId = "u" + Long.toString(System.currentTimeMillis() % 1_000_000_000L, 36);
         this.loginPassword = "Password@123";
     }
 

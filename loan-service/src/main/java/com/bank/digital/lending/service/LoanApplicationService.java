@@ -83,39 +83,42 @@ public class LoanApplicationService {
         // 2. Persist Customer into Customers table
         Customer customer = null;
         if (request.customerEmail() != null && !request.customerEmail().isBlank()) {
-            customer = customerRepository.findByEmail(request.customerEmail()).orElse(null);
+            customer = customerRepository.findByEmail(request.customerEmail().trim()).orElse(null);
         }
-        if (customer == null && request.customerId() != null && !request.customerId().isBlank()) {
+        if (customer == null && request.customerId() != null && !request.customerId().isBlank()
+                && !request.customerId().equalsIgnoreCase("CUST-1") && !request.customerId().equalsIgnoreCase("CUST-null")) {
             try {
-                String rawId = request.customerId().replace("CUST-", "");
+                String rawId = request.customerId().replace("CUST-", "").trim();
                 customer = customerRepository.findById(Long.parseLong(rawId)).orElse(null);
             } catch (Exception ignored) {}
         }
         if (customer == null) {
+            Customer newCust = new Customer(
+                    request.customerName() != null ? request.customerName() : "Applicant",
+                    request.customerEmail() != null ? request.customerEmail().trim() : "customer@bank.com",
+                    (request.customerPhone() != null && !request.customerPhone().isBlank()) ? request.customerPhone().trim() : "N/A",
+                    request.monthlyIncome(),
+                    request.employmentType() != null ? request.employmentType().name() : "SALARIED"
+            );
+            newCust.setLoginId("u" + Long.toString(System.currentTimeMillis() % 1_000_000_000L, 36));
+            newCust.setLoginPassword("Password@123");
             try {
-                Customer newCust = new Customer(
-                        request.customerName(),
-                        request.customerEmail(),
-                        request.customerPhone(),
-                        request.monthlyIncome(),
-                        request.employmentType() != null ? request.employmentType().name() : "SALARIED"
-                );
                 customer = customerRepository.save(newCust);
             } catch (Exception ex) {
-                log.warn("Could not persist customer: {}. Using in-memory customer reference.", ex.getMessage());
-                customer = new Customer();
-                customer.setCustomerId(System.currentTimeMillis() % 10000);
-                customer.setFullName(request.customerName());
-                customer.setEmail(request.customerEmail());
-                customer.setMobileNumber(request.customerPhone());
+                log.warn("[LOAN-SERVICE] Customer save warning: {}. Retrying with fresh instance.", ex.getMessage());
+                newCust.setLoginId("u" + (int)(Math.random() * 900000 + 100000));
+                customer = customerRepository.save(newCust);
             }
         } else {
-            customer.setFullName(request.customerName());
-            if (request.customerEmail() != null && !request.customerEmail().isBlank()) {
-                customer.setEmail(request.customerEmail());
+            if (request.customerName() != null && !request.customerName().isBlank()) {
+                customer.setFullName(request.customerName().trim());
             }
-            customer.setMobileNumber(request.customerPhone());
-            customer.setIncomeDetails(request.monthlyIncome());
+            if (request.customerPhone() != null && !request.customerPhone().isBlank()) {
+                customer.setMobileNumber(request.customerPhone().trim());
+            }
+            if (request.monthlyIncome() != null) {
+                customer.setIncomeDetails(request.monthlyIncome());
+            }
             if (request.employmentType() != null) {
                 customer.setEmploymentDetails(request.employmentType().name());
             }
@@ -124,7 +127,12 @@ public class LoanApplicationService {
             } catch (Exception ignored) {}
         }
 
-        String assignedCustomerId = "CUST-" + (customer.getCustomerId() != null ? customer.getCustomerId() : "1");
+        String assignedCustomerId = (request.customerId() != null && !request.customerId().isBlank()
+                && !request.customerId().equalsIgnoreCase("CUST-1") && !request.customerId().equalsIgnoreCase("CUST-null"))
+                ? request.customerId().trim()
+                : (customer != null && customer.getCustomerId() != null
+                        ? "CUST-" + customer.getCustomerId()
+                        : "CUST-" + (1000 + (System.currentTimeMillis() % 9000)));
 
         // 3. Initialize Application Entity
         LoanApplication app = new LoanApplication();

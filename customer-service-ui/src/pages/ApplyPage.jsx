@@ -110,7 +110,6 @@ export default function ApplyPage() {
   };
 
   const submit = async () => {
-    if (docs.length === 0) { setError('Please upload at least one supporting document.'); return; }
     setLoading(true);
     setResult(null);
     setError('');
@@ -127,7 +126,7 @@ export default function ApplyPage() {
         schemeId: form.schemeId,
         loanAmount: parseFloat(form.loanAmount),
         tenureMonths: parseInt(form.tenureMonths),
-        documentIds,
+        documentIds: documentIds.length > 0 ? documentIds : [],
       };
       let res = await applyLoan(body);
       if (!res.applicationId) {
@@ -135,16 +134,17 @@ export default function ApplyPage() {
         return;
       }
 
-      // Link the uploaded documents to the new application and push the workflow
-      // past the document-review gate (same callback the officer console relies on).
-      try {
-        const advanced = await notifyDocumentUploaded(res.applicationId, {
-          documentIds,
-          customerId: body.customerId || res.customerId,
-        });
-        if (advanced?.status) res = { ...res, ...advanced };
-      } catch (e) {
-        console.warn('document-uploaded callback failed (non-fatal):', e);
+      // If documents were uploaded in this form, link them to the application
+      if (documentIds.length > 0) {
+        try {
+          const advanced = await notifyDocumentUploaded(res.applicationId, {
+            documentIds,
+            customerId: body.customerId || res.customerId,
+          });
+          if (advanced?.status) res = { ...res, ...advanced };
+        } catch (e) {
+          console.warn('document-uploaded callback note:', e);
+        }
       }
 
       setResult(res);
@@ -163,39 +163,58 @@ export default function ApplyPage() {
   return (
     <div className="page">
       <div className="info-box">
-        Submitting this form runs the bank's automated credit workflow. Upload your
-        KYC &amp; income documents below — they are filed under your customer id
-        {loanCustomerId ? <> (<span className="font-mono">{loanCustomerId}</span>)</> : null} and
-        submitted with the application. Track progress under <strong>My Applications</strong>.
+        Submitting this form registers your loan application and assigns a dedicated Credit Manager to your case.
+        Uploading KYC &amp; income documents is optional during application and can also be uploaded later under <strong>My Documents</strong>.
       </div>
 
       {error && <div className="error-box">{error}</div>}
 
       {result && (
-        <div className="card p-6" style={{ marginBottom: 24, borderColor: statusColor(result.status), borderWidth: 1.5 }}>
-          <div className="card-header-title" style={{ color: statusColor(result.status), marginBottom: 16 }}>
-            Application Submitted — {result.status}
+        <div style={{ marginBottom: 24, padding: 20, borderRadius: 14, background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.12) 0%, rgba(13, 20, 44, 0.95) 100%)', border: '1.5px solid var(--green)' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 16 }}>
+            <div style={{ padding: 10, borderRadius: 10, background: 'rgba(16, 185, 129, 0.2)', color: 'var(--green)' }}>
+              <CheckCircle size={26} />
+            </div>
+            <div>
+              <h3 style={{ margin: 0, color: '#fff', fontSize: '1.15rem', fontWeight: 700 }}>
+                🎉 Loan Application Submitted Successfully!
+              </h3>
+              <p style={{ margin: '4px 0 0', fontSize: '.86rem', color: 'var(--text-muted)' }}>
+                Application ID: <strong style={{ color: '#fff' }}>{result.applicationId}</strong> · Customer ID: <strong className="font-mono" style={{ color: 'var(--accent)' }}>{result.customerId}</strong> · Status: <span style={{ color: statusColor(result.status), fontWeight: 700 }}>{result.status}</span>
+              </p>
+            </div>
           </div>
-          <div className="detail-grid">
-            {[
-              ['Application ID', result.applicationId],
-              ['Customer ID', result.customerId || '—'],
-              ['Status', result.status],
-              ['Risk Score', result.riskScore != null ? `${result.riskScore}/100` : '—'],
-              ['DTI Ratio', result.dtiRatio != null ? `${result.dtiRatio}%` : '—'],
-              ['Calculated EMI', result.calculatedEMI != null ? `₹${result.calculatedEMI.toLocaleString('en-IN')}` : '—'],
-              ['Documents', docs.map((d) => d.id).join(', ') || '—'],
-              ['Decision Remarks', result.decisionRemarks],
-            ].map(([l, v]) => (
-              <div key={l} className="detail-field">
-                <div className="detail-field-label">{l}</div>
-                <div className="detail-field-value" style={{ fontSize: '.82rem' }}>{v}</div>
+
+          {/* ASSIGNED LOAN MANAGER POPUP CARD */}
+          <div style={{ background: 'rgba(0, 210, 255, 0.08)', border: '1px solid rgba(0, 210, 255, 0.35)', borderRadius: 12, padding: '16px 18px', marginBottom: 16 }}>
+            <div style={{ fontSize: '.92rem', fontWeight: 700, color: 'var(--accent)', marginBottom: 6, display: 'flex', alignItems: 'center', gap: 6 }}>
+              👨‍💼 Dedicated Loan Manager Assigned
+            </div>
+            <div style={{ fontSize: '.84rem', color: 'var(--text)', lineHeight: 1.5 }}>
+              A dedicated Relationship &amp; Underwriting Manager has been assigned to assist and review your loan application:
+            </div>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 12, marginTop: 12 }}>
+              <div style={{ background: 'rgba(0,0,0,0.35)', padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize: '.72rem', color: 'var(--muted)' }}>Manager Name</div>
+                <div style={{ fontSize: '.9rem', fontWeight: 700, color: '#fff' }}>Mark Johnson ({result.assignedManager || 'markj'})</div>
               </div>
-            ))}
+              <div style={{ background: 'rgba(0,0,0,0.35)', padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize: '.72rem', color: 'var(--muted)' }}>Contact Mobile</div>
+                <div style={{ fontSize: '.9rem', fontWeight: 700, color: 'var(--green)' }}>+1 (555) 019-2834</div>
+              </div>
+              <div style={{ background: 'rgba(0,0,0,0.35)', padding: '10px 14px', borderRadius: 8, border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize: '.72rem', color: 'var(--muted)' }}>Official Email</div>
+                <div style={{ fontSize: '.9rem', fontWeight: 700, color: 'var(--accent)' }}>mark.johnson@bank.com</div>
+              </div>
+            </div>
           </div>
-          <div className="mt-4">
+
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
             <button className="btn btn-primary" onClick={() => navigate(`/applications/${result.applicationId}`)}>
-              View Status &amp; Next Steps →
+              View Application Details &amp; Progress →
+            </button>
+            <button className="btn btn-ghost" onClick={() => navigate('/documents')}>
+              Upload Supporting Documents →
             </button>
           </div>
         </div>

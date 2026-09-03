@@ -77,6 +77,29 @@ public class NotificationFunction {
     }
 
     /**
+     * Trigger 5: HTTP POST Trigger for Direct Notifications (/api/notify)
+     */
+    @FunctionName("ProcessHttpNotification")
+    public com.microsoft.azure.functions.HttpResponseMessage processHttpNotification(
+        @com.microsoft.azure.functions.annotation.HttpTrigger(
+            name = "req",
+            methods = {com.microsoft.azure.functions.HttpMethod.POST, com.microsoft.azure.functions.HttpMethod.GET},
+            authLevel = com.microsoft.azure.functions.annotation.AuthorizationLevel.ANONYMOUS,
+            route = "notify"
+        ) com.microsoft.azure.functions.HttpRequestMessage<java.util.Optional<String>> request,
+        final ExecutionContext context
+    ) {
+        String body = request.getBody().orElse("");
+        context.getLogger().info("[HTTP NOTIFICATION] Received direct notification payload: " + body);
+        handleGenericEvent(body, context);
+        return request.createResponseBuilder(com.microsoft.azure.functions.HttpStatus.OK)
+                .header("Content-Type", "application/json")
+                .header("Access-Control-Allow-Origin", "*")
+                .body("{\"status\":\"SUCCESS\",\"message\":\"Notification dispatched successfully\"}")
+                .build();
+    }
+
+    /**
      * Unified event router for all incoming events across Service Bus and Event Grid
      */
     public void handleGenericEvent(String rawContent, ExecutionContext context) {
