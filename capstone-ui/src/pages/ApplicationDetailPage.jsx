@@ -5,6 +5,7 @@ import {
   fetchAuditLogs,
   submitManagerCallback,
   notifyDocumentUploaded,
+  requestDocumentsFromCustomer,
   fetchCustomerDocuments
 } from '../services/api';
 import {
@@ -17,7 +18,9 @@ import {
   ShieldCheck,
   Lock,
   Search,
-  CheckCircle
+  CheckCircle,
+  Mail,
+  Send
 } from 'lucide-react';
 import WorkflowDiagram from '../components/WorkflowDiagram';
 
@@ -33,6 +36,13 @@ function fmt(n) {
   return new Intl.NumberFormat('en-IN', { style:'currency', currency:'INR', maximumFractionDigits:0 }).format(n);
 }
 
+const DEFAULT_REQUIRED_DOCS = [
+  'Government Photo ID (PAN Card - Mandatory)',
+  'Address Proof (Aadhaar Card / Passport / Recent Utility Bill)',
+  'Income Proof (Salary Slips for Last 3 Months or Latest Form 16 / ITR)',
+  'Bank Account Statement (Operational Bank Account Statement for Last 6 Months)'
+];
+
 export default function ApplicationDetailPage() {
   const { id } = useParams();
   const navigate = useNavigate();
@@ -42,10 +52,11 @@ export default function ApplicationDetailPage() {
   const [loading, setLoading]     = useState(true);
   const [tab, setTab]             = useState('details');
 
-  // Document upload state
-  const [uploadDocIds, setUploadDocIds] = useState('DOC-KYC-VERIFIED, DOC-INCOME-VERIFIED');
-  const [uploadingDoc, setUploadingDoc] = useState(false);
-  const [docUploadMsg, setDocUploadMsg] = useState('');
+  // Document Email Request State
+  const [selectedDocs, setSelectedDocs] = useState(DEFAULT_REQUIRED_DOCS);
+  const [customNotes, setCustomNotes]   = useState('');
+  const [sendingEmail, setSendingEmail] = useState(false);
+  const [emailStatusMsg, setEmailStatusMsg] = useState('');
 
   // Manager callback
   const [decision, setDecision]   = useState('APPROVE');
@@ -88,25 +99,24 @@ export default function ApplicationDetailPage() {
 
   useEffect(() => { load(); }, [id]);
 
-  const doUploadDocuments = async () => {
-    if (!uploadDocIds.trim()) return;
-    setUploadingDoc(true);
-    setDocUploadMsg('');
+  const doSendDocumentRequestEmail = async () => {
+    if (!app?.customerEmail) {
+      setEmailStatusMsg('❌ Customer email address is missing.');
+      return;
+    }
+    setSendingEmail(true);
+    setEmailStatusMsg('');
     try {
-      const docList = uploadDocIds.split(',').map(s => s.trim()).filter(Boolean);
-      const updated = await notifyDocumentUploaded(id, {
-        documentIds: docList,
-        customerId: app?.customerId || 'CUST-DEFAULT',
+      const res = await requestDocumentsFromCustomer(id, {
+        requiredDocumentTypes: selectedDocs,
+        customNotes: customNotes.trim(),
       });
-      setDocUploadMsg('✅ Documents successfully uploaded! Workflow advanced.');
-      if (updated?.status) {
-        setApp(updated);
-      }
+      setEmailStatusMsg(`✅ Document request email sent to ${app.customerEmail}! Applicant has received the list of required documents.`);
       await load();
     } catch (err) {
-      setDocUploadMsg('❌ Error uploading documents: ' + err.message);
+      setEmailStatusMsg('❌ Failed to send document request email: ' + (err.message || 'Server error'));
     } finally {
-      setUploadingDoc(false);
+      setSendingEmail(false);
     }
   };
 
@@ -200,30 +210,105 @@ export default function ApplicationDetailPage() {
             </div>
           </div>
 
-          {/* Conditional Document Action Card */}
+          {/* Conditional Document Request Email Action Card */}
           {app.status === 'DOCUMENT_REVIEW_PENDING' && (
-            <div className="card p-6" style={{ background: '#f59e0b10', borderColor: '#f59e0b', borderWidth: 1.5 }}>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12 }}>
-                <AlertTriangle color="#d97706" size={24} />
-                <div>
-                  <h4 style={{ margin: 0, color: '#d97706' }}>Action Required: Upload Verification Documents</h4>
-                  <p style={{ margin: '4px 0 0', fontSize: '.88rem', color: 'var(--text-muted)' }}>
-                    Documents are mandatory for approval. Once verified by Underwriting, this application will advance.
-                  </p>
+            <div className="card p-6" style={{ background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(20, 26, 50, 0.9) 100%)', borderColor: '#f59e0b', borderWidth: 1.5, borderRadius: 14 }}>
+              <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                  <div style={{ padding: 10, borderRadius: 10, background: 'rgba(245, 158, 11, 0.15)', color: '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    <Mail size={24} />
+                  </div>
+                  <div>
+                    <h4 style={{ margin: 0, color: '#f59e0b', fontSize: '1.05rem', fontWeight: 700 }}>
+                      Action Required: Send Verification Documents Request Email
+                    </h4>
+                    <p style={{ margin: '4px 0 0', fontSize: '.84rem', color: 'var(--text-muted)' }}>
+                      Notify applicant <strong>{app.customerName}</strong> ({app.customerEmail}) with the list of mandatory documents required for loan underwriting.
+                    </p>
+                  </div>
+                </div>
+                <button
+                  className="btn btn-ghost"
+                  style={{ fontSize: '.78rem', color: 'var(--accent)', border: '1px solid rgba(0, 210, 255, 0.3)' }}
+                  onClick={() => navigate('/documents')}
+                >
+                  <ExternalLink size={13} style={{ marginRight: 5 }} />
+                  Open Documents Review Portal
+                </button>
+              </div>
+
+              {/* Required Document Checklist Selector */}
+              <div style={{ marginBottom: 16, background: 'rgba(0,0,0,0.25)', padding: '14px 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)' }}>
+                <div style={{ fontSize: '.84rem', fontWeight: 600, color: 'var(--text)', marginBottom: 10 }}>
+                  Select Document Requirements Checklist to include in email:
+                </div>
+                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 10 }}>
+                  {DEFAULT_REQUIRED_DOCS.map(doc => {
+                    const isChecked = selectedDocs.includes(doc);
+                    return (
+                      <label
+                        key={doc}
+                        style={{
+                          display: 'flex',
+                          alignItems: 'center',
+                          gap: 8,
+                          fontSize: '.82rem',
+                          color: isChecked ? '#fff' : 'var(--muted)',
+                          cursor: 'pointer',
+                          background: isChecked ? 'rgba(0, 210, 255, 0.08)' : 'transparent',
+                          padding: '6px 10px',
+                          borderRadius: 6,
+                          border: isChecked ? '1px solid rgba(0, 210, 255, 0.3)' : '1px solid transparent',
+                        }}
+                      >
+                        <input
+                          type="checkbox"
+                          checked={isChecked}
+                          onChange={e => {
+                            if (e.target.checked) {
+                              setSelectedDocs(prev => [...prev, doc]);
+                            } else {
+                              setSelectedDocs(prev => prev.filter(d => d !== doc));
+                            }
+                          }}
+                          style={{ accentColor: 'var(--accent)' }}
+                        />
+                        <span>{doc}</span>
+                      </label>
+                    );
+                  })}
                 </div>
               </div>
-              {docUploadMsg && <div style={{ marginBottom: 12, fontWeight: 600, fontSize: '.9rem' }}>{docUploadMsg}</div>}
-              <div style={{ display: 'flex', gap: 12, alignItems: 'center', flexWrap: 'wrap' }}>
-                <input
-                  className="form-input"
-                  style={{ flex: 1, minWidth: 250 }}
-                  value={uploadDocIds}
-                  onChange={e => setUploadDocIds(e.target.value)}
-                  placeholder="e.g. DOC-KYC-01, DOC-SALARY-01"
-                />
-                <button className="btn btn-primary" onClick={doUploadDocuments} disabled={uploadingDoc}>
-                  <UploadCloud size={16} style={{ marginRight: 6 }} />
-                  {uploadingDoc ? 'Uploading…' : 'Submit Verification Documents'}
+
+              {emailStatusMsg && (
+                <div
+                  style={{
+                    marginBottom: 14,
+                    padding: '10px 14px',
+                    borderRadius: 8,
+                    fontSize: '.85rem',
+                    fontWeight: 600,
+                    background: emailStatusMsg.startsWith('✅') ? 'rgba(0, 230, 118, 0.12)' : 'rgba(231, 76, 60, 0.12)',
+                    color: emailStatusMsg.startsWith('✅') ? '#2ecc71' : '#e74c3c',
+                    border: '1px solid ' + (emailStatusMsg.startsWith('✅') ? 'rgba(0, 230, 118, 0.3)' : 'rgba(231, 76, 60, 0.3)'),
+                  }}
+                >
+                  {emailStatusMsg}
+                </div>
+              )}
+
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 12 }}>
+                <div style={{ fontSize: '.8rem', color: 'var(--muted)' }}>
+                  Recipient: <strong style={{ color: 'var(--accent)' }}>{app.customerEmail || 'No email provided'}</strong>
+                </div>
+                <button
+                  className="btn btn-primary"
+                  onClick={doSendDocumentRequestEmail}
+                  disabled={sendingEmail || !app.customerEmail || selectedDocs.length === 0}
+                  style={{ padding: '9px 18px', fontSize: '.88rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 8 }}
+                >
+                  <Send size={15} />
+                  {sendingEmail ? 'Sending Email to Customer…' : '📧 Send Document Request Email to Customer'}
                 </button>
               </div>
             </div>

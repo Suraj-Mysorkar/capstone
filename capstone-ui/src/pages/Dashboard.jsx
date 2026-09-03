@@ -55,8 +55,16 @@ export default function Dashboard() {
 
   useEffect(() => {
     load();
-    const t = setInterval(load, 10000);
-    return () => clearInterval(t);
+    const t = setInterval(load, 15000);
+    const handleDataUpdate = () => {
+      console.log('Real-time event: auto-refreshing dashboard metrics');
+      load();
+    };
+    window.addEventListener('loan-data-updated', handleDataUpdate);
+    return () => {
+      clearInterval(t);
+      window.removeEventListener('loan-data-updated', handleDataUpdate);
+    };
   }, []);
 
   const approved = apps.filter(a => a.status === 'APPROVED').length;

@@ -20,4 +20,9 @@ public class DocumentStatusUpdateRequest {
     private String verifiedBy;
 
     private String customerEmail;
+
+    public DocumentStatusUpdateRequest(DocumentStatus status, String remarks) {
+        this.status = status;
+        this.remarks = remarks;
+    }
 }

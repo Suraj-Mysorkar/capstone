@@ -35,13 +35,14 @@ public class LoanApplicationController {
         return ResponseEntity.ok(applicationService.listCustomers());
     }
 
-    @PostMapping("/customers")
-    @Operation(summary = "Register / upsert a customer (no loan application)",
-               description = "Creates or updates a row in the shared Customers table, keyed by email. "
-                       + "Used by the customer self-service portal so a newly-registered customer is "
-                       + "immediately visible to the loan officer console.")
-    public ResponseEntity<CustomerResponse> registerCustomer(@Valid @RequestBody CustomerRegistrationRequest request) {
-        return ResponseEntity.status(HttpStatus.CREATED).body(applicationService.registerOrUpdateCustomer(request));
+    @PostMapping("/applications/{id}/request-documents")
+    @Operation(summary = "Send Document Request Email to Customer",
+               description = "Dispatches an email checklist of required documents to the customer for verification")
+    public ResponseEntity<DocumentRequestEmailResponse> sendDocumentRequestEmail(
+            @PathVariable("id") String applicationId,
+            @RequestBody(required = false) DocumentRequestEmailRequest request) {
+        DocumentRequestEmailResponse response = applicationService.sendDocumentRequestEmail(applicationId, request);
+        return ResponseEntity.ok(response);
     }
 
     // Endpoint to receive document upload notification and advance workflow
