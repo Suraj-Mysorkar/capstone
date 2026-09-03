@@ -265,24 +265,25 @@ public class LoanDurableOrchestrator {
         log.info("[MOCK AZURE DURABLE FUNCTION] Instance ID: {}", instanceId);
         log.info("[MOCK AZURE DURABLE FUNCTION] Workflow: 'LoanProcessingOrchestrator' | Application: {}", app.getApplicationId());
 
-        // Step 1: ValidateApplicationActivity
-        log.info("[MOCK AZURE DURABLE FUNCTION] [Step 1/3] Executing Activity: 'ValidateApplicationActivity'...");
-        boolean isValid = validateApplicationData(app);
-        if (!isValid) {
-            log.warn("[MOCK AZURE DURABLE FUNCTION] [Step 1/3] Validation FAILED for application: {}", app.getApplicationId());
-            app.setStatus(LoanStatus.REJECTED);
-            app.setDecisionRemarks("Application data validation failed (scheme limits or negative values).");
-            log.info("================================================================================");
-            return;
-        }
-        log.info("[MOCK AZURE DURABLE FUNCTION] [Step 1/3] Validation PASSED. State checkpoint saved.");
-
-        // Step 2: ComputeCreditRiskScoreActivity
-        log.info("[MOCK AZURE DURABLE FUNCTION] [Step 2/3] Executing Activity: 'ComputeCreditRiskScoreActivity'...");
+        // Step 1: ComputeCreditRiskScoreActivity (always compute risk score first)
+        log.info("[MOCK AZURE DURABLE FUNCTION] [Step 1/3] Executing Activity: 'ComputeCreditRiskScoreActivity'...");
         CreditRiskScoringService.RiskAssessmentResult result = creditRiskScoringService.evaluateApplication(app);
         app.setRiskScore(result.riskScore());
         app.setDtiRatio(result.dtiRatio());
-        log.info("[MOCK AZURE DURABLE FUNCTION] [Step 2/3] Risk Score Evaluated: {}/100, DTI: {}%", result.riskScore(), result.dtiRatio());
+        log.info("[MOCK AZURE DURABLE FUNCTION] [Step 1/3] Risk Score Evaluated: {}/100, DTI: {}%", result.riskScore(), result.dtiRatio());
+
+        // Step 2: ValidateApplicationActivity
+        log.info("[MOCK AZURE DURABLE FUNCTION] [Step 2/3] Executing Activity: 'ValidateApplicationActivity'...");
+        String validationError = validateApplicationDataDetailed(app);
+        if (validationError != null) {
+            log.warn("[MOCK AZURE DURABLE FUNCTION] [Step 2/3] Validation FAILED for application: {} — {}", app.getApplicationId(), validationError);
+            app.setStatus(LoanStatus.REJECTED);
+            app.setDecisionRemarks("Application Rejected: " + validationError
+                    + " (Risk Score: " + result.riskScore() + "/100, DTI: " + result.dtiRatio() + "%).");
+            log.info("================================================================================");
+            return;
+        }
+        log.info("[MOCK AZURE DURABLE FUNCTION] [Step 2/3] Validation PASSED. State checkpoint saved.");
 
         // Step 3: DecisionGatewayActivity
         log.info("[MOCK AZURE DURABLE FUNCTION] [Step 3/3] Executing Activity: 'DecisionGatewayActivity'...");
@@ -318,15 +319,39 @@ public class LoanDurableOrchestrator {
     }
 
     private boolean validateApplicationData(LoanApplication app) {
-        LoanScheme scheme = app.getScheme();
-        if (scheme == null) return false;
+        return validateApplicationDataDetailed(app) == null;
+    }
 
-        if (app.getLoanAmount() == null || app.getLoanAmount().compareTo(scheme.getMinAmount()) < 0
-                || app.getLoanAmount().compareTo(scheme.getMaxAmount()) > 0) {
-            return false;
+    private String validateApplicationDataDetailed(LoanApplication app) {
+        LoanScheme scheme = app.getScheme();
+        if (scheme == null) return "No loan scheme found for this application.";
+
+        if (app.getLoanAmount() == null) return "Loan amount is missing.";
+
+        if (app.getLoanAmount().compareTo(scheme.getMinAmount()) < 0) {
+            return "Requested loan amount ₹" + app.getLoanAmount().toPlainString()
+                    + " is below the minimum ₹" + scheme.getMinAmount().toPlainString()
+                    + " for scheme '" + scheme.getSchemeName() + "'.";
+        }
+        if (app.getLoanAmount().compareTo(scheme.getMaxAmount()) > 0) {
+            return "Requested loan amount ₹" + app.getLoanAmount().toPlainString()
+                    + " exceeds the maximum ₹" + scheme.getMaxAmount().toPlainString()
+                    + " for scheme '" + scheme.getSchemeName() + "'.";
         }
 
-        return app.getTenureMonths() != null && app.getTenureMonths() >= scheme.getMinTenureMonths()
-                && app.getTenureMonths() <= scheme.getMaxTenureMonths();
+        if (app.getTenureMonths() == null) return "Tenure months is missing.";
+
+        if (app.getTenureMonths() < scheme.getMinTenureMonths()) {
+            return "Requested tenure of " + app.getTenureMonths()
+                    + " months is below the minimum " + scheme.getMinTenureMonths()
+                    + " months for scheme '" + scheme.getSchemeName() + "'.";
+        }
+        if (app.getTenureMonths() > scheme.getMaxTenureMonths()) {
+            return "Requested tenure of " + app.getTenureMonths()
+                    + " months exceeds the maximum " + scheme.getMaxTenureMonths()
+                    + " months for scheme '" + scheme.getSchemeName() + "'.";
+        }
+
+        return null; // valid
     }
 }

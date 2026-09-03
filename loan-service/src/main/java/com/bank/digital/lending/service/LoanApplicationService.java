@@ -343,9 +343,11 @@ public class LoanApplicationService {
             }
             List<LoanApplication> activeApps = applicationRepository.findByStatusIn(List.of(
                     LoanStatus.SUBMITTED,
+                    LoanStatus.VALIDATING,
+                    LoanStatus.CREDIT_ASSESSMENT,
                     LoanStatus.DOCUMENT_REVIEW_PENDING,
-                    LoanStatus.MANUAL_REVIEW_REQUIRED,
-                    LoanStatus.CREDIT_ASSESSMENT
+                    LoanStatus.DOCUMENTS_SUBMITTED,
+                    LoanStatus.MANUAL_REVIEW_REQUIRED
             ));
             for (LoanApplication a : activeApps) {
                 if (a.getAssignedManager() != null) {
