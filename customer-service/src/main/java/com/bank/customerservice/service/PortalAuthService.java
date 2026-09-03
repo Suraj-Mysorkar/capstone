@@ -9,6 +9,7 @@ import com.bank.customerservice.exception.DuplicateResourceException;
 import com.bank.customerservice.exception.InvalidCredentialsException;
 import com.bank.customerservice.exception.ResourceNotFoundException;
 import com.bank.customerservice.repository.AppUserRepository;
+import com.bank.customerservice.repository.CustomerRepository;
 import com.bank.customerservice.security.PortalJwtIssuer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -28,6 +29,7 @@ public class PortalAuthService {
     private static final String CUSTOMER_ROLE = "customer";
 
     private final CustomerService customerService;
+    private final CustomerRepository customerRepository;
     private final AppUserRepository appUserRepository;
     private final PortalJwtIssuer jwtIssuer;
 
@@ -40,12 +42,13 @@ public class PortalAuthService {
         }
 
         // 1. Customer profile (customer_profiles). Reuse the existing flow so the
-        //    CustomerRegistered event still fires. Tolerate a pre-existing profile.
+        //    CustomerRegistered event still fires. Tolerate a pre-existing profile safely
+        //    without throwing exceptions inside the transaction.
         CustomerResponse profile;
-        try {
-            profile = customerService.register(request.toCustomerRegistration());
-        } catch (DuplicateResourceException dup) {
+        if (customerRepository.existsByEmailIgnoreCase(email)) {
             profile = customerService.getByEmail(email);
+        } else {
+            profile = customerService.register(request.toCustomerRegistration());
         }
 
         // 2. Credentials row in the shared Users table. loginid is a narrow column
