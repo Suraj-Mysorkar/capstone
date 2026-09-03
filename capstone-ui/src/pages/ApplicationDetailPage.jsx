@@ -246,8 +246,8 @@ export default function ApplicationDetailPage() {
             </div>
           </div>
 
-          {/* Document Request & Pending Checklist Card (Always available during underwriting) */}
-          {app.status !== 'APPROVED' && app.status !== 'REJECTED' && (
+          {/* Document Request & Pending Checklist Card (Hidden once all docs submitted & verified) */}
+          {app.status !== 'APPROVED' && app.status !== 'REJECTED' && !isDocReviewCompleted && (
             <div className="card p-6" style={{ background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(20, 26, 50, 0.9) 100%)', borderColor: isDocReviewCompleted ? 'var(--green)' : '#f59e0b', borderWidth: 1.5, borderRadius: 14 }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
