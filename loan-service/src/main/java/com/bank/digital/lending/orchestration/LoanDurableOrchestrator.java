@@ -296,29 +296,23 @@ public class LoanDurableOrchestrator {
             log.info("[MOCK AZURE DURABLE FUNCTION] Decision Gateway: High Risk → Auto-Rejection. Score={}/100, DTI={}%",
                     result.riskScore(), result.dtiRatio());
 
-        } else if (result.initialStatus() == LoanStatus.APPROVED) {
-            // ── BRANCH A: Low Risk (Score ≤ 30) ── Document Review Required FIRST ──────────────
-            // Documents are ALWAYS mandatory. Auto-Approval happens ONLY after docs are verified.
+        } else if (result.initialStatus() == LoanStatus.APPROVED || result.initialStatus() == LoanStatus.MANUAL_REVIEW_REQUIRED) {
+            // ── Both Low Risk and Moderate Risk require Document Submission and Manager Review ──
             app.setStatus(LoanStatus.DOCUMENT_REVIEW_PENDING);
-            app.setDecisionRemarks("Auto-Approval Eligible (Low Risk — Score: " + result.riskScore() + "/100, DTI: "
+            app.setDecisionRemarks("Application Under Review (Risk Score: " + result.riskScore() + "/100, DTI: "
                     + result.dtiRatio() + "%). "
-                    + "STEP 1 OF 2: Mandatory KYC and Income verification documents must be submitted for document review. "
-                    + "Once documents are verified, this application will be auto-approved immediately.");
-            log.info("[MOCK AZURE DURABLE FUNCTION] Decision Gateway: Low Risk → DOCUMENT_REVIEW_PENDING (Level 1: Document Review). "
-                    + "Auto-Approval will trigger upon document verification.");
+                    + "Mandatory KYC and Income verification documents must be submitted and reviewed by Credit Manager ("
+                    + (app.getAssignedManager() != null ? app.getAssignedManager() : "markj")
+                    + ") before final approval decision.");
+            log.info("[MOCK AZURE DURABLE FUNCTION] Decision Gateway: Risk Score={}/100, DTI={}% → DOCUMENT_REVIEW_PENDING. Awaiting Manager Document Review.",
+                    result.riskScore(), result.dtiRatio());
 
         } else {
-            // ── BRANCH B: Medium Risk (31 ≤ Score < 70) ── Two-Level Approval Required ─────────
-            // Level 1: Document Review (KYC/Income documents)
-            // Level 2: Underwriter Review (loan amount, terms, risk profile)
+            // Fallback
             app.setStatus(LoanStatus.DOCUMENT_REVIEW_PENDING);
-            app.setDecisionRemarks("Moderate Risk Profile — Requires Two-Level Approval (Score: " + result.riskScore()
-                    + "/100, DTI: " + result.dtiRatio() + "%). "
-                    + "STEP 1 OF 2: Please submit KYC and Income verification documents for document review. "
-                    + "STEP 2 OF 2: After document verification, an Operations Manager will review the loan amount, "
-                    + "tenure, and overall risk profile before final decision.");
-            log.info("[MOCK AZURE DURABLE FUNCTION] Decision Gateway: Moderate Risk → DOCUMENT_REVIEW_PENDING "
-                    + "(Level 1 of 2-Level Approval: Document Review). Manager underwriting review follows.");
+            app.setDecisionRemarks("Underwriting Review Pending (Risk Score: " + result.riskScore()
+                    + "/100, DTI: " + result.dtiRatio() + "%). Awaiting document review and Manager decision.");
+            log.info("[MOCK AZURE DURABLE FUNCTION] Decision Gateway: DOCUMENT_REVIEW_PENDING. Manager underwriting review follows.");
         }
         log.info("================================================================================");
     }

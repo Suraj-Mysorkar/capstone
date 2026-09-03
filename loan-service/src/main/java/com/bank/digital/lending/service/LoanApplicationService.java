@@ -377,42 +377,24 @@ public class LoanApplicationService {
 
         LoanStatus previousStatus = app.getStatus();
 
-        // ── 3. Advance workflow based on risk score ────────────────────────────────────────
-        if (app.getStatus() == LoanStatus.DOCUMENT_REVIEW_PENDING) {
+        // ── 3. Keep application in DOCUMENT_REVIEW_PENDING for Manager Review ─────────
+        if (app.getStatus() == LoanStatus.DOCUMENT_REVIEW_PENDING || app.getStatus() == LoanStatus.SUBMITTED) {
             int score = app.getRiskScore() != null ? app.getRiskScore() : 50;
             String dti  = app.getDtiRatio() != null ? app.getDtiRatio().toString() : "—";
+            String manager = app.getAssignedManager() != null ? app.getAssignedManager() : "markj";
 
-            if (score <= 30) {
-                // ── BRANCH A: Low Risk → Level 1 complete → Auto-Approved ────────────────────────
-                app.setStatus(LoanStatus.APPROVED);
-                app.setDecisionRemarks(
-                        "✅ Document Review Passed (Level 1 of 1). "
-                        + "Auto-Approved by Credit Engine: KYC and income verification documents received and verified. "
-                        + "Low risk profile confirmed (Score: " + score + "/100, DTI: " + dti + "%). "
-                        + "No further review required.");
-                recordAuditLog(applicationId, previousStatus, LoanStatus.APPROVED,
-                        "SYSTEM_CREDIT_ENGINE",
-                        "Level 1 (Document Review) passed. Low-risk auto-approval triggered.");
-                eventBusPublisher.publishLoanCompletedEvent(app);
-
-            } else {
-                // ── BRANCH B: Medium Risk → Level 1 complete → Escalate to Level 2 ───────────────
-                app.setStatus(LoanStatus.MANUAL_REVIEW_REQUIRED);
-                app.setDecisionRemarks(
-                        "✅ Document Review Passed (Level 1 of 2). "
-                        + "KYC and income verification documents received and verified (Score: " + score + "/100, DTI: " + dti + "%). "
-                        + "Now awaiting Level 2: Operations Manager must review loan amount, tenure, and overall risk profile before final decision.");
-                recordAuditLog(applicationId, previousStatus, LoanStatus.MANUAL_REVIEW_REQUIRED,
-                        "DOC_VERIFICATION_SERVICE",
-                        "Level 1 (Document Review) passed. Escalated to Level 2 (Underwriter Review).");
-                String callbackUrl = callbackUrlFor(applicationId);
-                durableOrchestrator.triggerManagerReviewWorkflow(app, callbackUrl);
-                eventBusPublisher.publishLoanStatusEvent(app, "LOAN_MANUAL_REVIEW_REQUIRED", app.getDecisionRemarks());
-            }
+            app.setStatus(LoanStatus.DOCUMENT_REVIEW_PENDING);
+            app.setDecisionRemarks(
+                    "📄 Documents uploaded by applicant (Risk Score: " + score + "/100, DTI: " + dti + "%). "
+                    + "Awaiting Credit Manager (" + manager + ") document review and underwriting decision.");
+            recordAuditLog(applicationId, previousStatus, LoanStatus.DOCUMENT_REVIEW_PENDING,
+                    "DOC_UPLOAD_SERVICE",
+                    "Documents uploaded (" + fileName + "). Application in Document Review queue for Manager decision.");
+            eventBusPublisher.publishLoanStatusEvent(app, "LOAN_DOCUMENT_REVIEW_PENDING", app.getDecisionRemarks());
         } else {
             // Additional documents on an already-processed application
             recordAuditLog(applicationId, app.getStatus(), app.getStatus(),
-                    "DOC_UPLOAD_SERVICE", "Supplementary documents uploaded and linked.");
+                    "DOC_UPLOAD_SERVICE", "Supplementary document (" + fileName + ") uploaded and linked.");
         }
 
         LoanApplication saved = applicationRepository.save(app);
@@ -421,7 +403,7 @@ public class LoanApplicationService {
         notificationService.sendNotification(new NotificationDTO(
                 "markj",
                 "Document Uploaded: " + saved.getCustomerName(),
-                "Customer " + saved.getCustomerName() + " (" + saved.getCustomerId() + ") has uploaded " + fileName + " (" + docType.name() + ").",
+                "Customer " + saved.getCustomerName() + " (" + saved.getCustomerId() + ") has uploaded " + fileName + " (" + docType.name() + "). Ready for Document Review.",
                 "DOCUMENT_UPLOADED",
                 saved.getCustomerId(),
                 saved.getCustomerName(),

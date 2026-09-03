@@ -157,10 +157,10 @@ export default function ApplicationDetailPage() {
                   : app.riskScore <= 30   ? 'var(--green)'
                   : app.riskScore >= 70   ? 'var(--red)' : 'var(--yellow)';
 
-  // Check if Document Review is done and approved for this customer
+  // Check if Document Review is done and approved for this customer in Document Review Portal
   const verifiedDocs = customerDocs.filter(d => d.status === 'VERIFIED' || d.status === 'APPROVED');
   const rejectedDocs = customerDocs.filter(d => d.status === 'REJECTED' || d.status === 'ACTION_REQUIRED');
-  const isDocReviewCompleted = (customerDocs.length > 0 && verifiedDocs.length > 0) || (app.documents && app.documents.length > 0);
+  const isDocReviewCompleted = customerDocs.length > 0 && verifiedDocs.length > 0 && rejectedDocs.length === 0;
 
   return (
     <div className="page">
@@ -431,12 +431,12 @@ export default function ApplicationDetailPage() {
             <ShieldCheck size={20} color="var(--accent)" /> Manager Underwriting Decision Callback
           </div>
           <div className="text-muted" style={{ marginBottom: 20, fontSize: '.83rem' }}>
-            Only applications in <strong>MANUAL_REVIEW_REQUIRED</strong> state can receive an underwriter approval.
+            Applications in <strong>DOCUMENT_REVIEW_PENDING</strong> or <strong>MANUAL_REVIEW_REQUIRED</strong> state can receive an underwriter approval once documents are reviewed.
           </div>
 
-          {app.status !== 'MANUAL_REVIEW_REQUIRED' && (
+          {app.status !== 'MANUAL_REVIEW_REQUIRED' && app.status !== 'DOCUMENT_REVIEW_PENDING' && (
             <div className="info-box" style={{ marginBottom: 16 }}>
-              This application is currently <strong>{app.status}</strong>. Manager callback is only applicable when status is MANUAL_REVIEW_REQUIRED.
+              This application is currently <strong>{app.status}</strong>. Manager callback is only applicable when status is DOCUMENT_REVIEW_PENDING or MANUAL_REVIEW_REQUIRED.
             </div>
           )}
 
