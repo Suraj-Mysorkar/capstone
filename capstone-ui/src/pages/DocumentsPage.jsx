@@ -5,6 +5,8 @@ import {
   fetchDocumentTypes,
   fetchDocumentBlobUrl,
   fetchCustomerDocuments,
+  fetchApplicationDocuments,
+  fetchApplications,
   updateDocumentStatus,
   deleteDocumentById
 } from '../services/api';
@@ -26,18 +28,28 @@ import {
   ShieldCheck,
   AlertTriangle,
   X,
-  Trash2
+  Trash2,
+  CheckSquare,
+  Square,
+  Filter
 } from 'lucide-react';
 
 export default function DocumentsPage() {
   const [tab, setTab] = useState('fetch');
   const [docTypesList, setDocTypesList] = useState([]);
   
-  // Customer Search & Documents list
+  // Customer & Application Search & Documents list
   const [searchCustomerId, setSearchCustomerId] = useState('CUST-3');
   const [activeCustomerId, setActiveCustomerId] = useState('CUST-3');
   const [customerDocs, setCustomerDocs] = useState([]);
+  const [allApps, setAllApps] = useState([]);
+  const [customerApps, setCustomerApps] = useState([]);
+  const [selectedAppId, setSelectedAppId] = useState('ALL');
   const [loadingCustomerDocs, setLoadingCustomerDocs] = useState(false);
+
+  // Multi-Select Batch Actions State
+  const [selectedDocIds, setSelectedDocIds] = useState(new Set());
+  const [batchSubmitting, setBatchSubmitting] = useState(false);
 
   // Selected Document & In-Browser Viewer state
   const [selectedDoc, setSelectedDoc] = useState(null);
@@ -74,14 +86,18 @@ export default function DocumentsPage() {
       }
     });
 
+    fetchApplications().then(apps => {
+      if (Array.isArray(apps)) setAllApps(apps);
+    }).catch(() => {});
+
     handleSearchCustomer('CUST-3');
   }, []);
 
-  // Fetch all documents for a customer ID
-  const handleSearchCustomer = async (cust = searchCustomerId) => {
-    const cleanCust = String(cust || '').trim();
-    if (!cleanCust) {
-      setDocError('Please enter a valid Customer ID.');
+  // Fetch all documents for a customer ID or Application ID
+  const handleSearchCustomer = async (inputVal = searchCustomerId) => {
+    const cleanInput = String(inputVal || '').trim();
+    if (!cleanInput) {
+      setDocError('Please enter a valid Customer ID or Application ID.');
       return;
     }
 
@@ -89,22 +105,53 @@ export default function DocumentsPage() {
     setDocError('');
     setReviewSuccessMsg('');
     setReviewErrorMsg('');
-    setActiveCustomerId(cleanCust);
+    setSelectedDocIds(new Set());
 
     try {
-      const docs = await fetchCustomerDocuments(cleanCust);
-      const docList = Array.isArray(docs) ? docs : [];
+      let docList = [];
+      let activeCust = cleanInput;
+
+      // Check if input is an Application ID (starts with APP-)
+      if (cleanInput.toUpperCase().startsWith('APP-')) {
+        const appDocs = await fetchApplicationDocuments(cleanInput);
+        docList = Array.isArray(appDocs) ? appDocs : [];
+        if (docList.length > 0 && docList[0].customerId) {
+          activeCust = docList[0].customerId;
+        }
+        setSelectedAppId(cleanInput);
+      } else {
+        const docs = await fetchCustomerDocuments(cleanInput);
+        docList = Array.isArray(docs) ? docs : [];
+        setSelectedAppId('ALL');
+      }
+
+      setActiveCustomerId(activeCust);
       setCustomerDocs(docList);
+
+      // Load applications for this customer
+      let currentApps = allApps;
+      if (!currentApps || currentApps.length === 0) {
+        try {
+          currentApps = await fetchApplications();
+          setAllApps(currentApps);
+        } catch {}
+      }
+
+      const matchingApps = (Array.isArray(currentApps) ? currentApps : []).filter(
+        a => (a.customerId || '').toLowerCase() === activeCust.toLowerCase() ||
+             (a.customerEmail || '').toLowerCase() === activeCust.toLowerCase()
+      );
+      setCustomerApps(matchingApps);
 
       if (docList.length > 0) {
         selectAndPreviewDoc(docList[0]);
       } else {
         setSelectedDoc(null);
         setPreviewBlobUrl(null);
-        setDocError(`No documents found for Customer ID: ${cleanCust}`);
+        setDocError(`No documents found for: ${cleanInput}`);
       }
     } catch (e) {
-      setDocError(e.message || `Failed to fetch documents for Customer ID: ${cleanCust}`);
+      setDocError(e.message || `Failed to fetch documents for: ${cleanInput}`);
       setCustomerDocs([]);
       setSelectedDoc(null);
       setPreviewBlobUrl(null);
@@ -213,6 +260,83 @@ export default function DocumentsPage() {
     }
   };
 
+  // Toggle selection for a single document
+  const toggleSelectDoc = (docId, e) => {
+    e.stopPropagation();
+    const strId = String(docId);
+    setSelectedDocIds(prev => {
+      const next = new Set(prev);
+      if (next.has(strId)) next.delete(strId);
+      else next.add(strId);
+      return next;
+    });
+  };
+
+  // Toggle select all visible documents
+  const toggleSelectAll = (visibleDocs) => {
+    if (selectedDocIds.size === visibleDocs.length && visibleDocs.length > 0) {
+      setSelectedDocIds(new Set());
+    } else {
+      setSelectedDocIds(new Set(visibleDocs.map(d => String(d.documentId || d.id))));
+    }
+  };
+
+  // Batch approve or reject selected documents
+  const doBatchReview = async (targetStatus) => {
+    if (selectedDocIds.size === 0) return;
+    setBatchSubmitting(true);
+    setReviewSuccessMsg('');
+    setReviewErrorMsg('');
+
+    const remarksText = targetStatus === 'VERIFIED'
+      ? 'Batch verified and approved by Operations Manager.'
+      : 'Batch rejected by Operations Manager. Please upload clearer/valid documents.';
+    const reviewer = managerId.trim() || 'senior.underwriter@bank.com';
+    const email = recipientEmail.trim() || 'itsarpitgupta@gmail.com';
+
+    let successCount = 0;
+    let failedCount = 0;
+
+    const idsToProcess = Array.from(selectedDocIds);
+    for (const docId of idsToProcess) {
+      try {
+        await updateDocumentStatus(docId, {
+          status: targetStatus,
+          remarks: remarksText,
+          verifiedBy: reviewer,
+          customerEmail: email,
+        });
+        successCount++;
+      } catch (err) {
+        console.warn(`Failed to update document ${docId}:`, err);
+        failedCount++;
+      }
+    }
+
+    // Refresh state
+    setCustomerDocs(prev =>
+      prev.map(d => {
+        if (selectedDocIds.has(String(d.documentId || d.id))) {
+          return { ...d, status: targetStatus, remarks: remarksText };
+        }
+        return d;
+      })
+    );
+
+    if (selectedDoc && selectedDocIds.has(String(selectedDoc.documentId || selectedDoc.id))) {
+      setSelectedDoc(prev => prev ? { ...prev, status: targetStatus, remarks: remarksText } : prev);
+    }
+
+    setSelectedDocIds(new Set());
+    setBatchSubmitting(false);
+
+    if (successCount > 0) {
+      setReviewSuccessMsg(`✅ Batch action completed: ${successCount} document(s) marked as ${targetStatus}.${failedCount > 0 ? ` (${failedCount} failed)` : ''}`);
+    } else {
+      setReviewErrorMsg(`❌ Failed to update selected documents.`);
+    }
+  };
+
   // Handle standalone upload tab file selection
   const handleUploadFileChange = (e) => {
     const f = e.target.files?.[0];
@@ -314,14 +438,14 @@ export default function DocumentsPage() {
         <div
           style={{
             display: 'grid',
-            gridTemplateColumns: '460px 1fr',
+            gridTemplateColumns: '520px 1fr',
             gap: 16,
             flex: 1,
             minHeight: 0,
             overflow: 'hidden'
           }}
         >
-          {/* Left Column: Customer Search, All Customer Documents & Manager Review Form */}
+          {/* Left Column: Customer Search, Application Cascading Selector, Document Multi-Select & Review Form */}
           <div
             className="card p-4"
             style={{
@@ -332,28 +456,62 @@ export default function DocumentsPage() {
               maxHeight: '100%'
             }}
           >
-            {/* 1. Primary Customer Search Input */}
-            <div style={{ background: 'rgba(255,255,255,0.02)', padding: 10, borderRadius: 8, border: '1px solid var(--border)' }}>
-              <label className="form-label" style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6 }}>
-                <User size={14} color="var(--accent)" /> Search Documents by Customer ID *
-              </label>
-              <div className="flex-row" style={{ gap: 8 }}>
-                <input
-                  className="form-input"
-                  value={searchCustomerId}
-                  onChange={e => setSearchCustomerId(e.target.value)}
-                  placeholder="e.g. CUST-3, CUST-1002"
-                  onKeyDown={e => e.key === 'Enter' && handleSearchCustomer(searchCustomerId)}
-                  style={{ fontSize: '0.85rem', padding: '7px 12px', flex: 1 }}
-                />
-                <button
-                  className="btn btn-primary"
-                  onClick={() => handleSearchCustomer(searchCustomerId)}
-                  disabled={loadingCustomerDocs}
-                  style={{ padding: '7px 14px', fontSize: '0.85rem', flexShrink: 0 }}
+            {/* 1. Primary Customer Search Input & Cascading Application Selector */}
+            <div style={{ background: 'rgba(255,255,255,0.02)', padding: 12, borderRadius: 8, border: '1px solid var(--border)', display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div>
+                <label className="form-label" style={{ fontSize: '0.78rem', display: 'flex', alignItems: 'center', gap: 5, marginBottom: 6 }}>
+                  <User size={14} color="var(--accent)" /> Search Documents by Customer ID / Application ID *
+                </label>
+                <div className="flex-row" style={{ gap: 8 }}>
+                  <input
+                    className="form-input"
+                    value={searchCustomerId}
+                    onChange={e => setSearchCustomerId(e.target.value)}
+                    placeholder="e.g. CUST-3, APP-D2E4EF4B"
+                    onKeyDown={e => e.key === 'Enter' && handleSearchCustomer(searchCustomerId)}
+                    style={{ fontSize: '0.85rem', padding: '7px 12px', flex: 1 }}
+                  />
+                  <button
+                    className="btn btn-primary"
+                    onClick={() => handleSearchCustomer(searchCustomerId)}
+                    disabled={loadingCustomerDocs}
+                    style={{ padding: '7px 14px', fontSize: '0.85rem', flexShrink: 0 }}
+                  >
+                    {loadingCustomerDocs ? <RefreshCw size={14} className="spin" /> : <Search size={14} />} Fetch
+                  </button>
+                </div>
+              </div>
+
+              {/* Cascading Application Selector */}
+              <div>
+                <label className="form-label" style={{ fontSize: '0.75rem', display: 'flex', alignItems: 'center', gap: 5, marginBottom: 4, color: 'var(--muted)' }}>
+                  <Filter size={13} color="var(--accent)" /> Filter by Loan Application
+                </label>
+                <select
+                  className="form-select"
+                  value={selectedAppId}
+                  onChange={e => {
+                    const val = e.target.value;
+                    setSelectedAppId(val);
+                    setSelectedDocIds(new Set());
+                    const filtered = val === 'ALL'
+                      ? customerDocs
+                      : customerDocs.filter(d => d.applicationId === val || String(d.applicationId).toUpperCase() === String(val).toUpperCase());
+                    if (filtered.length > 0) selectAndPreviewDoc(filtered[0]);
+                  }}
+                  style={{ fontSize: '0.82rem', padding: '6px 10px', width: '100%', background: 'rgba(0,0,0,0.2)' }}
                 >
-                  {loadingCustomerDocs ? <RefreshCw size={14} className="spin" /> : <Search size={14} />} Fetch
-                </button>
+                  <option value="ALL">📂 All Applications ({customerDocs.length} Total Documents)</option>
+                  {customerApps.map(a => {
+                    const appId = a.applicationId || a.id;
+                    const count = customerDocs.filter(d => d.applicationId === appId || String(d.applicationId).toUpperCase() === String(appId).toUpperCase()).length;
+                    return (
+                      <option key={appId} value={appId}>
+                        {appId} — {a.schemeName || a.loanType || 'Loan'} ({count} docs) [{a.status}]
+                      </option>
+                    );
+                  })}
+                </select>
               </div>
             </div>
 
@@ -363,103 +521,185 @@ export default function DocumentsPage() {
               </div>
             )}
 
-            {/* 2. All Documents for this Customer (with small 'x' delete button in front) */}
-            <div>
-              <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text)', marginBottom: 6, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
-                  <Layers size={14} color="var(--accent)" /> Documents for {activeCustomerId} ({customerDocs.length})
-                </div>
-                {customerDocs.length > 0 && (
-                  <span style={{ fontSize: '0.72rem', color: 'var(--muted)' }}>Click to view & review</span>
-                )}
-              </div>
+            {/* 2. Document List Header with Select All & Bulk Actions */}
+            {(() => {
+              const visibleDocs = selectedAppId === 'ALL'
+                ? customerDocs
+                : customerDocs.filter(d => d.applicationId === selectedAppId || String(d.applicationId).toUpperCase() === String(selectedAppId).toUpperCase());
 
-              {customerDocs.length > 0 ? (
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 150, overflowY: 'auto' }}>
-                  {customerDocs.map(doc => {
-                    const isSelected = selectedDoc && String(selectedDoc.documentId || selectedDoc.id) === String(doc.documentId || doc.id);
-                    return (
-                      <div
-                        key={doc.documentId || doc.id}
-                        onClick={() => selectAndPreviewDoc(doc)}
-                        style={{
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'space-between',
-                          padding: '8px 10px',
-                          borderRadius: 6,
-                          cursor: 'pointer',
-                          background: isSelected ? 'rgba(0, 210, 255, 0.12)' : 'rgba(255, 255, 255, 0.02)',
-                          border: isSelected ? '1px solid var(--accent)' : '1px solid var(--border)',
-                          transition: 'all 0.15s ease',
-                          gap: 8
-                        }}
+              const allSelected = visibleDocs.length > 0 && visibleDocs.every(d => selectedDocIds.has(String(d.documentId || d.id)));
+
+              return (
+                <div>
+                  <div style={{ fontSize: '0.8rem', fontWeight: 700, color: 'var(--text)', marginBottom: 8, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <button
+                        title={allSelected ? 'Deselect All' : 'Select All'}
+                        onClick={() => toggleSelectAll(visibleDocs)}
+                        style={{ background: 'transparent', border: 'none', cursor: 'pointer', padding: 0, color: allSelected ? 'var(--accent)' : 'var(--muted)', display: 'flex', alignItems: 'center' }}
                       >
-                        {/* Small 'x' Delete Button in front of document */}
+                        {allSelected ? <CheckSquare size={16} /> : <Square size={16} />}
+                      </button>
+                      <Layers size={14} color="var(--accent)" />
+                      <span>
+                        Documents {selectedAppId !== 'ALL' ? `for ${selectedAppId}` : `for ${activeCustomerId}`} ({visibleDocs.length})
+                      </span>
+                    </div>
+
+                    {selectedDocIds.size > 0 && (
+                      <span className="badge" style={{ fontSize: '0.7rem', background: 'rgba(0, 210, 255, 0.15)', color: 'var(--accent)' }}>
+                        {selectedDocIds.size} Selected
+                      </span>
+                    )}
+                  </div>
+
+                  {/* BULK ACTION BUTTONS BAR (Visible when 1+ docs are checked) */}
+                  {selectedDocIds.size > 0 && (
+                    <div
+                      style={{
+                        background: 'rgba(0, 210, 255, 0.08)',
+                        border: '1px solid rgba(0, 210, 255, 0.3)',
+                        borderRadius: 6,
+                        padding: '8px 10px',
+                        marginBottom: 10,
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 8,
+                        flexWrap: 'wrap'
+                      }}
+                    >
+                      <span style={{ fontSize: '0.76rem', fontWeight: 600, color: 'var(--text)' }}>
+                        Bulk Action ({selectedDocIds.size} docs):
+                      </span>
+                      <div className="flex-row" style={{ gap: 6 }}>
                         <button
-                          title="Delete this document"
-                          onClick={(e) => handleDeleteDocument(e, doc)}
-                          style={{
-                            background: 'rgba(239, 68, 68, 0.15)',
-                            border: '1px solid rgba(239, 68, 68, 0.3)',
-                            color: '#ef4444',
-                            borderRadius: '50%',
-                            width: 20,
-                            height: 20,
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            cursor: 'pointer',
-                            flexShrink: 0,
-                            padding: 0,
-                            transition: 'all 0.15s ease'
-                          }}
-                          onMouseEnter={e => {
-                            e.currentTarget.style.background = '#ef4444';
-                            e.currentTarget.style.color = '#ffffff';
-                          }}
-                          onMouseLeave={e => {
-                            e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
-                            e.currentTarget.style.color = '#ef4444';
-                          }}
+                          className="btn btn-primary"
+                          onClick={() => doBatchReview('VERIFIED')}
+                          disabled={batchSubmitting}
+                          style={{ fontSize: '0.74rem', padding: '4px 10px', background: '#10b981', borderColor: '#10b981', color: '#fff' }}
                         >
-                          <X size={11} strokeWidth={2.5} />
+                          {batchSubmitting ? <RefreshCw size={12} className="spin" /> : <CheckCircle size={12} />} Approve All ({selectedDocIds.size})
                         </button>
-
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden', flex: 1 }}>
-                          <span style={{ fontSize: '1rem' }}>{isPdf(doc) ? '📄' : '🖼️'}</span>
-                          <div style={{ overflow: 'hidden' }}>
-                            <div style={{ fontSize: '0.78rem', fontWeight: 600, color: isSelected ? 'var(--accent)' : 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                              ID: {doc.documentId || doc.id} — {doc.documentName || doc.originalFileName || doc.documentType}
-                            </div>
-                            <div style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>
-                              Type: {doc.documentType || doc.docType} {doc.fileSizeBytes ? `• ${(doc.fileSizeBytes / 1024).toFixed(1)} KB` : ''}
-                            </div>
-                          </div>
-                        </div>
-
-                        <span
-                          className={`badge ${
-                            doc.status === 'VERIFIED' || doc.status === 'APPROVED'
-                              ? 'badge-approved'
-                              : doc.status === 'REJECTED' || doc.status === 'ACTION_REQUIRED'
-                              ? 'badge-rejected'
-                              : 'badge-under-review'
-                          }`}
-                          style={{ fontSize: '0.68rem', flexShrink: 0 }}
+                        <button
+                          className="btn btn-primary"
+                          onClick={() => doBatchReview('REJECTED')}
+                          disabled={batchSubmitting}
+                          style={{ fontSize: '0.74rem', padding: '4px 10px', background: '#ef4444', borderColor: '#ef4444', color: '#fff' }}
                         >
-                          {doc.status || 'UPLOADED'}
-                        </span>
+                          {batchSubmitting ? <RefreshCw size={12} className="spin" /> : <X size={12} />} Reject All ({selectedDocIds.size})
+                        </button>
+                        <button
+                          className="btn btn-ghost"
+                          onClick={() => setSelectedDocIds(new Set())}
+                          style={{ fontSize: '0.72rem', padding: '4px 8px' }}
+                        >
+                          Clear
+                        </button>
                       </div>
-                    );
-                  })}
+                    </div>
+                  )}
+
+                  {visibleDocs.length > 0 ? (
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6, maxHeight: 240, overflowY: 'auto' }}>
+                      {visibleDocs.map(doc => {
+                        const effectiveId = String(doc.documentId || doc.id);
+                        const isSelected = selectedDoc && String(selectedDoc.documentId || selectedDoc.id) === effectiveId;
+                        const isChecked = selectedDocIds.has(effectiveId);
+
+                        return (
+                          <div
+                            key={effectiveId}
+                            onClick={() => selectAndPreviewDoc(doc)}
+                            style={{
+                              display: 'flex',
+                              alignItems: 'center',
+                              justifyContent: 'space-between',
+                              padding: '8px 10px',
+                              borderRadius: 6,
+                              cursor: 'pointer',
+                              background: isChecked ? 'rgba(0, 210, 255, 0.15)' : isSelected ? 'rgba(0, 210, 255, 0.08)' : 'rgba(255, 255, 255, 0.02)',
+                              border: isChecked ? '1px solid var(--accent)' : isSelected ? '1px solid rgba(0, 210, 255, 0.5)' : '1px solid var(--border)',
+                              transition: 'all 0.15s ease',
+                              gap: 8
+                            }}
+                          >
+                            {/* Checkbox for Batch Review */}
+                            <input
+                              type="checkbox"
+                              checked={isChecked}
+                              onChange={e => toggleSelectDoc(effectiveId, e)}
+                              style={{ cursor: 'pointer', accentColor: 'var(--accent)', width: 15, height: 15, flexShrink: 0 }}
+                            />
+
+                            {/* Small 'x' Delete Button */}
+                            <button
+                              title="Delete this document"
+                              onClick={e => handleDeleteDocument(e, doc)}
+                              style={{
+                                background: 'rgba(239, 68, 68, 0.15)',
+                                border: '1px solid rgba(239, 68, 68, 0.3)',
+                                color: '#ef4444',
+                                borderRadius: '50%',
+                                width: 18,
+                                height: 18,
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                flexShrink: 0,
+                                padding: 0,
+                                transition: 'all 0.15s ease'
+                              }}
+                              onMouseEnter={e => {
+                                e.currentTarget.style.background = '#ef4444';
+                                e.currentTarget.style.color = '#ffffff';
+                              }}
+                              onMouseLeave={e => {
+                                e.currentTarget.style.background = 'rgba(239, 68, 68, 0.15)';
+                                e.currentTarget.style.color = '#ef4444';
+                              }}
+                            >
+                              <X size={10} strokeWidth={2.5} />
+                            </button>
+
+                            <div style={{ display: 'flex', alignItems: 'center', gap: 8, overflow: 'hidden', flex: 1 }}>
+                              <span style={{ fontSize: '1rem' }}>{isPdf(doc) ? '📄' : '🖼️'}</span>
+                              <div style={{ overflow: 'hidden' }}>
+                                <div style={{ fontSize: '0.78rem', fontWeight: 600, color: isSelected ? 'var(--accent)' : 'var(--text)', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                                  {doc.applicationId ? <span className="badge" style={{ fontSize: '0.65rem', marginRight: 6, background: 'rgba(0, 210, 255, 0.12)', color: 'var(--accent)' }}>{doc.applicationId}</span> : null}
+                                  {doc.documentName || doc.originalFileName || doc.documentType}
+                                </div>
+                                <div style={{ fontSize: '0.7rem', color: 'var(--muted)' }}>
+                                  ID: {effectiveId} • {doc.documentType || doc.docType} {doc.fileSizeBytes ? `• ${(doc.fileSizeBytes / 1024).toFixed(1)} KB` : ''}
+                                </div>
+                              </div>
+                            </div>
+
+                            <span
+                              className={`badge ${
+                                doc.status === 'VERIFIED' || doc.status === 'APPROVED'
+                                  ? 'badge-approved'
+                                  : doc.status === 'REJECTED' || doc.status === 'ACTION_REQUIRED'
+                                  ? 'badge-rejected'
+                                  : 'badge-under-review'
+                              }`}
+                              style={{ fontSize: '0.68rem', flexShrink: 0 }}
+                            >
+                              {doc.status || 'UPLOADED'}
+                            </span>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  ) : (
+                    <div style={{ padding: 12, textAlign: 'center', color: 'var(--muted)', fontSize: '0.78rem', background: 'rgba(255,255,255,0.01)', borderRadius: 6, border: '1px dashed var(--border)' }}>
+                      No documents found {selectedAppId !== 'ALL' ? `for application ${selectedAppId}` : `for ${activeCustomerId}`}.
+                    </div>
+                  )}
                 </div>
-              ) : (
-                <div style={{ padding: 12, textAlign: 'center', color: 'var(--muted)', fontSize: '0.78rem', background: 'rgba(255,255,255,0.01)', borderRadius: 6, border: '1px dashed var(--border)' }}>
-                  No documents found for {activeCustomerId}. You can upload a document in the Upload Document tab.
-                </div>
-              )}
-            </div>
+              );
+            })()}
 
             {/* 3. MANAGER DOCUMENT REVIEW FORM (ALWAYS VISIBLE & PROMINENT) */}
             <div

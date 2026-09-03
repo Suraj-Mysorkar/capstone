@@ -64,9 +64,12 @@ export default function Dashboard() {
   const load = async () => {
     setLoading(true);
     const email = (session?.email || '').toLowerCase();
+    let mine = [];
+    let fetchedDocs = [];
+
     try {
       const all = await fetchApplications();
-      const mine = (Array.isArray(all) ? all : []).filter(
+      mine = (Array.isArray(all) ? all : []).filter(
         (a) => (a.customerEmail || '').toLowerCase() === email || (session?.loanCustomerId && a.customerId === session.loanCustomerId),
       );
       setApps(mine);
@@ -74,13 +77,36 @@ export default function Dashboard() {
 
     const cid = docCustomerId(session);
     if (cid) {
-      try { setDocs(await fetchCustomerDocuments(cid)); } catch { setDocs([]); }
+      try {
+        const d = await fetchCustomerDocuments(cid);
+        fetchedDocs = Array.isArray(d) ? d : [];
+        setDocs(fetchedDocs);
+      } catch { setDocs([]); }
     }
+
+    // Dynamically calculate and advance Customer Onboarding Status
+    let computedStatus = 'REGISTERED';
+    const hasApprovedLoan = mine.some((a) => a.status === 'APPROVED');
+    const hasVerifiedDocs = fetchedDocs.some((d) => d.status === 'VERIFIED' || d.status === 'APPROVED');
+    const hasSubmittedDocs = mine.some((a) => a.status === 'DOCUMENTS_SUBMITTED') || fetchedDocs.length >= 3;
+    const hasPendingDocs = fetchedDocs.length > 0 || mine.some((a) => a.status === 'DOCUMENT_REVIEW_PENDING' || a.status === 'MANUAL_REVIEW_REQUIRED');
+
+    if (hasApprovedLoan) {
+      computedStatus = 'ONBOARDING_COMPLETE';
+    } else if (hasVerifiedDocs || mine.some((a) => a.status === 'MANUAL_REVIEW_REQUIRED')) {
+      computedStatus = 'KYC_APPROVED';
+    } else if (hasSubmittedDocs) {
+      computedStatus = 'DOCUMENTS_SUBMITTED';
+    } else if (hasPendingDocs || mine.length > 0) {
+      computedStatus = 'DOCUMENTS_PENDING';
+    }
+
+    update({ onboardingStatus: computedStatus });
 
     try {
       const profile = await getCustomerByEmail(email);
-      if (profile?.onboardingStatus && profile.onboardingStatus !== session.onboardingStatus) {
-        update({ onboardingStatus: profile.onboardingStatus, customerServiceId: profile.id });
+      if (profile?.id) {
+        update({ customerServiceId: profile.id });
       }
     } catch { /* no profile */ }
 
