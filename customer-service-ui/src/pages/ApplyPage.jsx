@@ -360,10 +360,10 @@ export default function ApplyPage() {
           </div>
         </div>
 
-        <button className="btn btn-primary" onClick={submit} disabled={loading || linking || !form.customerName || !session?.email || docs.length === 0}>
+        <button className="btn btn-primary" onClick={submit} disabled={loading || linking || !form.customerName || !session?.email}>
           {loading ? <><Loader2 size={16} className="spin" /> Submitting Application…</> : '🚀 Submit Application'}
         </button>
-        {docs.length === 0 && <div style={{ fontSize: '.75rem', color: 'var(--muted)', marginTop: 8 }}>Upload at least one supporting document to enable submission.</div>}
+
       </div>
     </div>
   );
