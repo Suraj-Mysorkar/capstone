@@ -15,14 +15,14 @@ import { getAuthHeaders } from './api';
 const LOAN_KEY = 'cs_ui_loan_api_base';
 const DOC_KEY = 'cs_ui_doc_api_base';
 
-// Defaults to a LOCAL loan-service (port 8080) because customer registration
-// upserts into the shared Customers table via POST /customers — an endpoint the
-// currently-deployed team6 loan-service does not have yet. The local instance
-// writes to the same Azure SQL database the deployed service reads, so the loan
-// officer console still sees everything. Override on the Settings page once a
-// loan-service build with POST /customers is deployed.
+// Set VITE_LOAN_API_URL / VITE_DOC_API_URL at build time (or override on the
+// Settings page). The loan-service must be a build that includes both the CORS
+// filter and POST /api/v1/loans/customers (this repo's loan-service) and must
+// allow this app's origin (APP_CORS_ALLOWED_ORIGINS). For local dev point these
+// at http://localhost:8080 / :8082.
 const LOAN_DEFAULT =
-  import.meta.env.VITE_LOAN_API_URL || 'http://localhost:8080/api/v1/loans';
+  import.meta.env.VITE_LOAN_API_URL ||
+  'https://team6-loan-service.azurewebsites.net/api/v1/loans';
 const DOC_DEFAULT =
   import.meta.env.VITE_DOC_API_URL ||
   'https://team6-document-service.azurewebsites.net/api/v1/documents';

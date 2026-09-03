@@ -56,6 +56,8 @@ export default function Dashboard() {
   const [apps, setApps] = useState([]);
   const [docs, setDocs] = useState([]);
   const [schemes, setSchemes] = useState([]);
+  const [schemesError, setSchemesError] = useState('');
+  const [schemesLoading, setSchemesLoading] = useState(true);
   const [loading, setLoading] = useState(true);
 
   const load = async () => {
@@ -84,9 +86,21 @@ export default function Dashboard() {
     setLoading(false);
   };
 
-  useEffect(() => {
-    fetchSchemes().then((d) => setSchemes(Array.isArray(d) ? d : [])).catch(() => setSchemes([]));
-  }, []);
+  const loadSchemes = () => {
+    setSchemesLoading(true);
+    setSchemesError('');
+    fetchSchemes()
+      .then((d) => setSchemes(Array.isArray(d) ? d : []))
+      .catch((e) => {
+        setSchemes([]);
+        setSchemesError(
+          `Couldn't load loan schemes — the loan service may be unreachable or not allowing this site (${e.message}).`,
+        );
+      })
+      .finally(() => setSchemesLoading(false));
+  };
+
+  useEffect(() => { loadSchemes(); }, []);
 
   useEffect(() => { load(); /* eslint-disable-next-line */ }, [session?.email, session?.loanCustomerId]);
 
@@ -150,8 +164,15 @@ export default function Dashboard() {
           <button className="btn btn-primary" onClick={() => navigate('/apply')}>Apply for a Loan <ArrowRight size={15} /></button>
         </div>
 
-        {schemes.length === 0 ? (
+        {schemesLoading ? (
           <div className="empty">Loading loan products…</div>
+        ) : schemesError ? (
+          <div className="error-box" style={{ marginBottom: 0, display: 'flex', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
+            <span style={{ flex: 1, minWidth: 240 }}>{schemesError}</span>
+            <button className="btn btn-ghost" onClick={loadSchemes}><RefreshCw size={14} /> Retry</button>
+          </div>
+        ) : schemes.length === 0 ? (
+          <div className="empty">No loan products are currently available.</div>
         ) : (
           <div className="scheme-grid">
             {schemes.map((s) => (
