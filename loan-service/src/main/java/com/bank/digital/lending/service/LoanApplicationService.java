@@ -393,6 +393,71 @@ public class LoanApplicationService {
         return mapToResponse(saved);
     }
 
+    /**
+     * Creates or updates (upsert keyed by email) a row in the shared Customers
+     * table, without a loan application. Lets the customer self-service portal
+     * make a freshly-registered customer visible to the loan officer console.
+     */
+    @Transactional
+    public com.bank.digital.lending.model.dto.CustomerResponse registerOrUpdateCustomer(
+            com.bank.digital.lending.model.dto.CustomerRegistrationRequest request) {
+
+        Customer customer = customerRepository.findByEmail(request.email()).orElse(null);
+        if (customer == null) {
+            customer = new Customer(
+                    request.fullName(),
+                    request.email(),
+                    (request.mobileNumber() != null && !request.mobileNumber().isBlank())
+                            ? request.mobileNumber() : "N/A",
+                    request.incomeDetails(),
+                    (request.employmentDetails() != null && !request.employmentDetails().isBlank())
+                            ? request.employmentDetails() : "SALARIED"
+            );
+        } else {
+            if (request.fullName() != null && !request.fullName().isBlank()) {
+                customer.setFullName(request.fullName());
+            }
+            if (request.mobileNumber() != null && !request.mobileNumber().isBlank()) {
+                customer.setMobileNumber(request.mobileNumber());
+            }
+            if (request.incomeDetails() != null) {
+                customer.setIncomeDetails(request.incomeDetails());
+            }
+            if (request.employmentDetails() != null && !request.employmentDetails().isBlank()) {
+                customer.setEmploymentDetails(request.employmentDetails());
+            }
+        }
+        if (request.address() != null && !request.address().isBlank()) {
+            customer.setAddress(request.address());
+        }
+        if (request.onboardingStatus() != null && !request.onboardingStatus().isBlank()) {
+            customer.setOnboardingStatus(request.onboardingStatus());
+        }
+        // The shared Customers.loginid column is narrow (varchar(20)); the entity
+        // default copies the full email in and overflows it. Portal customers
+        // authenticate via customer-service, not here, so use a short token.
+        if (customer.getCustomerId() == null) {
+            customer.setLoginId("u" + Long.toString(System.currentTimeMillis() % 1_000_000_000L, 36));
+        }
+
+        Customer saved = customerRepository.save(customer);
+        log.info("[LOAN-SERVICE] Customer upserted from portal registration: id={}, email={}, externalRef={}",
+                saved.getCustomerId(), saved.getEmail(), request.externalRef());
+
+        return new com.bank.digital.lending.model.dto.CustomerResponse(
+                saved.getCustomerId(),
+                "CUST-" + saved.getCustomerId(),
+                saved.getFullName(),
+                saved.getEmail(),
+                saved.getMobileNumber(),
+                saved.getAddress(),
+                saved.getEmploymentDetails(),
+                saved.getIncomeDetails(),
+                saved.getOnboardingStatus(),
+                saved.getCreatedAt()
+        );
+    }
+
     @Transactional(readOnly = true)
     public List<com.bank.digital.lending.model.dto.CustomerResponse> listCustomers() {
         return customerRepository.findAll().stream()
