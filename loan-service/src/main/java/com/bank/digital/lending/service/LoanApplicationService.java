@@ -197,6 +197,9 @@ public class LoanApplicationService {
         // 7. Publish Status Event to Azure Service Bus (Approved, Rejected, Manual Review, Doc Pending)
         if (updatedApp.getStatus() == LoanStatus.APPROVED || updatedApp.getStatus() == LoanStatus.REJECTED) {
             eventBusPublisher.publishLoanCompletedEvent(updatedApp);
+            if (updatedApp.getStatus() == LoanStatus.REJECTED) {
+                dispatchLoanRejectionEmail(updatedApp, chosenManager);
+            }
         } else if (updatedApp.getStatus() == LoanStatus.MANUAL_REVIEW_REQUIRED) {
             eventBusPublisher.publishLoanStatusEvent(updatedApp, "LOAN_MANUAL_REVIEW_REQUIRED", updatedApp.getDecisionRemarks());
         } else if (updatedApp.getStatus() == LoanStatus.DOCUMENT_REVIEW_PENDING) {
@@ -232,6 +235,10 @@ public class LoanApplicationService {
 
         // Publish Completion Event to Azure Service Bus
         eventBusPublisher.publishLoanCompletedEvent(finalizedApp);
+        
+        if (finalizedApp.getStatus() == LoanStatus.REJECTED) {
+            dispatchLoanRejectionEmail(finalizedApp, getManagerInfo(finalizedApp.getAssignedManager()));
+        }
 
         // Dispatch Real-time Notification
         notificationService.sendNotification(new NotificationDTO(
@@ -781,6 +788,36 @@ public class LoanApplicationService {
                 app.getTenureMonths() != null ? app.getTenureMonths().toString() : "24",
                 mgr.name(),
                 mgr.loginId(),
+                mgr.phone(),
+                mgr.email()
+        );
+        dispatchEmailViaLogicApp(app.getCustomerEmail(), subject, body);
+    }
+
+    private void dispatchLoanRejectionEmail(LoanApplication app, ManagerInfo mgr) {
+        if (app.getCustomerEmail() == null || app.getCustomerEmail().isBlank()) return;
+        String subject = "Update on Your Loan Application (ID: " + app.getApplicationId() + ")";
+        String body = String.format(
+                "<html><body style=\"font-family: Arial, sans-serif; font-size: 14px; color: #333333; line-height: 1.6;\">"
+                + "<p>Dear %s,</p>"
+                + "<p>Thank you for submitting your loan application with Digital Banking (Application ID: <strong>%s</strong>).</p>"
+                + "<p>After carefully reviewing your application and assessing your profile, we regret to inform you that we are unable to approve your loan request at this time.</p>"
+                + "<h3>Reason for Rejection</h3>"
+                + "<p style=\"padding: 12px; background: #fee2e2; border-left: 4px solid #ef4444; color: #991b1b; font-weight: 500;\">%s</p>"
+                + "<h3>Dedicated Loan Relationship Manager</h3>"
+                + "<p>If you have any questions about this decision, please reach out to your assigned Credit Manager:</p>"
+                + "<table style=\"border-collapse: collapse; width: 100%%; max-width: 600px; margin-bottom: 16px; background: #f3f4f6;\">"
+                + "<tr><td style=\"padding: 8px; border: 1px solid #d1d5db; font-weight: bold;\">Manager Name</td><td style=\"padding: 8px; border: 1px solid #d1d5db;\">%s</td></tr>"
+                + "<tr><td style=\"padding: 8px; border: 1px solid #d1d5db; font-weight: bold;\">Contact Mobile</td><td style=\"padding: 8px; border: 1px solid #d1d5db;\">%s</td></tr>"
+                + "<tr><td style=\"padding: 8px; border: 1px solid #d1d5db; font-weight: bold;\">Official Email</td><td style=\"padding: 8px; border: 1px solid #d1d5db;\">%s</td></tr>"
+                + "</table>"
+                + "<p>We appreciate your interest in Digital Banking and encourage you to apply again in the future.</p>"
+                + "<p>Kind regards,<br><strong>Digital Banking Lending Team</strong></p>"
+                + "</body></html>",
+                app.getCustomerName() != null ? app.getCustomerName() : "Applicant",
+                app.getApplicationId(),
+                app.getDecisionRemarks() != null ? app.getDecisionRemarks() : "Did not meet credit criteria",
+                mgr.name(),
                 mgr.phone(),
                 mgr.email()
         );
