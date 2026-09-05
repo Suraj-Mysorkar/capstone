@@ -57,7 +57,7 @@ function toUser(res, fallbackUsername) {
     customerServiceId: res.customerId || claims?.customerId || null,
     onboardingStatus: res.onboardingStatus || null,
     phoneNumber: res.phoneNumber || null,
-    loanCustomerId: null,
+    loanCustomerId: (res.customerId || claims?.customerId) ? `CUST-${res.customerId || claims?.customerId}` : null,
     loginTime: new Date().toISOString(),
   };
 }

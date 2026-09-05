@@ -21,6 +21,12 @@ export default function ApplyPage() {
   const [linking, setLinking] = useState(true);
   const [loanCustomerId, setLoanCustomerId] = useState(session?.loanCustomerId || '');
 
+  const effectiveCustomerId =
+    loanCustomerId ||
+    session?.loanCustomerId ||
+    (session?.customerServiceId ? `CUST-${session.customerServiceId}` : '') ||
+    (session?.userId ? `CUST-${session.userId}` : '');
+
   const [form, setForm] = useState({
     monthlyIncome: 75000,
     existingLiabilities: 5000,
@@ -118,7 +124,7 @@ export default function ApplyPage() {
     try {
       const documentIds = docs.map((d) => String(d.id));
       const body = {
-        customerId: loanCustomerId || session?.loanCustomerId || undefined,
+        customerId: effectiveCustomerId || undefined,
         customerName: form.customerName,
         customerEmail: session.email,
         customerPhone: form.customerPhone,
@@ -256,7 +262,12 @@ export default function ApplyPage() {
           </div>
           <div className="form-group">
             <label className="form-label">Customer ID</label>
-            <input className="form-input" value={linking ? 'Linking…' : (loanCustomerId || '(assigned on submit)')} readOnly style={{ opacity: 0.8, background: 'rgba(255,255,255,0.04)' }} />
+            <input
+              className="form-input font-mono"
+              value={effectiveCustomerId || (linking ? 'Linking…' : '(assigned on submit)')}
+              readOnly
+              style={{ opacity: 0.9, background: 'rgba(255,255,255,0.04)', color: 'var(--accent)', fontWeight: 600 }}
+            />
           </div>
           <div className="form-group">
             <label className="form-label">Full Name *</label>
