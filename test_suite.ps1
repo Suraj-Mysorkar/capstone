@@ -88,6 +88,27 @@ try {
     Report-Result -TestName "GET /documents/api/v1/documents/types" -Success $false -Details $_.Exception.Message
 }
 
+try {
+    $tempDocPath = [System.IO.Path]::GetTempFileName() + ".pdf"
+    [System.IO.File]::WriteAllBytes($tempDocPath, [System.Text.Encoding]::UTF8.GetBytes("%PDF-1.4 dummy test document"))
+    $upResRaw = & curl.exe -s -X POST "$APIM_BASE_URL/documents/api/v1/documents/upload" `
+                           -H "Ocp-Apim-Subscription-Key: $APIM_KEY" `
+                           -H "client-key: $APIM_KEY" `
+                           -H "X-User-Role: ROLE_CUSTOMER" `
+                           -F "customerId=CUST-06195662-545d-4e12-9b96-9d0e9ea323cb" `
+                           -F "applicationId=APP-37155A60" `
+                           -F "documentType=IDENTITY_PROOF" `
+                           -F "documentName=SuiteVerificationDoc.pdf" `
+                           -F "file=@$tempDocPath"
+    $upRes = $upResRaw | ConvertFrom-Json
+    Report-Result -TestName "POST /documents/api/v1/documents/upload (Document Upload via APIM)" `
+                  -Success ($upRes.documentId -gt 0) `
+                  -Details "Uploaded Document ID: $($upRes.documentId) | Blob: $($upRes.blobPath)"
+    Remove-Item $tempDocPath -ErrorAction SilentlyContinue
+} catch {
+    Report-Result -TestName "POST /documents/api/v1/documents/upload" -Success $false -Details $_.Exception.Message
+}
+
 # -------------------------------------------------------------
 # SUITE 2: AUTHENTICATION & CUSTOMER PROFILES (VIA APIM)
 # -------------------------------------------------------------
