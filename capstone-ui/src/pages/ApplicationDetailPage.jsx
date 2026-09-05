@@ -7,7 +7,8 @@ import {
   notifyDocumentUploaded,
   requestDocumentsFromCustomer,
   fetchApplicationDocuments,
-  fetchCustomerDocuments
+  fetchCustomerDocuments,
+  updateDocumentStatus
 } from '../services/api';
 import {
   ArrowLeft,
@@ -38,11 +39,27 @@ function fmt(n) {
   return new Intl.NumberFormat('en-IN', { style:'currency', currency:'INR', maximumFractionDigits:0 }).format(n);
 }
 
-const DEFAULT_REQUIRED_DOCS = [
-  'Government Photo ID (PAN Card - Mandatory)',
-  'Address Proof (Aadhaar Card / Passport / Recent Utility Bill)',
-  'Income Proof (Salary Slips for Last 3 Months or Latest Form 16 / ITR)',
-  'Bank Account Statement (Operational Bank Account Statement for Last 6 Months)'
+const MANDATORY_REQUIREMENTS = [
+  {
+    code: 'IDENTITY_PROOF',
+    label: 'Government Photo ID (PAN Card - Mandatory)',
+    keywords: ['IDENTITY', 'ID_PROOF', 'PAN', 'AADHAAR', 'PASSPORT']
+  },
+  {
+    code: 'ADDRESS_PROOF',
+    label: 'Address Proof (Aadhaar Card / Utility Bill / Rent Agreement)',
+    keywords: ['ADDRESS', 'UTILITY', 'BILL']
+  },
+  {
+    code: 'INCOME_PROOF',
+    label: 'Income Proof (Salary Slips for Last 3 Months / Form 16 / ITR)',
+    keywords: ['INCOME', 'SALARY', 'PAYSLIP', 'ITR', 'FORM_16']
+  },
+  {
+    code: 'BANK_STATEMENT',
+    label: 'Bank Account Statement (Operational Statement for Last 6 Months)',
+    keywords: ['BANK', 'STATEMENT']
+  }
 ];
 
 export default function ApplicationDetailPage() {
@@ -55,10 +72,11 @@ export default function ApplicationDetailPage() {
   const [tab, setTab]             = useState('details');
 
   // Document Email Request State
-  const [selectedDocs, setSelectedDocs] = useState(DEFAULT_REQUIRED_DOCS);
+  const [selectedDocs, setSelectedDocs] = useState([]);
   const [customNotes, setCustomNotes]   = useState('');
   const [sendingEmail, setSendingEmail] = useState(false);
   const [emailStatusMsg, setEmailStatusMsg] = useState('');
+  const [actionInProgressDocId, setActionInProgressDocId] = useState(null);
 
   // Manager callback
   const [decision, setDecision]   = useState('APPROVE');
@@ -193,10 +211,104 @@ export default function ApplicationDetailPage() {
                   : app.riskScore <= 30   ? 'var(--green)'
                   : app.riskScore >= 70   ? 'var(--red)' : 'var(--yellow)';
 
-  // Check if Document Review is done and approved for this customer in Document Review Portal
-  const verifiedDocs = customerDocs.filter(d => d.status === 'VERIFIED' || d.status === 'APPROVED');
-  const rejectedDocs = customerDocs.filter(d => d.status === 'REJECTED' || d.status === 'ACTION_REQUIRED');
+  // Group documents by status
+  const rejectedDocs = customerDocs.filter(
+    d => String(d.status).toUpperCase() === 'REJECTED' || String(d.status).toUpperCase() === 'ACTION_REQUIRED'
+  );
+
+  const validUploadedDocs = customerDocs.filter(
+    d => String(d.status).toUpperCase() !== 'REJECTED' && String(d.status).toUpperCase() !== 'ACTION_REQUIRED'
+  );
+
+  const verifiedDocs = customerDocs.filter(
+    d => String(d.status).toUpperCase() === 'VERIFIED' || String(d.status).toUpperCase() === 'APPROVED'
+  );
+
+  // Check if a requirement is met by valid (unrejected) uploaded documents
+  const isRequirementUploaded = (req) => {
+    return validUploadedDocs.some(d => {
+      const docStr = String(d.documentType || d.typeCode || d.documentName || '').toUpperCase();
+      return req.keywords.some(kw => docStr.includes(kw));
+    });
+  };
+
+  // Determine missing documents that were NOT uploaded by customer:
+  // If customer has 0 uploaded documents, all mandatory requirements are missing.
+  // If customer has uploaded at least 3 valid documents (standard submission), no mandatory doc is missing unless unmatched.
+  const missingDocRequirements = customerDocs.length === 0
+    ? MANDATORY_REQUIREMENTS
+    : (validUploadedDocs.length < 3
+        ? MANDATORY_REQUIREMENTS.filter(req => !isRequirementUploaded(req))
+        : []);
+
+  // Actionable documents: ONLY documents rejected by manager OR missing documents not uploaded by customer
+  const actionableDocItems = [
+    ...rejectedDocs.map(d => {
+      const typeName = d.documentType || d.documentName || 'Document';
+      return {
+        id: `rejected-${d.documentId || d.id}`,
+        label: `${typeName} (Re-upload Required: Rejected by reviewer${d.remarks ? ` - "${d.remarks}"` : ''})`,
+        shortLabel: typeName,
+        isRejected: true,
+        remarks: d.remarks,
+        doc: d
+      };
+    }),
+    ...missingDocRequirements.map(m => ({
+      id: `missing-${m.code}`,
+      label: `${m.label} (Not Uploaded by Customer)`,
+      shortLabel: m.label,
+      isMissing: true
+    }))
+  ];
+
+  // Box appears ONLY when application is active AND there are actionable items (rejected or missing documents)
+  // If all documents are submitted and NONE are rejected, showUnderwriterDocRequestBox is FALSE!
+  const showUnderwriterDocRequestBox = app &&
+                                      app.status !== 'APPROVED' &&
+                                      app.status !== 'REJECTED' &&
+                                      actionableDocItems.length > 0;
+
+  // Fully verified check for loan approval unlock
   const isDocReviewCompleted = customerDocs.length > 0 && verifiedDocs.length > 0 && rejectedDocs.length === 0;
+
+  // Synchronize selectedDocs when actionableDocItems changes
+  useEffect(() => {
+    if (actionableDocItems.length > 0) {
+      setSelectedDocs(actionableDocItems.map(item => item.label));
+    } else {
+      setSelectedDocs([]);
+    }
+  }, [customerDocs]);
+
+  // Quick action for manager to verify or reject a document directly
+  const handleQuickDocAction = async (docId, newStatus) => {
+    let remarks = '';
+    if (newStatus === 'REJECTED') {
+      const inputRemarks = window.prompt(
+        'Enter rejection reason to notify customer for re-upload:',
+        'Document is unclear / illegible or does not meet compliance requirements. Please upload a clear valid copy.'
+      );
+      if (inputRemarks === null) return; // User cancelled
+      remarks = inputRemarks.trim() || 'Document rejected during underwriting review. Please re-upload.';
+    } else {
+      remarks = 'Document verified and approved by underwriting manager.';
+    }
+
+    setActionInProgressDocId(docId);
+    try {
+      await updateDocumentStatus(docId, {
+        status: newStatus,
+        remarks,
+        reviewerId: managerId || 'mgr1'
+      });
+      await load();
+    } catch (err) {
+      alert(`Failed to update document status: ${err.message || 'Server error'}`);
+    } finally {
+      setActionInProgressDocId(null);
+    }
+  };
 
   return (
     <div className="page">
@@ -246,21 +358,69 @@ export default function ApplicationDetailPage() {
             </div>
           </div>
 
-          {/* Document Request & Pending Checklist Card (Hidden once all docs submitted & verified) */}
-          {app.status !== 'APPROVED' && app.status !== 'REJECTED' && !isDocReviewCompleted && (
-            <div className="card p-6" style={{ background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(20, 26, 50, 0.9) 100%)', borderColor: isDocReviewCompleted ? 'var(--green)' : '#f59e0b', borderWidth: 1.5, borderRadius: 14 }}>
+          {/* Document Status Banner when All Documents are Submitted & None Rejected */}
+          {!showUnderwriterDocRequestBox && app.status !== 'APPROVED' && app.status !== 'REJECTED' && (
+            <div
+              style={{
+                background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.08) 0%, rgba(20, 26, 50, 0.9) 100%)',
+                border: '1.5px solid rgba(16, 185, 129, 0.4)',
+                borderRadius: 14,
+                padding: '16px 20px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                flexWrap: 'wrap',
+                gap: 12
+              }}
+            >
+              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                <div style={{ padding: 10, borderRadius: 10, background: 'rgba(16, 185, 129, 0.15)', color: 'var(--green)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <CheckCircle2 size={24} />
+                </div>
+                <div>
+                  <h4 style={{ margin: 0, color: 'var(--green)', fontSize: '1.05rem', fontWeight: 700 }}>
+                    All Required Documents Submitted ({validUploadedDocs.length} Documents on File)
+                  </h4>
+                  <p style={{ margin: '4px 0 0', fontSize: '.84rem', color: 'var(--text-muted)' }}>
+                    Applicant <strong>{app.customerName}</strong> has submitted all required verification documents. No pending documents or re-requests required.
+                  </p>
+                </div>
+              </div>
+              <button
+                className="btn btn-ghost"
+                style={{ fontSize: '.78rem', color: 'var(--accent)', border: '1px solid rgba(0, 210, 255, 0.3)' }}
+                onClick={() => navigate('/documents')}
+              >
+                <ExternalLink size={13} style={{ marginRight: 5 }} />
+                Open Documents Review Portal
+              </button>
+            </div>
+          )}
+
+          {/* Document Request & Pending Checklist Card (Shows ONLY when there are rejected or missing docs) */}
+          {showUnderwriterDocRequestBox && (
+            <div className="card p-6" style={{ background: 'linear-gradient(135deg, rgba(245, 158, 11, 0.08) 0%, rgba(20, 26, 50, 0.9) 100%)', borderColor: rejectedDocs.length > 0 ? '#ef4444' : '#f59e0b', borderWidth: 1.5, borderRadius: 14 }}>
               <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: 12, marginBottom: 16 }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                  <div style={{ padding: 10, borderRadius: 10, background: isDocReviewCompleted ? 'rgba(16, 185, 129, 0.15)' : 'rgba(245, 158, 11, 0.15)', color: isDocReviewCompleted ? 'var(--green)' : '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                  <div style={{ padding: 10, borderRadius: 10, background: rejectedDocs.length > 0 ? 'rgba(239, 68, 68, 0.15)' : 'rgba(245, 158, 11, 0.15)', color: rejectedDocs.length > 0 ? '#ef4444' : '#d97706', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     <Mail size={24} />
                   </div>
                   <div>
-                    <h4 style={{ margin: 0, color: isDocReviewCompleted ? 'var(--green)' : '#f59e0b', fontSize: '1.05rem', fontWeight: 700 }}>
-                      {isDocReviewCompleted ? 'Document Requirements Complete (All Verified)' : 'Underwriter Action: Pending Documents & Request Email'}
+                    <h4 style={{ margin: 0, color: rejectedDocs.length > 0 ? '#ef4444' : '#f59e0b', fontSize: '1.05rem', fontWeight: 700 }}>
+                      {rejectedDocs.length > 0 && missingDocRequirements.length > 0
+                        ? `Underwriter Action: ${rejectedDocs.length} Rejected & ${missingDocRequirements.length} Missing Document(s)`
+                        : rejectedDocs.length > 0
+                        ? `Underwriter Action: ${rejectedDocs.length} Document(s) Rejected — Request Re-upload`
+                        : `Underwriter Action: Pending Documents & Request Email`}
                     </h4>
                     <p style={{ margin: '4px 0 0', fontSize: '.84rem', color: 'var(--text-muted)' }}>
-                      Applicant <strong>{app.customerName}</strong> ({app.customerEmail}) · Status: <span style={{ fontWeight: 600, color: 'var(--accent)' }}>{app.status}</span>
-                      {customerDocs.length > 0 ? ` · Received: ${customerDocs.length}/3 documents` : ' · Awaiting initial documents'}
+                      Applicant <strong>{app.customerName}</strong> ({app.customerEmail}) · 
+                      {rejectedDocs.length > 0 ? (
+                        <span style={{ color: '#f87171', fontWeight: 600 }}> {rejectedDocs.length} document(s) marked rejected by reviewer</span>
+                      ) : (
+                        <span> Awaiting {missingDocRequirements.length} required document(s)</span>
+                      )}
+                      {validUploadedDocs.length > 0 && ` · ${validUploadedDocs.length} valid document(s) on file`}
                     </p>
                   </div>
                 </div>
@@ -274,50 +434,32 @@ export default function ApplicationDetailPage() {
                 </button>
               </div>
 
-              {/* Pending Documents Summary Strip */}
-              <div style={{ marginBottom: 14, display: 'flex', gap: 10, flexWrap: 'wrap', alignItems: 'center' }}>
-                <span style={{ fontSize: '.82rem', fontWeight: 600, color: 'var(--text)' }}>
-                  Customer File:
-                </span>
-                {customerDocs.length > 0 ? (
-                  customerDocs.map(d => (
-                    <span
-                      key={d.documentId || d.id}
-                      className={`badge ${d.status === 'VERIFIED' || d.status === 'APPROVED' ? 'badge-approved' : d.status === 'REJECTED' ? 'badge-rejected' : 'badge-warning'}`}
-                      style={{ fontSize: '.72rem', padding: '4px 8px' }}
-                    >
-                      {d.documentType || d.documentName || 'Document'}: {d.status || 'UPLOADED'}
-                    </span>
-                  ))
-                ) : (
-                  <span className="badge badge-warning" style={{ fontSize: '.72rem' }}>
-                    No documents uploaded yet (3 mandatory documents required)
-                  </span>
-                )}
-              </div>
-
-              {/* Required Document Checklist Selector */}
+              {/* Actionable Documents Checklist Selector */}
               <div style={{ marginBottom: 16, background: 'rgba(0,0,0,0.25)', padding: '14px 16px', borderRadius: 10, border: '1px solid rgba(255,255,255,0.06)' }}>
                 <div style={{ fontSize: '.84rem', fontWeight: 600, color: 'var(--text)', marginBottom: 10 }}>
-                  Select Document Requirements to include in customer notification email:
+                  Select documents to include in request notification email to applicant:
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 10 }}>
-                  {DEFAULT_REQUIRED_DOCS.map(doc => {
-                    const isChecked = selectedDocs.includes(doc);
+                  {actionableDocItems.map(item => {
+                    const isChecked = selectedDocs.includes(item.label);
                     return (
                       <label
-                        key={doc}
+                        key={item.id}
                         style={{
                           display: 'flex',
-                          alignItems: 'center',
+                          alignItems: 'flex-start',
                           gap: 8,
                           fontSize: '.82rem',
                           color: isChecked ? '#fff' : 'var(--muted)',
                           cursor: 'pointer',
-                          background: isChecked ? 'rgba(0, 210, 255, 0.08)' : 'transparent',
-                          padding: '6px 10px',
+                          background: item.isRejected
+                            ? (isChecked ? 'rgba(239, 68, 68, 0.15)' : 'rgba(239, 68, 68, 0.05)')
+                            : (isChecked ? 'rgba(0, 210, 255, 0.08)' : 'transparent'),
+                          padding: '8px 12px',
                           borderRadius: 6,
-                          border: isChecked ? '1px solid rgba(0, 210, 255, 0.3)' : '1px solid transparent',
+                          border: item.isRejected
+                            ? (isChecked ? '1px solid rgba(239, 68, 68, 0.5)' : '1px solid rgba(239, 68, 68, 0.2)')
+                            : (isChecked ? '1px solid rgba(0, 210, 255, 0.3)' : '1px solid transparent'),
                         }}
                       >
                         <input
@@ -325,14 +467,21 @@ export default function ApplicationDetailPage() {
                           checked={isChecked}
                           onChange={e => {
                             if (e.target.checked) {
-                              setSelectedDocs(prev => [...prev, doc]);
+                              setSelectedDocs(prev => [...prev, item.label]);
                             } else {
-                              setSelectedDocs(prev => prev.filter(d => d !== doc));
+                              setSelectedDocs(prev => prev.filter(d => d !== item.label));
                             }
                           }}
-                          style={{ accentColor: 'var(--accent)' }}
+                          style={{ accentColor: item.isRejected ? '#ef4444' : 'var(--accent)', marginTop: 2 }}
                         />
-                        <span>{doc}</span>
+                        <div>
+                          <div style={{ fontWeight: 600, color: item.isRejected ? '#fca5a5' : '#fff' }}>
+                            {item.shortLabel}
+                          </div>
+                          <div style={{ fontSize: '.74rem', color: item.isRejected ? '#f87171' : 'var(--muted)', marginTop: 2 }}>
+                            {item.isRejected ? `❌ Rejected: ${item.remarks || 'Re-upload required'}` : '⚠️ Not uploaded yet'}
+                          </div>
+                        </div>
                       </label>
                     );
                   })}
@@ -382,7 +531,11 @@ export default function ApplicationDetailPage() {
                   style={{ padding: '9px 18px', fontSize: '.88rem', fontWeight: 600, display: 'inline-flex', alignItems: 'center', gap: 8 }}
                 >
                   <Send size={15} />
-                  {sendingEmail ? 'Sending Email to Customer…' : '📧 Send Document Request Email to Customer'}
+                  {sendingEmail ? 'Sending Email to Customer…' : (
+                    rejectedDocs.length > 0 && missingDocRequirements.length === 0
+                      ? '📧 Send Re-upload Request for Rejected Document(s)'
+                      : '📧 Send Document Request Email to Customer'
+                  )}
                 </button>
               </div>
             </div>
@@ -444,20 +597,51 @@ export default function ApplicationDetailPage() {
                         <div style={{ fontSize: '.72rem', color: 'var(--muted)' }}>
                           Type: {d.documentType} {d.fileSizeBytes ? `• ${(d.fileSizeBytes / 1024).toFixed(1)} KB` : ''}
                         </div>
+                        {d.remarks && (
+                          <div style={{ fontSize: '.72rem', color: d.status === 'REJECTED' ? '#ef4444' : 'var(--accent)', marginTop: 2 }}>
+                            Note: {d.remarks}
+                          </div>
+                        )}
                       </div>
 
-                      <span
-                        className={`badge ${
-                          d.status === 'VERIFIED' || d.status === 'APPROVED'
-                            ? 'badge-approved'
-                            : d.status === 'REJECTED' || d.status === 'ACTION_REQUIRED'
-                            ? 'badge-rejected'
-                            : 'badge-under-review'
-                        }`}
-                        style={{ fontSize: '.7rem' }}
-                      >
-                        {d.status || 'UPLOADED'}
-                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span
+                          className={`badge ${
+                            d.status === 'VERIFIED' || d.status === 'APPROVED'
+                              ? 'badge-approved'
+                              : d.status === 'REJECTED' || d.status === 'ACTION_REQUIRED'
+                              ? 'badge-rejected'
+                              : 'badge-under-review'
+                          }`}
+                          style={{ fontSize: '.7rem' }}
+                        >
+                          {d.status || 'UPLOADED'}
+                        </span>
+
+                        {/* Quick Underwriter Verify / Reject buttons */}
+                        {d.status !== 'VERIFIED' && d.status !== 'APPROVED' && (
+                          <button
+                            className="btn btn-ghost"
+                            style={{ fontSize: '.7rem', padding: '3px 8px', color: 'var(--green)', border: '1px solid rgba(16, 185, 129, 0.3)' }}
+                            title="Mark as Verified"
+                            disabled={actionInProgressDocId === (d.documentId || d.id)}
+                            onClick={() => handleQuickDocAction(d.documentId || d.id, 'VERIFIED')}
+                          >
+                            ✓ Verify
+                          </button>
+                        )}
+                        {d.status !== 'REJECTED' && (
+                          <button
+                            className="btn btn-ghost"
+                            style={{ fontSize: '.7rem', padding: '3px 8px', color: '#ef4444', border: '1px solid rgba(239, 68, 68, 0.3)' }}
+                            title="Reject Document"
+                            disabled={actionInProgressDocId === (d.documentId || d.id)}
+                            onClick={() => handleQuickDocAction(d.documentId || d.id, 'REJECTED')}
+                          >
+                            ✕ Reject
+                          </button>
+                        )}
+                      </div>
                     </div>
                   ))}
                 </div>
