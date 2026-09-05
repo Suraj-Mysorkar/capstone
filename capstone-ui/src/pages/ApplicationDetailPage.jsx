@@ -204,26 +204,6 @@ export default function ApplicationDetailPage() {
     }
   };
 
-  // Navigate to Document Review Portal with auto-populated customerId and applicationId / loan account no
-  const goToDocPortal = () => {
-    const targetCustId = app?.customerId || '';
-    const targetAppId = app?.applicationId || app?.id || id || '';
-    const params = new URLSearchParams();
-    if (targetCustId) params.set('customerId', targetCustId);
-    if (targetAppId) params.set('applicationId', targetAppId);
-    const queryString = params.toString() ? `?${params.toString()}` : '';
-    navigate(`/documents${queryString}`, {
-      state: { customerId: targetCustId, applicationId: targetAppId }
-    });
-  };
-
-  if (loading) return <div className="page"><div className="spinner"/></div>;
-  if (!app)    return <div className="page"><div className="error-box">Application not found.</div></div>;
-
-  const riskColor = app.riskScore == null ? 'var(--muted)'
-                  : app.riskScore <= 30   ? 'var(--green)'
-                  : app.riskScore >= 70   ? 'var(--red)' : 'var(--yellow)';
-
   // Group documents by status
   const rejectedDocs = customerDocs.filter(
     d => String(d.status).toUpperCase() === 'REJECTED' || String(d.status).toUpperCase() === 'ACTION_REQUIRED'
@@ -277,15 +257,17 @@ export default function ApplicationDetailPage() {
 
   // Box appears ONLY when application is active AND there are actionable items (rejected or missing documents)
   // If all documents are submitted and NONE are rejected, showUnderwriterDocRequestBox is FALSE!
-  const showUnderwriterDocRequestBox = app &&
-                                      app.status !== 'APPROVED' &&
-                                      app.status !== 'REJECTED' &&
-                                      actionableDocItems.length > 0;
+  const showUnderwriterDocRequestBox = Boolean(
+    app &&
+    app.status !== 'APPROVED' &&
+    app.status !== 'REJECTED' &&
+    actionableDocItems.length > 0
+  );
 
   // Fully verified check for loan approval unlock
   const isDocReviewCompleted = customerDocs.length > 0 && verifiedDocs.length > 0 && rejectedDocs.length === 0;
 
-  // Synchronize selectedDocs when actionableDocItems changes
+  // Synchronize selectedDocs when actionableDocItems changes (ALWAYS called on every render before returns)
   useEffect(() => {
     if (actionableDocItems.length > 0) {
       setSelectedDocs(actionableDocItems.map(item => item.label));
@@ -322,6 +304,26 @@ export default function ApplicationDetailPage() {
       setActionInProgressDocId(null);
     }
   };
+
+  // Navigate to Document Review Portal with auto-populated customerId and applicationId / loan account no
+  const goToDocPortal = () => {
+    const targetCustId = app?.customerId || '';
+    const targetAppId = app?.applicationId || app?.id || id || '';
+    const params = new URLSearchParams();
+    if (targetCustId) params.set('customerId', targetCustId);
+    if (targetAppId) params.set('applicationId', targetAppId);
+    const queryString = params.toString() ? `?${params.toString()}` : '';
+    navigate(`/documents${queryString}`, {
+      state: { customerId: targetCustId, applicationId: targetAppId }
+    });
+  };
+
+  if (loading) return <div className="page"><div className="spinner"/></div>;
+  if (!app)    return <div className="page"><div className="error-box">Application not found.</div></div>;
+
+  const riskColor = app.riskScore == null ? 'var(--muted)'
+                  : app.riskScore <= 30   ? 'var(--green)'
+                  : app.riskScore >= 70   ? 'var(--red)' : 'var(--yellow)';
 
   return (
     <div className="page">
