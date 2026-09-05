@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { useSearchParams, useLocation } from 'react-router-dom';
 import {
   uploadDocument,
   fetchDocumentById,
@@ -35,16 +36,26 @@ import {
 } from 'lucide-react';
 
 export default function DocumentsPage() {
+  const [searchParams] = useSearchParams();
+  const location = useLocation();
+
+  // Read customerId and applicationId from URL query params or router state
+  const paramCustomerId = searchParams.get('customerId') || searchParams.get('custId') || location.state?.customerId || '';
+  const paramAppId = searchParams.get('applicationId') || searchParams.get('appId') || searchParams.get('loanAccountNo') || location.state?.applicationId || '';
+
+  const initialCustId = paramCustomerId || (paramAppId ? paramAppId : 'CUST-3');
+  const initialAppId = paramAppId || 'ALL';
+
   const [tab, setTab] = useState('fetch');
   const [docTypesList, setDocTypesList] = useState([]);
   
   // Customer & Application Search & Documents list
-  const [searchCustomerId, setSearchCustomerId] = useState('CUST-3');
-  const [activeCustomerId, setActiveCustomerId] = useState('CUST-3');
+  const [searchCustomerId, setSearchCustomerId] = useState(initialCustId);
+  const [activeCustomerId, setActiveCustomerId] = useState(initialCustId);
   const [customerDocs, setCustomerDocs] = useState([]);
   const [allApps, setAllApps] = useState([]);
   const [customerApps, setCustomerApps] = useState([]);
-  const [selectedAppId, setSelectedAppId] = useState('ALL');
+  const [selectedAppId, setSelectedAppId] = useState(initialAppId);
   const [loadingCustomerDocs, setLoadingCustomerDocs] = useState(false);
 
   // Multi-Select Batch Actions State
@@ -66,9 +77,9 @@ export default function DocumentsPage() {
   const [reviewSuccessMsg, setReviewSuccessMsg] = useState('');
   const [reviewErrorMsg, setReviewErrorMsg] = useState('');
 
-  // Upload Tab state
-  const [uploadCustId, setUploadCustId] = useState('CUST-3');
-  const [uploadAppId, setUploadAppId] = useState('');
+  // Upload Tab state (auto-populated if navigated from application)
+  const [uploadCustId, setUploadCustId] = useState(paramCustomerId || 'CUST-3');
+  const [uploadAppId, setUploadAppId] = useState(paramAppId || '');
   const [uploadDocType, setUploadDocType] = useState('IDENTITY_PROOF');
   const [uploadDocName, setUploadDocName] = useState('');
   const [uploadFile, setUploadFile] = useState(null);
@@ -77,7 +88,7 @@ export default function DocumentsPage() {
   const [uploadResult, setUploadResult] = useState(null);
   const [uploadError, setUploadError] = useState('');
 
-  // Load document types and default customer documents on mount
+  // Load document types and customer documents on mount
   useEffect(() => {
     fetchDocumentTypes().then(types => {
       if (Array.isArray(types) && types.length > 0) {
@@ -90,11 +101,16 @@ export default function DocumentsPage() {
       if (Array.isArray(apps)) setAllApps(apps);
     }).catch(() => {});
 
-    handleSearchCustomer('CUST-3');
-  }, []);
+    if (paramCustomerId || paramAppId) {
+      const searchTarget = paramCustomerId || paramAppId;
+      handleSearchCustomer(searchTarget, paramAppId || null);
+    } else {
+      handleSearchCustomer('CUST-3');
+    }
+  }, [paramCustomerId, paramAppId]);
 
   // Fetch all documents for a customer ID or Application ID
-  const handleSearchCustomer = async (inputVal = searchCustomerId) => {
+  const handleSearchCustomer = async (inputVal = searchCustomerId, specificAppId = null) => {
     const cleanInput = String(inputVal || '').trim();
     if (!cleanInput) {
       setDocError('Please enter a valid Customer ID or Application ID.');
@@ -110,22 +126,51 @@ export default function DocumentsPage() {
     try {
       let docList = [];
       let activeCust = cleanInput;
+      const targetApp = specificAppId || (cleanInput.toUpperCase().startsWith('APP-') ? cleanInput : null);
 
-      // Check if input is an Application ID (starts with APP-)
-      if (cleanInput.toUpperCase().startsWith('APP-')) {
-        const appDocs = await fetchApplicationDocuments(cleanInput);
-        docList = Array.isArray(appDocs) ? appDocs : [];
-        if (docList.length > 0 && docList[0].customerId) {
-          activeCust = docList[0].customerId;
+      // Check if targetApp is provided or input starts with APP-
+      if (targetApp) {
+        try {
+          const appDocs = await fetchApplicationDocuments(targetApp);
+          if (Array.isArray(appDocs) && appDocs.length > 0) {
+            docList = appDocs;
+            if (appDocs[0].customerId) {
+              activeCust = appDocs[0].customerId;
+            }
+          }
+        } catch (appErr) {
+          console.warn('Could not fetch by application ID:', appErr);
         }
-        setSelectedAppId(cleanInput);
-      } else {
-        const docs = await fetchCustomerDocuments(cleanInput);
-        docList = Array.isArray(docs) ? docs : [];
-        setSelectedAppId('ALL');
       }
 
+      // If no docs found from application endpoint, or cleanInput is a Customer ID, fetch customer docs
+      if (docList.length === 0) {
+        try {
+          const docs = await fetchCustomerDocuments(cleanInput);
+          if (Array.isArray(docs) && docs.length > 0) {
+            docList = docs;
+          }
+        } catch (custErr) {
+          console.warn('Could not fetch by customer ID:', custErr);
+        }
+      }
+
+      // If still empty and targetApp is set, try fetching customer docs using activeCust
+      if (docList.length === 0 && activeCust && activeCust !== targetApp) {
+        try {
+          const docs = await fetchCustomerDocuments(activeCust);
+          if (Array.isArray(docs) && docs.length > 0) {
+            docList = docs;
+          }
+        } catch {}
+      }
+
+      const effectiveAppId = targetApp || 'ALL';
+      setSelectedAppId(effectiveAppId);
       setActiveCustomerId(activeCust);
+      setSearchCustomerId(activeCust);
+      setUploadCustId(activeCust);
+      if (targetApp) setUploadAppId(targetApp);
       setCustomerDocs(docList);
 
       // Load applications for this customer
@@ -139,16 +184,23 @@ export default function DocumentsPage() {
 
       const matchingApps = (Array.isArray(currentApps) ? currentApps : []).filter(
         a => (a.customerId || '').toLowerCase() === activeCust.toLowerCase() ||
-             (a.customerEmail || '').toLowerCase() === activeCust.toLowerCase()
+             (a.customerEmail || '').toLowerCase() === activeCust.toLowerCase() ||
+             (targetApp && (a.applicationId === targetApp || a.id === targetApp))
       );
       setCustomerApps(matchingApps);
 
-      if (docList.length > 0) {
+      const visibleDocs = effectiveAppId === 'ALL'
+        ? docList
+        : docList.filter(d => d.applicationId === effectiveAppId || String(d.applicationId).toUpperCase() === String(effectiveAppId).toUpperCase());
+
+      if (visibleDocs.length > 0) {
+        selectAndPreviewDoc(visibleDocs[0]);
+      } else if (docList.length > 0) {
         selectAndPreviewDoc(docList[0]);
       } else {
         setSelectedDoc(null);
         setPreviewBlobUrl(null);
-        setDocError(`No documents found for: ${cleanInput}`);
+        setDocError(`No documents found for: ${cleanInput}${targetApp ? ` (Application: ${targetApp})` : ''}`);
       }
     } catch (e) {
       setDocError(e.message || `Failed to fetch documents for: ${cleanInput}`);
@@ -502,6 +554,11 @@ export default function DocumentsPage() {
                   style={{ fontSize: '0.82rem', padding: '6px 10px', width: '100%', background: 'rgba(0,0,0,0.2)' }}
                 >
                   <option value="ALL">📂 All Applications ({customerDocs.length} Total Documents)</option>
+                  {selectedAppId && selectedAppId !== 'ALL' && !customerApps.some(a => (a.applicationId || a.id) === selectedAppId) && (
+                    <option value={selectedAppId}>
+                      {selectedAppId} — Active Loan Application
+                    </option>
+                  )}
                   {customerApps.map(a => {
                     const appId = a.applicationId || a.id;
                     const count = customerDocs.filter(d => d.applicationId === appId || String(d.applicationId).toUpperCase() === String(appId).toUpperCase()).length;

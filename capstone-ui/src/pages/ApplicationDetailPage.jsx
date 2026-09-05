@@ -204,6 +204,19 @@ export default function ApplicationDetailPage() {
     }
   };
 
+  // Navigate to Document Review Portal with auto-populated customerId and applicationId / loan account no
+  const goToDocPortal = () => {
+    const targetCustId = app?.customerId || '';
+    const targetAppId = app?.applicationId || app?.id || id || '';
+    const params = new URLSearchParams();
+    if (targetCustId) params.set('customerId', targetCustId);
+    if (targetAppId) params.set('applicationId', targetAppId);
+    const queryString = params.toString() ? `?${params.toString()}` : '';
+    navigate(`/documents${queryString}`, {
+      state: { customerId: targetCustId, applicationId: targetAppId }
+    });
+  };
+
   if (loading) return <div className="page"><div className="spinner"/></div>;
   if (!app)    return <div className="page"><div className="error-box">Application not found.</div></div>;
 
@@ -389,7 +402,7 @@ export default function ApplicationDetailPage() {
               <button
                 className="btn btn-ghost"
                 style={{ fontSize: '.78rem', color: 'var(--accent)', border: '1px solid rgba(0, 210, 255, 0.3)' }}
-                onClick={() => navigate('/documents')}
+                onClick={goToDocPortal}
               >
                 <ExternalLink size={13} style={{ marginRight: 5 }} />
                 Open Documents Review Portal
@@ -427,7 +440,7 @@ export default function ApplicationDetailPage() {
                 <button
                   className="btn btn-ghost"
                   style={{ fontSize: '.78rem', color: 'var(--accent)', border: '1px solid rgba(0, 210, 255, 0.3)' }}
-                  onClick={() => navigate('/documents')}
+                  onClick={goToDocPortal}
                 >
                   <ExternalLink size={13} style={{ marginRight: 5 }} />
                   Open Documents Review Portal
@@ -569,7 +582,7 @@ export default function ApplicationDetailPage() {
                 <button
                   className="btn btn-ghost"
                   style={{ fontSize: '.75rem', padding: '3px 8px' }}
-                  onClick={() => navigate('/documents')}
+                  onClick={goToDocPortal}
                 >
                   <Search size={12} /> Document Review Portal →
                 </button>
@@ -731,7 +744,7 @@ export default function ApplicationDetailPage() {
                   <div style={{ display: 'flex', gap: 10, marginTop: 12, flexWrap: 'wrap' }}>
                     <button
                       className="btn btn-primary"
-                      onClick={() => navigate('/documents')}
+                      onClick={goToDocPortal}
                       style={{ fontSize: '.82rem', padding: '6px 14px', display: 'flex', alignItems: 'center', gap: 6 }}
                     >
                       <FileText size={15} /> Go to Document Review for {app.customerId} →
@@ -821,7 +834,7 @@ export default function ApplicationDetailPage() {
             ) : (
               <button
                 className="btn btn-ghost"
-                onClick={() => navigate('/documents')}
+                onClick={goToDocPortal}
                 style={{ padding: '8px 18px', fontSize: '.88rem', display: 'flex', alignItems: 'center', gap: 6 }}
               >
                 <Lock size={15} /> Complete Document Review First →
