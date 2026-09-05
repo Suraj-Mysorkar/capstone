@@ -241,6 +241,46 @@ try {
 }
 
 # -------------------------------------------------------------
+# SUITE 5: NOTIFICATION SERVICE & ALERTS (MANAGER & CUSTOMER)
+# -------------------------------------------------------------
+Write-Host "`n--- 5. Testing Notification Service & Alerts ---" -ForegroundColor White
+
+$NOTIF_SVC_URL = "https://team6-notification-service-function-app-f3afbxhbfnbbaner.southindia-01.azurewebsites.net"
+
+# 5.1 Manager In-App Notifications Queue
+try {
+    $mgrNotifs = Invoke-RestMethod -Uri "$LOAN_SVC_URL/api/v1/notifications?username=mgr1" -Method Get -TimeoutSec 20
+    $notifCount = ($mgrNotifs | Measure-Object).Count
+    Report-Result -TestName "GET /api/v1/notifications?username=mgr1 (Manager In-App Alerts)" `
+                  -Success ($notifCount -ge 1) `
+                  -Details "Retrieved $notifCount alert(s) for manager queue (Latest: $($mgrNotifs[0].title) - $($mgrNotifs[0].message))"
+} catch {
+    Report-Result -TestName "GET /api/v1/notifications?username=mgr1" -Success $false -Details $_.Exception.Message
+}
+
+# 5.2 Azure Logic App Email Alert Dispatch
+try {
+    $emailPayload = @{
+        eventType = "LOAN_APPLIED"
+        data = @{
+            customerName  = "Suite Test Customer"
+            email         = "itsarpitgupta@gmail.com"
+            applicationId = $(if ($createdAppId) { $createdAppId } else { "APP-62900096" })
+            amount        = "250000"
+        }
+    } | ConvertTo-Json
+
+    $notifRes = Invoke-RestMethod -Uri "$NOTIF_SVC_URL/api/notify" `
+                                  -Method Post -ContentType "application/json" -Body $emailPayload -TimeoutSec 25
+    $isDispatched = ($notifRes.status -eq "SUCCESS")
+    Report-Result -TestName "POST /api/notify (Logic App Email Alert Dispatch)" `
+                  -Success $isDispatched `
+                  -Details "Notification dispatched: Status = $($notifRes.status) | $($notifRes.message) (Email sent to itsarpitgupta@gmail.com)"
+} catch {
+    Report-Result -TestName "POST /api/notify (Logic App Email Alert Dispatch)" -Success $false -Details $_.Exception.Message
+}
+
+# -------------------------------------------------------------
 # FINAL SCORECARD
 # -------------------------------------------------------------
 Write-Host "`n========================================================" -ForegroundColor Cyan
