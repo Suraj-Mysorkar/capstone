@@ -17,7 +17,7 @@ public class LoanDocument {
     @Column(name = "APPLICATION_ID", length = 36)
     private String applicationId;
 
-    @Column(name = "CUSTOMER_ID", nullable = false, length = 36)
+    @Column(name = "CUSTOMER_ID", nullable = false, length = 64)
     private String customerId;
 
     @Enumerated(EnumType.STRING)

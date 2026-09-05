@@ -21,7 +21,7 @@ public class LoanApplication extends BaseAuditable {
     @Column(name = "APPLICATION_ID", length = 36)
     private String applicationId;
 
-    @Column(name = "CUSTOMER_ID", nullable = false, length = 36)
+    @Column(name = "CUSTOMER_ID", nullable = false, length = 64)
     private String customerId;
 
     @Column(name = "CUSTOMER_NAME", nullable = false, length = 100)
