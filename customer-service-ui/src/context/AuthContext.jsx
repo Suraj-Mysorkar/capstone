@@ -46,14 +46,16 @@ function persist(user) {
 
 /** Normalise an auth response into the shape the portal uses everywhere. */
 function toUser(res, fallbackUsername) {
-  const claims = res.token ? parseJwt(res.token) : null;
+  const token = res.access_token || res.token || res.accessToken || '';
+  const claims = token ? parseJwt(token) : null;
+  const role = res.role || claims?.roles?.replace(/^ROLE_/, '')?.toLowerCase() || 'customer';
   return {
     username: res.username || claims?.preferred_username || fallbackUsername,
-    email: res.email || claims?.email || fallbackUsername,
+    email: res.email || claims?.email || (fallbackUsername?.includes('@') ? fallbackUsername : null),
     name: res.name || claims?.name || res.username || fallbackUsername,
-    role: res.role || claims?.role || 'customer',
+    role: role,
     userId: res.userId ?? claims?.userId ?? null,
-    token: res.token || '',
+    token: token,
     customerServiceId: res.customerId || claims?.customerId || null,
     onboardingStatus: res.onboardingStatus || null,
     phoneNumber: res.phoneNumber || null,

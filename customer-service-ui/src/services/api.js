@@ -89,12 +89,14 @@ async function handle(res) {
 // ── Health ───────────────────────────────────────────────────────────
 export const ping = () => fetch(`${apiBase()}/ping`).then(handle);
 
-// ── Portal auth (username / password, backed by the shared Users table) ──
+// ── Portal auth via Azure API Management Gateway ──────────────────────
+const APIM_CUSTOMER_LOGIN_URL = 'https://team6-api-management.azure-api.net/auth/customer/login';
+
 export const authLogin = (username, password) =>
-  fetch(`${apiBase()}/auth/login`, {
+  fetch(APIM_CUSTOMER_LOGIN_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ username, password }),
+    body: JSON.stringify({ username: username.trim(), password }),
   }).then(handle);
 
 export const authRegister = (payload) =>
