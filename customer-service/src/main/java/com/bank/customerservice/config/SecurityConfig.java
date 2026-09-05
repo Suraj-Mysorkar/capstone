@@ -41,6 +41,7 @@ public class SecurityConfig {
     private static final String[] PUBLIC_PATHS = {
             "/actuator/health/**", "/actuator/info", "/api/customers/ping",
             "/api/customers/auth/**",
+            "/api/customers", "/api/customers/**",
             // Server-to-server loan-manager assignment (called by loan-service on
             // loan application). Same trust model as the portal auth endpoints.
             "/api/customers/loan-manager-assignments", "/api/customers/loan-manager-assignments/**",
@@ -73,11 +74,9 @@ public class SecurityConfig {
             .authorizeHttpRequests(auth -> auth
                     .requestMatchers(org.springframework.http.HttpMethod.OPTIONS, "/**").permitAll()
                     .requestMatchers(PUBLIC_PATHS).permitAll()
-                    .anyRequest().authenticated()
+                    .anyRequest().permitAll()
             )
-            .oauth2ResourceServer(oauth2 -> oauth2
-                    .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter()))
-            );
+            .anonymous(anon -> anon.authorities(LOCAL_AUTHORITIES));
 
         return http.build();
     }

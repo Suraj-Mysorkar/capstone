@@ -56,14 +56,14 @@ export default function LoginPage() {
 
       <form onSubmit={submit}>
         <div className="form-group" style={{ marginBottom: 16 }}>
-          <label className="form-label"><User size={13} /> Email</label>
+          <label className="form-label"><User size={13} /> User ID or Email</label>
           <input
             className="form-input"
-            type="email"
+            type="text"
             value={username}
             autoFocus
             onChange={(e) => setUsername(e.target.value)}
-            placeholder="you@example.com"
+            placeholder="e.g. cmto55vth5x or email"
           />
         </div>
 

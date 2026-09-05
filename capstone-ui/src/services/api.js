@@ -1,5 +1,6 @@
-const BASE = import.meta.env.VITE_LOAN_API_URL || 'https://team6-loan-service.azurewebsites.net/api/v1/loans';
-const DOC_BASE = import.meta.env.VITE_DOC_API_URL || 'https://team6-document-service.azurewebsites.net/api/v1/documents';
+const BASE = import.meta.env.VITE_LOAN_API_URL || 'https://team6-api-management.azure-api.net/loan-applications/api/v1/loans';
+const DOC_BASE = import.meta.env.VITE_DOC_API_URL || 'https://team6-api-management.azure-api.net/documents/api/v1/documents';
+const APIM_KEY = 'e668065d6523405f912e56c3fe3c2ca9';
 
 // ── JWT Auth Header Helpers ──────────────────────────────────────────
 export const getAuthToken = () => {
@@ -12,7 +13,12 @@ export const getAuthToken = () => {
 
 export const getAuthHeaders = (extraHeaders = {}) => {
   const token = getAuthToken();
-  const headers = { ...extraHeaders };
+  const headers = {
+    'Ocp-Apim-Subscription-Key': APIM_KEY,
+    'client-key': APIM_KEY,
+    'X-User-Role': 'ROLE_EMPLOYEE',
+    ...extraHeaders
+  };
   if (token) {
     headers['Authorization'] = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
   }
@@ -303,6 +309,9 @@ export const employeeLogin = async (username, password) => {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
+      'Ocp-Apim-Subscription-Key': APIM_KEY,
+      'client-key': APIM_KEY,
+      'X-User-Role': 'ROLE_EMPLOYEE',
     },
     body: JSON.stringify({ username, password }),
   });
@@ -326,7 +335,7 @@ export const employeeLogin = async (username, password) => {
 const NOTIF_ROOT = BASE.replace(/\/loans\/?$/, '/notifications');
 
 export const getNotificationStreamUrl = (username = 'mgr1') => {
-  return `${NOTIF_ROOT}/stream?username=${encodeURIComponent(username)}`;
+  return `${NOTIF_ROOT}/stream?username=${encodeURIComponent(username)}&subscription-key=${APIM_KEY}`;
 };
 
 export const fetchNotifications = (username = 'mgr1') =>

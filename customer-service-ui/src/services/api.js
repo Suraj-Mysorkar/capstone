@@ -8,10 +8,11 @@
 // (1) means a build deployed to Azure Static Web Apps can be pointed at the
 // right backend from the browser even if the env var was not set at build time.
 
-const DEFAULT_BASE = 'http://localhost:8081/api/customers';
+const DEFAULT_BASE = 'https://team6-api-management.azure-api.net/customers/api/customers';
 const BASE_KEY = 'cs_ui_api_base';
 const TOKEN_KEY = 'cs_ui_token';   // legacy manual override (Settings page)
 const AUTH_TOKEN_KEY = 'csp_token'; // JWT from the portal login (AuthContext)
+const APIM_KEY = 'e668065d6523405f912e56c3fe3c2ca9';
 
 function readLS(key) {
   try {
@@ -60,7 +61,13 @@ export function setToken(token) {
 
 export function getAuthHeaders(extra = {}) {
   const token = getToken();
-  return token ? { ...extra, Authorization: `Bearer ${token}` } : extra;
+  const baseHeaders = {
+    'Ocp-Apim-Subscription-Key': APIM_KEY,
+    'client-key': APIM_KEY,
+    'X-User-Role': 'ROLE_CUSTOMER',
+    ...extra,
+  };
+  return token ? { ...baseHeaders, Authorization: `Bearer ${token}` } : baseHeaders;
 }
 
 const headers = getAuthHeaders;
@@ -87,7 +94,7 @@ async function handle(res) {
 }
 
 // ── Health ───────────────────────────────────────────────────────────
-export const ping = () => fetch(`${apiBase()}/ping`).then(handle);
+export const ping = () => fetch(`${apiBase()}/ping`, { headers: getAuthHeaders() }).then(handle);
 
 // ── Portal auth via Azure API Management Gateway ──────────────────────
 const APIM_CUSTOMER_LOGIN_URL = 'https://team6-api-management.azure-api.net/auth/customer/login';
@@ -95,7 +102,12 @@ const APIM_CUSTOMER_LOGIN_URL = 'https://team6-api-management.azure-api.net/auth
 export const authLogin = (username, password) =>
   fetch(APIM_CUSTOMER_LOGIN_URL, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: {
+      'Content-Type': 'application/json',
+      'Ocp-Apim-Subscription-Key': APIM_KEY,
+      'client-key': APIM_KEY,
+      'X-User-Role': 'ROLE_CUSTOMER',
+    },
     body: JSON.stringify({ username: username.trim(), password }),
   }).then(handle);
 

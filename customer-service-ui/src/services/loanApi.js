@@ -22,10 +22,10 @@ const DOC_KEY = 'cs_ui_doc_api_base';
 // at http://localhost:8080 / :8082.
 const LOAN_DEFAULT =
   import.meta.env.VITE_LOAN_API_URL ||
-  'https://team6-loan-service.azurewebsites.net/api/v1/loans';
+  'https://team6-api-management.azure-api.net/loan-applications/api/v1/loans';
 const DOC_DEFAULT =
   import.meta.env.VITE_DOC_API_URL ||
-  'https://team6-document-service.azurewebsites.net/api/v1/documents';
+  'https://team6-api-management.azure-api.net/documents/api/v1/documents';
 
 function readLS(key) {
   try {

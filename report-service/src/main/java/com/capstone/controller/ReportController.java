@@ -26,7 +26,7 @@ public class ReportController {
         this.reportService = reportService;
     }
 
-    @PreAuthorize("hasRole('ROLE_EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ROLE_EMPLOYEE', 'ROLE_MANAGER', 'EMPLOYEE', 'MANAGER')")
     @GetMapping("/operations/summary")
     public ResponseEntity<OperationsSummaryDto> getOperationsSummary(@RequestHeader("X-User-Id") Long userId,     // Reads the extracted claim passed by APIM
             @RequestHeader("X-User-Role") String name) {
@@ -34,7 +34,7 @@ public class ReportController {
         return ResponseEntity.ok(summary);
     }
 
-    @PreAuthorize("hasRole('ROLE_EMPLOYEE')")
+    @PreAuthorize("hasAnyRole('ROLE_EMPLOYEE', 'ROLE_MANAGER', 'EMPLOYEE', 'MANAGER')")
     @GetMapping("/executives/metrics")
     public ResponseEntity<List<MonthlyMetricDto>> getExecutiveMetrics(@RequestHeader("X-User-Id") Long userId,     // Reads the extracted claim passed by APIM
             @RequestHeader("X-User-Role") String name) {
