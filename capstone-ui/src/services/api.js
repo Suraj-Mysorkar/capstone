@@ -325,11 +325,11 @@ export const employeeLogin = async (username, password) => {
 // ── Live Notifications (SSE / WebSockets) ─────────────────────────────
 const NOTIF_ROOT = BASE.replace(/\/loans\/?$/, '/notifications');
 
-export const getNotificationStreamUrl = (username = 'markj') => {
+export const getNotificationStreamUrl = (username = 'mgr1') => {
   return `${NOTIF_ROOT}/stream?username=${encodeURIComponent(username)}`;
 };
 
-export const fetchNotifications = (username = 'markj') =>
+export const fetchNotifications = (username = 'mgr1') =>
   fetch(`${NOTIF_ROOT}?username=${encodeURIComponent(username)}`, {
     headers: getAuthHeaders()
   }).then(r => {
@@ -343,7 +343,7 @@ export const markNotificationAsRead = (id) =>
     headers: getAuthHeaders()
   }).then(r => r.json()).catch(() => ({ success: false }));
 
-export const markAllNotificationsAsRead = (username = 'markj') =>
+export const markAllNotificationsAsRead = (username = 'mgr1') =>
   fetch(`${NOTIF_ROOT}/read-all?username=${encodeURIComponent(username)}`, {
     method: 'POST',
     headers: getAuthHeaders()

@@ -30,15 +30,15 @@ public class NotificationService {
     private final Deque<NotificationDTO> notificationHistory = new ConcurrentLinkedDeque<>();
 
     public NotificationService() {
-        // Seed initial notifications for markj / credit officers
+        // Seed initial notifications for managers / credit officers
         NotificationDTO seed = new NotificationDTO(
-                "markj",
-                "Assigned Cases Active",
-                "You have active credit assessment cases assigned to your queue.",
-                "NEW_CASE_ASSIGNED",
-                "CUST-12",
-                "E2E Test Customer",
-                "APP-958E058E"
+                "all",
+                "Credit Assessment Queue Active",
+                "Welcome to Digital Lending Portal. Credit assessment and verification queues are active.",
+                "QUEUE_READY",
+                "CUST-1",
+                "All Managers",
+                "APP-SYSTEM"
         );
         notificationHistory.addFirst(seed);
     }
@@ -66,7 +66,7 @@ public class NotificationService {
             // Send unread notifications for this user
             List<NotificationDTO> unread = getNotificationsForUser(user).stream()
                     .filter(n -> !n.isRead())
-                    .limit(5)
+                    .limit(10)
                     .collect(Collectors.toList());
             
             for (NotificationDTO n : unread) {
@@ -112,7 +112,15 @@ public class NotificationService {
                 notification.getTitle(), recipient, notification.getEventType());
 
         dispatchToUser(recipient, notification);
-        if (!"all".equalsIgnoreCase(recipient)) {
+        // If recipient is a manager or 'all', also broadcast to all active manager emitters and 'all'
+        boolean isMgr = recipient.startsWith("mgr") || "markj".equalsIgnoreCase(recipient) || "all".equalsIgnoreCase(recipient);
+        if (isMgr) {
+            for (String activeUser : userEmitters.keySet()) {
+                if (!activeUser.equalsIgnoreCase(recipient) && (activeUser.startsWith("mgr") || "markj".equalsIgnoreCase(activeUser) || "all".equalsIgnoreCase(activeUser))) {
+                    dispatchToUser(activeUser, notification);
+                }
+            }
+        } else if (!"all".equalsIgnoreCase(recipient)) {
             dispatchToUser("all", notification);
         }
     }
@@ -140,10 +148,15 @@ public class NotificationService {
 
     public List<NotificationDTO> getNotificationsForUser(String username) {
         String user = (username != null && !username.isBlank()) ? username.trim().toLowerCase() : "all";
+        boolean isManager = user.startsWith("mgr") || "markj".equalsIgnoreCase(user) || "admin".equalsIgnoreCase(user) || "all".equalsIgnoreCase(user);
         return notificationHistory.stream()
-                .filter(n -> "all".equalsIgnoreCase(n.getRecipientUsername()) ||
-                             user.equalsIgnoreCase(n.getRecipientUsername()) ||
-                             "all".equalsIgnoreCase(user))
+                .filter(n -> {
+                    String recipient = n.getRecipientUsername() != null ? n.getRecipientUsername().trim().toLowerCase() : "all";
+                    if ("all".equalsIgnoreCase(recipient) || "all".equalsIgnoreCase(user)) return true;
+                    if (user.equalsIgnoreCase(recipient)) return true;
+                    if (isManager && (recipient.startsWith("mgr") || "markj".equalsIgnoreCase(recipient))) return true;
+                    return false;
+                })
                 .collect(Collectors.toList());
     }
 

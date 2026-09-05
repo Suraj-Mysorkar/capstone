@@ -4,20 +4,20 @@ import { fetchApplications, fetchCustomerDocuments } from '../services/loanApi';
 
 const NotificationContext = createContext(null);
 
-const getSeenAlerts = () => {
+const getSeenAlerts = (userKey = 'default') => {
   try {
-    return new Set(JSON.parse(localStorage.getItem('customer_seen_alerts') || '[]'));
+    return new Set(JSON.parse(localStorage.getItem(`customer_seen_alerts_${userKey}`) || '[]'));
   } catch (e) {
     return new Set();
   }
 };
 
-const recordSeenAlert = (id) => {
+const recordSeenAlert = (id, userKey = 'default') => {
   try {
-    const current = Array.from(getSeenAlerts());
+    const current = Array.from(getSeenAlerts(userKey));
     if (!current.includes(id)) {
       current.push(id);
-      localStorage.setItem('customer_seen_alerts', JSON.stringify(current.slice(-150)));
+      localStorage.setItem(`customer_seen_alerts_${userKey}`, JSON.stringify(current.slice(-150)));
     }
   } catch (e) {}
 };
@@ -26,6 +26,8 @@ export function NotificationProvider({ children }) {
   const { currentUser } = useAuth();
   const [notifications, setNotifications] = useState([]);
   const [toast, setToast] = useState(null);
+
+  const userKey = (currentUser?.email || currentUser?.username || 'default').toLowerCase();
 
   const playChime = useCallback(() => {
     try {
@@ -56,16 +58,16 @@ export function NotificationProvider({ children }) {
     (notif) => {
       const id = notif.id || `notif-${Date.now()}-${Math.random()}`;
       const item = { ...notif, id, timestamp: new Date().toISOString(), read: false };
-      const seen = getSeenAlerts();
+      const seen = getSeenAlerts(userKey);
       if (!seen.has(id)) {
-        recordSeenAlert(id);
+        recordSeenAlert(id, userKey);
         setToast(item);
         playChime();
         setTimeout(() => setToast((curr) => (curr?.id === id ? null : curr)), 7000);
       }
       setNotifications((prev) => [item, ...prev]);
     },
-    [playChime]
+    [playChime, userKey]
   );
 
   // Sync application & manager events for the current user
@@ -80,12 +82,37 @@ export function NotificationProvider({ children }) {
 
       const generated = [];
 
+      // If user has no loan applications yet, show active Welcome alert
+      if (myApps.length === 0) {
+        generated.push({
+          id: `welcome-${email}`,
+          title: `Welcome to Digital Banking! 🎉`,
+          message: `Your customer account is active. Explore flexible loan schemes, calculate EMIs, and submit your loan application online anytime.`,
+          type: 'WELCOME',
+          timestamp: currentUser.loginTime || new Date().toISOString(),
+          read: false,
+          link: `/schemes`,
+        });
+      }
+
       myApps.forEach((app) => {
         const mgrName = app.assignedManagerName || (app.assignedManager === 'markj' ? 'Mark Johnson' : app.assignedManager || 'Assigned Officer');
         const mgrPhone = app.assignedManagerPhone || '+1 (555) 019-2834';
         const mgrEmail = app.assignedManagerEmail || 'manager@bank.com';
 
-        // 1. Manager Assignment notification
+        // 1. Application Submitted notification
+        generated.push({
+          id: `app-submitted-${app.applicationId}`,
+          title: `Loan Application: ${app.applicationId}`,
+          message: `Application for ₹${Number(app.loanAmount || 0).toLocaleString('en-IN')} (${app.schemeName || 'Loan'}) was received. Assigned to ${mgrName}.`,
+          type: 'SUBMITTED',
+          timestamp: app.createdAt || new Date().toISOString(),
+          read: false,
+          link: `/applications/${app.applicationId}`,
+          meta: { applicationId: app.applicationId }
+        });
+
+        // 2. Manager Assignment notification
         generated.push({
           id: `mgr-assign-${app.applicationId}`,
           title: `Loan Manager Assigned: ${mgrName}`,
@@ -97,7 +124,7 @@ export function NotificationProvider({ children }) {
           meta: { managerName: mgrName, managerPhone: mgrPhone, managerEmail: mgrEmail, applicationId: app.applicationId }
         });
 
-        // 2. Action Required / Document Request notification
+        // 3. Action Required / Document Request notification
         if (app.status === 'DOCUMENT_REVIEW_PENDING' || app.status === 'MANUAL_REVIEW_REQUIRED') {
           generated.push({
             id: `doc-req-${app.applicationId}`,
@@ -111,7 +138,7 @@ export function NotificationProvider({ children }) {
           });
         }
 
-        // 3. Approval notification
+        // 4. Approval notification
         if (app.status === 'APPROVED') {
           generated.push({
             id: `app-approved-${app.applicationId}`,
@@ -122,6 +149,20 @@ export function NotificationProvider({ children }) {
             read: false,
             link: `/applications/${app.applicationId}`,
             meta: { status: 'APPROVED' }
+          });
+        }
+
+        // 5. Rejection notification
+        if (app.status === 'REJECTED') {
+          generated.push({
+            id: `app-rejected-${app.applicationId}`,
+            title: `Update on Loan Application (${app.applicationId})`,
+            message: app.decisionRemarks || `Your loan application was reviewed and could not be approved at this time.`,
+            type: 'STATUS_UPDATE',
+            timestamp: app.updatedAt || new Date().toISOString(),
+            read: false,
+            link: `/applications/${app.applicationId}`,
+            meta: { status: 'REJECTED' }
           });
         }
       });

@@ -242,7 +242,7 @@ public class LoanApplicationService {
 
         // Dispatch Real-time Notification
         notificationService.sendNotification(new NotificationDTO(
-                "markj",
+                finalizedApp.getAssignedManager() != null ? finalizedApp.getAssignedManager() : "all",
                 "Decision Processed: " + applicationId,
                 "Application " + applicationId + " for " + finalizedApp.getCustomerName() + " was marked " + request.decision() + " by " + request.managerId() + ".",
                 "DECISION_RECORDED",
@@ -325,21 +325,27 @@ public class LoanApplicationService {
     public record ManagerInfo(String loginId, String name, String email, String phone) {}
 
     public static final List<ManagerInfo> MANAGERS_POOL = List.of(
-            new ManagerInfo("mgr.arjun", "Arjun Rao", "arjun.rao@bank.example.com", "+91 98765 43211"),
-            new ManagerInfo("mgr.meera", "Meera Iyer", "meera.iyer@bank.example.com", "+91 98765 43212"),
-            new ManagerInfo("mgr.karan", "Karan Malhotra", "karan.malhotra@bank.example.com", "+91 98765 43213"),
-            new ManagerInfo("mgr.divya", "Divya Nair", "divya.nair@bank.example.com", "+91 98765 43214"),
-            new ManagerInfo("markj", "Mark Johnson", "mark.johnson@bank.com", "+1 (555) 019-2834")
+            new ManagerInfo("mgr1", "Arjun Rao", "manager1@bank.com", "+91 98765 43211"),
+            new ManagerInfo("mgr2", "Meera Iyer", "manager2@bank.com", "+91 98765 43212"),
+            new ManagerInfo("mgr3", "Karan Malhotra", "manager3@bank.com", "+91 98765 43213"),
+            new ManagerInfo("mgr4", "Divya Nair", "manager4@bank.com", "+91 98765 43214"),
+            new ManagerInfo("mgr5", "Mark Johnson", "manager5@bank.com", "+1 (555) 019-2834")
     );
 
     public static ManagerInfo getManagerInfo(String loginId) {
         if (loginId == null || loginId.isBlank()) {
             return MANAGERS_POOL.get(0);
         }
+        String clean = loginId.trim().toLowerCase();
+        if (clean.equals("mgr.arjun") || clean.equals("arjun")) return MANAGERS_POOL.get(0);
+        if (clean.equals("mgr.meera") || clean.equals("meera")) return MANAGERS_POOL.get(1);
+        if (clean.equals("mgr.karan") || clean.equals("karan")) return MANAGERS_POOL.get(2);
+        if (clean.equals("mgr.divya") || clean.equals("divya")) return MANAGERS_POOL.get(3);
+        if (clean.equals("markj") || clean.equals("suresh")) return MANAGERS_POOL.get(4);
         return MANAGERS_POOL.stream()
-                .filter(m -> m.loginId().equalsIgnoreCase(loginId.trim()))
+                .filter(m -> m.loginId().equalsIgnoreCase(clean))
                 .findFirst()
-                .orElse(new ManagerInfo(loginId, loginId, loginId + "@bank.com", "+1 (555) 019-2834"));
+                .orElse(new ManagerInfo(loginId, loginId, loginId + "@bank.com", "+91 98765 43211"));
     }
 
     private ManagerInfo selectLeastLoadedManager() {
@@ -730,9 +736,9 @@ public class LoanApplicationService {
         eventBusPublisher.publishLoanStatusEvent(app, "LOAN_DOCUMENT_REVIEW_PENDING",
                 "Document requirement checklist email sent to applicant " + customerEmail);
 
-        // 3. Dispatch Live Notification to Employee markj
+        // 3. Dispatch Live Notification to Assigned Employee
         notificationService.sendNotification(new NotificationDTO(
-                "markj",
+                app.getAssignedManager() != null ? app.getAssignedManager() : "all",
                 "Document Request Sent: " + app.getCustomerName(),
                 "Document requirement checklist email successfully sent to " + app.getCustomerName() + " (" + customerEmail + ") for application " + applicationId + ".",
                 "DOCUMENT_REQUEST_SENT",

@@ -162,7 +162,7 @@ export default function Header() {
                         >
                           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
                             <div style={{ fontWeight: 600, fontSize: '.84rem', color: n.read ? '#e2e8f0' : '#00d2ff' }}>
-                              {n.type === 'MANAGER_ASSIGNED' ? '👨‍💼 ' : n.type === 'DOC_REQUEST' ? '📋 ' : '🔔 '}
+                              {n.type === 'WELCOME' ? '🎉 ' : n.type === 'SUBMITTED' ? '📝 ' : n.type === 'MANAGER_ASSIGNED' ? '👨‍💼 ' : n.type === 'DOC_REQUEST' ? '📋 ' : n.type === 'DOC_APPROVED' ? '✅ ' : n.type === 'DOC_REJECTED' ? '❌ ' : '🔔 '}
                               {n.title}
                             </div>
                             {!n.read && (

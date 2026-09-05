@@ -75,7 +75,7 @@ export function NotificationProvider({ children }) {
   const eventSourceRef = useRef(null);
   const reconnectTimeoutRef = useRef(null);
 
-  const username = currentUser?.username || 'markj';
+  const username = currentUser?.username || 'mgr1';
 
   const loadHistory = useCallback(async () => {
     if (!isAuthenticated) return;
