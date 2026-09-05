@@ -25,6 +25,26 @@
             <when condition="@(((IResponse)context.Variables["dbCheckResponse"]).StatusCode == 200)">
                 <!-- Stream the raw string response out exactly ONCE to prevent stream-lock crashes -->
                 <set-variable name="functionRawResponse" value="@(((IResponse)context.Variables["dbCheckResponse"]).Body.As<string>(preserveContent: true))" />
+                <!-- Validate role: reject customers from internal login -->
+                <choose>
+                    <when condition="@{
+                        string rawResponse = context.Variables.GetValueOrDefault<string>("functionRawResponse");
+                        var resBody = JObject.Parse(rawResponse);
+                        string extractedRole = resBody["userRole"] != null ? resBody["userRole"].ToString().Trim().ToUpper() : "";
+                        return extractedRole == "CUSTOMER" || string.IsNullOrEmpty(extractedRole);
+                    }">
+                        <return-response>
+                            <set-status code="401" reason="Unauthorized" />
+                            <set-header name="Content-Type" exists-action="override">
+                                <value>application/json</value>
+                            </set-header>
+                            <set-body>{
+                                "statusCode": 401,
+                                "message": "Invalid username or password"
+                            }</set-body>
+                        </return-response>
+                    </when>
+                </choose>
                 <!-- 2. Parse everything using structured variable Extractions to prevent 500 errors -->
                 <set-variable name="username" value="@{
                     var body = JObject.Parse(context.Variables.GetValueOrDefault<string>("loginRequestBody"));
