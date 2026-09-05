@@ -114,7 +114,7 @@ export const authLogin = (username, password) =>
 export const authRegister = (payload) =>
   fetch(`${apiBase()}/auth/register`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: headers({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(payload),
   }).then(handle);
 
