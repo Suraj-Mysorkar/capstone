@@ -38,225 +38,93 @@ public class DatabaseInitializer implements CommandLineRunner {
     private void ensureSchemaExists() {
         log.info("Checking and ensuring MSSQL schema objects exist...");
         String[] ddlStatements = {
-                // 0. Drop legacy Loan_Applications table if Application_ID was created as bigint/numeric
+                // 1. loan_schemes
                 """
-                IF EXISTS (SELECT * FROM INFORMATION_SCHEMA.COLUMNS WHERE TABLE_NAME LIKE '%loan_applications%' AND COLUMN_NAME LIKE '%application_id%' AND DATA_TYPE IN ('bigint', 'int', 'numeric', 'decimal'))
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'loan_schemes' AND type = 'U')
                 BEGIN
-                    IF EXISTS (SELECT * FROM sys.foreign_keys WHERE name = 'FK_Documents_LoanApplication')
-                        ALTER TABLE Documents DROP CONSTRAINT FK_Documents_LoanApplication;
-
-                    IF EXISTS (SELECT * FROM sys.foreign_keys WHERE name = 'FK_LoanApplications_Customers')
-                        ALTER TABLE Loan_Applications DROP CONSTRAINT FK_LoanApplications_Customers;
-
-                    -- Drop any other FK on or referencing loan_applications
-                    DECLARE @drop_fks NVARCHAR(MAX) = N'';
-                    SELECT @drop_fks += N'ALTER TABLE ' + QUOTENAME(OBJECT_SCHEMA_NAME(parent_object_id))
-                        + '.' + QUOTENAME(OBJECT_NAME(parent_object_id)) 
-                        + ' DROP CONSTRAINT ' + QUOTENAME(name) + ';'
-                    FROM sys.foreign_keys
-                    WHERE referenced_object_id = OBJECT_ID('Loan_Applications')
-                       OR parent_object_id = OBJECT_ID('Loan_Applications')
-                       OR referenced_object_id = OBJECT_ID('LOAN_APPLICATIONS')
-                       OR parent_object_id = OBJECT_ID('LOAN_APPLICATIONS');
-
-                    IF @drop_fks <> N'' EXEC sp_executesql @drop_fks;
-
-                    DROP TABLE IF EXISTS Loan_Applications;
-                    DROP TABLE IF EXISTS LOAN_APPLICATIONS;
-                END
-                """,
-
-                // 1. LOAN_SCHEMES
-                """
-                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'LOAN_SCHEMES' AND type = 'U')
-                BEGIN
-                    CREATE TABLE LOAN_SCHEMES (
-                        SCHEME_ID VARCHAR(36) NOT NULL,
-                        LOAN_TYPE VARCHAR(30) NOT NULL,
-                        SCHEME_NAME VARCHAR(100) NOT NULL,
-                        MIN_AMOUNT DECIMAL(18, 2) NOT NULL,
-                        MAX_AMOUNT DECIMAL(18, 2) NOT NULL,
+                    CREATE TABLE loan_schemes (
+                        SCHEME_ID VARCHAR(64) NOT NULL,
+                        SCHEME_NAME VARCHAR(255) NOT NULL,
+                        DESCRIPTION VARCHAR(1000) NULL,
+                        MIN_AMOUNT DECIMAL(15, 2) NOT NULL,
+                        MAX_AMOUNT DECIMAL(15, 2) NOT NULL,
+                        MIN_INTEREST_RATE DECIMAL(5, 2) NOT NULL,
+                        MAX_INTEREST_RATE DECIMAL(5, 2) NOT NULL,
                         MIN_TENURE_MONTHS INT NOT NULL,
                         MAX_TENURE_MONTHS INT NOT NULL,
-                        BASE_INTEREST_RATE DECIMAL(5, 2) NOT NULL,
-                        IS_ACTIVE BIT NOT NULL CONSTRAINT DF_LOAN_SCHEMES_IS_ACTIVE DEFAULT 1,
+                        ACTIVE BIT NOT NULL CONSTRAINT DF_LOAN_SCHEMES_IS_ACTIVE DEFAULT 1,
+                        CREATED_AT DATETIME2 NOT NULL DEFAULT GETDATE(),
                         CONSTRAINT PK_LOAN_SCHEMES PRIMARY KEY (SCHEME_ID)
                     );
                 END
                 """,
 
-                // 2. LOAN_APPLICATIONS
+                // 2. loan_applications
                 """
-                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'LOAN_APPLICATIONS' AND type = 'U')
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'loan_applications' AND type = 'U')
                 BEGIN
-                    CREATE TABLE LOAN_APPLICATIONS (
-                        APPLICATION_ID VARCHAR(36) NOT NULL,
-                        CUSTOMER_ID VARCHAR(36) NOT NULL,
-                        CUSTOMER_NAME VARCHAR(100) NOT NULL,
-                        CUSTOMER_EMAIL VARCHAR(100) NOT NULL,
-                        CUSTOMER_PHONE VARCHAR(20) NOT NULL,
-                        MONTHLY_INCOME DECIMAL(18, 2) NOT NULL,
-                        EXISTING_LIABILITIES DECIMAL(18, 2) CONSTRAINT DF_LOAN_APPS_EXISTING_LIAB DEFAULT 0.00,
-                        EMPLOYMENT_TYPE VARCHAR(50) NOT NULL,
-                        SCHEME_ID VARCHAR(36) NOT NULL,
-                        LOAN_TYPE VARCHAR(30) NOT NULL,
-                        LOAN_AMOUNT DECIMAL(18, 2) NOT NULL,
-                        DOCUMENT_PROVIDED BIT NOT NULL CONSTRAINT DF_LOAN_APPS_DOC_PROVIDED DEFAULT 0,
+                    CREATE TABLE loan_applications (
+                        APPLICATION_ID BIGINT IDENTITY(10001,1) NOT NULL,
+                        CUSTOMER_ID VARCHAR(64) NOT NULL,
+                        CUSTOMER_NAME VARCHAR(255) NULL,
+                        CUSTOMER_EMAIL VARCHAR(255) NULL,
+                        SCHEME_ID VARCHAR(64) NULL,
+                        SCHEME_NAME VARCHAR(255) NULL,
+                        APPLIED_AMOUNT DECIMAL(15, 2) NOT NULL,
                         TENURE_MONTHS INT NOT NULL,
                         INTEREST_RATE DECIMAL(5, 2) NOT NULL,
-                        CALCULATED_EMI DECIMAL(18, 2) NOT NULL,
-                        STATUS VARCHAR(30) NOT NULL,
-                        RISK_SCORE INT NULL,
-                        DTI_RATIO DECIMAL(5, 2) NULL,
-                        ORCHESTRATION_INSTANCE_ID VARCHAR(100) NULL,
-                        ASSIGNED_MANAGER VARCHAR(100) NULL,
+                        MONTHLY_EMI DECIMAL(15, 2) NOT NULL,
+                        PURPOSE VARCHAR(500) NULL,
+                        STATUS VARCHAR(34) NOT NULL,
+                        ASSIGNED_MANAGER_ID VARCHAR(64) NULL,
                         DECISION_REMARKS VARCHAR(1000) NULL,
-                        CREATED_AT DATETIME2 NOT NULL CONSTRAINT DF_LOAN_APPS_CREATED_AT DEFAULT SYSUTCDATETIME(),
-                        UPDATED_AT DATETIME2 NOT NULL CONSTRAINT DF_LOAN_APPS_UPDATED_AT DEFAULT SYSUTCDATETIME(),
-                        CREATED_BY VARCHAR(100) NOT NULL CONSTRAINT DF_LOAN_APPS_CREATED_BY DEFAULT 'SYSTEM',
-                        CREATED_DATE DATETIME2 NOT NULL CONSTRAINT DF_LOAN_APPS_CREATED_DATE DEFAULT SYSUTCDATETIME(),
+                        DOCUMENT_PROVIDED BIT DEFAULT 0,
+                        CREATED_BY VARCHAR(100) NULL,
+                        CREATED_DATE DATETIME2 NOT NULL DEFAULT GETDATE(),
                         LAST_MODIFIED_BY VARCHAR(100) NULL,
                         LAST_MODIFIED_DATE DATETIME2 NULL,
+                        VERSION BIGINT DEFAULT 0,
                         CONSTRAINT PK_LOAN_APPLICATIONS PRIMARY KEY (APPLICATION_ID)
                     );
                 END
                 """,
 
-                // 2b. Add missing columns to LOAN_APPLICATIONS if already existing
-                "IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('LOAN_APPLICATIONS') AND name = 'SCHEME_ID') ALTER TABLE LOAN_APPLICATIONS ADD SCHEME_ID VARCHAR(36) NULL",
-                "IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('LOAN_APPLICATIONS') AND name = 'CUSTOMER_NAME') ALTER TABLE LOAN_APPLICATIONS ADD CUSTOMER_NAME VARCHAR(100) NULL",
-                "IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('LOAN_APPLICATIONS') AND name = 'CUSTOMER_EMAIL') ALTER TABLE LOAN_APPLICATIONS ADD CUSTOMER_EMAIL VARCHAR(100) NULL",
-                "IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('LOAN_APPLICATIONS') AND name = 'CUSTOMER_PHONE') ALTER TABLE LOAN_APPLICATIONS ADD CUSTOMER_PHONE VARCHAR(20) NULL",
-                "IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('LOAN_APPLICATIONS') AND name = 'MONTHLY_INCOME') ALTER TABLE LOAN_APPLICATIONS ADD MONTHLY_INCOME DECIMAL(18, 2) NULL",
-                "IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('LOAN_APPLICATIONS') AND name = 'EXISTING_LIABILITIES') ALTER TABLE LOAN_APPLICATIONS ADD EXISTING_LIABILITIES DECIMAL(18, 2) NULL",
-                "IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('LOAN_APPLICATIONS') AND name = 'EMPLOYMENT_TYPE') ALTER TABLE LOAN_APPLICATIONS ADD EMPLOYMENT_TYPE VARCHAR(50) NULL",
-                "IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('LOAN_APPLICATIONS') AND name = 'DOCUMENT_PROVIDED') ALTER TABLE LOAN_APPLICATIONS ADD DOCUMENT_PROVIDED BIT NOT NULL CONSTRAINT DF_LOAN_APPS_DOC_PROV_AUTO DEFAULT 0",
-                "IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('LOAN_APPLICATIONS') AND name = 'CALCULATED_EMI') ALTER TABLE LOAN_APPLICATIONS ADD CALCULATED_EMI DECIMAL(18, 2) NULL",
-                "IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('LOAN_APPLICATIONS') AND name = 'RISK_SCORE') ALTER TABLE LOAN_APPLICATIONS ADD RISK_SCORE INT NULL",
-                "IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('LOAN_APPLICATIONS') AND name = 'DTI_RATIO') ALTER TABLE LOAN_APPLICATIONS ADD DTI_RATIO DECIMAL(5, 2) NULL",
-                "IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('LOAN_APPLICATIONS') AND name = 'ORCHESTRATION_INSTANCE_ID') ALTER TABLE LOAN_APPLICATIONS ADD ORCHESTRATION_INSTANCE_ID VARCHAR(100) NULL",
-                "IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('LOAN_APPLICATIONS') AND name = 'ASSIGNED_MANAGER') ALTER TABLE LOAN_APPLICATIONS ADD ASSIGNED_MANAGER VARCHAR(100) NULL",
-                "IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('LOAN_APPLICATIONS') AND name = 'DECISION_REMARKS') ALTER TABLE LOAN_APPLICATIONS ADD DECISION_REMARKS VARCHAR(1000) NULL",
-                "IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('LOAN_APPLICATIONS') AND name = 'CREATED_AT') ALTER TABLE LOAN_APPLICATIONS ADD CREATED_AT DATETIME2 NULL",
-                "IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('LOAN_APPLICATIONS') AND name = 'UPDATED_AT') ALTER TABLE LOAN_APPLICATIONS ADD UPDATED_AT DATETIME2 NULL",
-                "IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('LOAN_APPLICATIONS') AND name = 'CREATED_BY') ALTER TABLE LOAN_APPLICATIONS ADD CREATED_BY VARCHAR(100) NULL",
-                "IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('LOAN_APPLICATIONS') AND name = 'CREATED_DATE') ALTER TABLE LOAN_APPLICATIONS ADD CREATED_DATE DATETIME2 NULL",
-                "IF NOT EXISTS (SELECT * FROM sys.columns WHERE object_id = OBJECT_ID('LOAN_APPLICATIONS') AND name = 'LAST_MODIFIED_BY') ALTER TABLE LOAN_APPLICATIONS ADD LAST_MODIFIED_BY VARCHAR(100) NULL",
-                // 2c. Drop restrictive check constraints on LOAN_DOCUMENTS if any
+                // 3. loan_documents
                 """
-                DECLARE @drop_ck NVARCHAR(MAX) = N'';
-                SELECT @drop_ck += N'ALTER TABLE ' + QUOTENAME(OBJECT_SCHEMA_NAME(parent_object_id))
-                    + '.' + QUOTENAME(OBJECT_NAME(parent_object_id)) 
-                    + ' DROP CONSTRAINT ' + QUOTENAME(name) + ';'
-                FROM sys.check_constraints
-                WHERE parent_object_id IN (OBJECT_ID('LOAN_DOCUMENTS'), OBJECT_ID('loan_documents'), OBJECT_ID('LOAN_DOCUMENTS_AUD'), OBJECT_ID('loan_documents_aud'));
-                IF @drop_ck <> N'' EXEC sp_executesql @drop_ck;
-                """,
-
-                // 3. LOAN_DOCUMENTS
-                """
-                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'LOAN_DOCUMENTS' AND type = 'U')
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'loan_documents' AND type = 'U')
                 BEGIN
-                    CREATE TABLE LOAN_DOCUMENTS (
-                        DOCUMENT_ID VARCHAR(36) NOT NULL,
-                        APPLICATION_ID VARCHAR(36) NULL,
-                        CUSTOMER_ID VARCHAR(36) NOT NULL,
-                        DOC_TYPE VARCHAR(50) NOT NULL,
+                    CREATE TABLE loan_documents (
+                        DOCUMENT_ID VARCHAR(64) NOT NULL,
+                        APPLICATION_ID BIGINT NOT NULL,
+                        DOCUMENT_TYPE VARCHAR(100) NOT NULL,
                         FILE_NAME VARCHAR(255) NOT NULL,
-                        CONTENT_TYPE VARCHAR(100) NOT NULL,
-                        BLOB_STORAGE_PATH VARCHAR(500) NOT NULL,
-                        FILE_SIZE_BYTES BIGINT NOT NULL,
-                        UPLOADED_AT DATETIME2 NOT NULL CONSTRAINT DF_LOAN_DOCS_UPLOADED_AT DEFAULT SYSUTCDATETIME(),
+                        FILE_PATH VARCHAR(500) NOT NULL,
+                        FILE_SIZE_BYTES BIGINT NULL,
+                        CONTENT_TYPE VARCHAR(100) NULL,
+                        VERIFICATION_STATUS VARCHAR(50) NOT NULL DEFAULT 'PENDING',
+                        REVIEWED_BY VARCHAR(100) NULL,
+                        REVIEW_REMARKS VARCHAR(500) NULL,
+                        REVIEWED_AT DATETIME2 NULL,
+                        UPLOADED_AT DATETIME2 NOT NULL DEFAULT GETDATE(),
                         CONSTRAINT PK_LOAN_DOCUMENTS PRIMARY KEY (DOCUMENT_ID)
                     );
                 END
                 """,
 
-                // 4. LOAN_AUDIT_LOGS
+                // 4. loan_audit_logs
                 """
-                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'LOAN_AUDIT_LOGS' AND type = 'U')
+                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'loan_audit_logs' AND type = 'U')
                 BEGIN
-                    CREATE TABLE LOAN_AUDIT_LOGS (
+                    CREATE TABLE loan_audit_logs (
                         LOG_ID BIGINT IDENTITY(1,1) NOT NULL,
-                        APPLICATION_ID VARCHAR(36) NOT NULL,
-                        PREVIOUS_STATUS VARCHAR(30) NULL,
-                        NEW_STATUS VARCHAR(30) NOT NULL,
-                        CHANGED_BY VARCHAR(100) NOT NULL,
-                        COMMENTS VARCHAR(1000) NULL,
-                        TIMESTAMP DATETIME2 NOT NULL CONSTRAINT DF_LOAN_AUDIT_TIMESTAMP DEFAULT SYSUTCDATETIME(),
+                        APPLICATION_ID BIGINT NOT NULL,
+                        PREVIOUS_STATUS VARCHAR(34) NULL,
+                        NEW_STATUS VARCHAR(34) NOT NULL,
+                        ACTION_BY VARCHAR(100) NOT NULL,
+                        ACTION_ROLE VARCHAR(50) NOT NULL,
+                        REMARKS VARCHAR(1000) NULL,
+                        TIMESTAMP DATETIME2 NOT NULL DEFAULT GETDATE(),
                         CONSTRAINT PK_LOAN_AUDIT_LOGS PRIMARY KEY (LOG_ID)
-                    );
-                END
-                """,
-
-                // 5. REVINFO (Hibernate Envers)
-                """
-                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'REVINFO' AND type = 'U')
-                BEGIN
-                    CREATE TABLE REVINFO (
-                        REV INT IDENTITY(1,1) NOT NULL,
-                        REVTSTMP BIGINT NULL,
-                        CONSTRAINT PK_REVINFO PRIMARY KEY (REV)
-                    );
-                END
-                """,
-
-                // 6. LOAN_APPLICATIONS_AUD (Hibernate Envers)
-                """
-                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'LOAN_APPLICATIONS_AUD' AND type = 'U')
-                BEGIN
-                    CREATE TABLE LOAN_APPLICATIONS_AUD (
-                        APPLICATION_ID VARCHAR(36) NOT NULL,
-                        REV INT NOT NULL,
-                        REVTYPE TINYINT NOT NULL,
-                        CUSTOMER_ID VARCHAR(36) NULL,
-                        CUSTOMER_NAME VARCHAR(100) NULL,
-                        CUSTOMER_EMAIL VARCHAR(100) NULL,
-                        CUSTOMER_PHONE VARCHAR(20) NULL,
-                        MONTHLY_INCOME DECIMAL(18, 2) NULL,
-                        EXISTING_LIABILITIES DECIMAL(18, 2) NULL,
-                        EMPLOYMENT_TYPE VARCHAR(50) NULL,
-                        SCHEME_ID VARCHAR(36) NULL,
-                        LOAN_TYPE VARCHAR(30) NULL,
-                        LOAN_AMOUNT DECIMAL(18, 2) NULL,
-                        DOCUMENT_PROVIDED BIT NULL,
-                        TENURE_MONTHS INT NULL,
-                        INTEREST_RATE DECIMAL(5, 2) NULL,
-                        CALCULATED_EMI DECIMAL(18, 2) NULL,
-                        STATUS VARCHAR(30) NULL,
-                        RISK_SCORE INT NULL,
-                        DTI_RATIO DECIMAL(5, 2) NULL,
-                        ORCHESTRATION_INSTANCE_ID VARCHAR(100) NULL,
-                        ASSIGNED_MANAGER VARCHAR(100) NULL,
-                        DECISION_REMARKS VARCHAR(1000) NULL,
-                        CREATED_AT DATETIME2 NULL,
-                        UPDATED_AT DATETIME2 NULL,
-                        CREATED_BY VARCHAR(100) NULL,
-                        CREATED_DATE DATETIME2 NULL,
-                        LAST_MODIFIED_BY VARCHAR(100) NULL,
-                        LAST_MODIFIED_DATE DATETIME2 NULL,
-                        CONSTRAINT PK_LOAN_APPLICATIONS_AUD PRIMARY KEY (APPLICATION_ID, REV)
-                    );
-                END
-                """,
-
-                // 7. LOAN_DOCUMENTS_AUD (Hibernate Envers)
-                """
-                IF NOT EXISTS (SELECT * FROM sys.tables WHERE name = 'LOAN_DOCUMENTS_AUD' AND type = 'U')
-                BEGIN
-                    CREATE TABLE LOAN_DOCUMENTS_AUD (
-                        DOCUMENT_ID VARCHAR(36) NOT NULL,
-                        REV INT NOT NULL,
-                        REVTYPE TINYINT NOT NULL,
-                        APPLICATION_ID VARCHAR(36) NULL,
-                        CUSTOMER_ID VARCHAR(36) NULL,
-                        DOC_TYPE VARCHAR(50) NULL,
-                        FILE_NAME VARCHAR(255) NULL,
-                        CONTENT_TYPE VARCHAR(100) NULL,
-                        BLOB_STORAGE_PATH VARCHAR(500) NULL,
-                        FILE_SIZE_BYTES BIGINT NULL,
-                        UPLOADED_AT DATETIME2 NULL,
-                        CONSTRAINT PK_LOAN_DOCUMENTS_AUD PRIMARY KEY (DOCUMENT_ID, REV)
                     );
                 END
                 """

@@ -20,9 +20,9 @@ import java.util.UUID;
  * has a different primary-key type and column set.
  */
 @Entity
-@Table(name = "customer_profiles", indexes = {
-        @Index(name = "idx_customer_profiles_email", columnList = "email", unique = true),
-        @Index(name = "idx_customer_profiles_status", columnList = "onboardingStatus")
+@Table(name = "customers", indexes = {
+        @Index(name = "idx_customers_email", columnList = "email", unique = true),
+        @Index(name = "idx_customers_status", columnList = "onboardingStatus")
 })
 @Getter
 @Setter
@@ -82,6 +82,18 @@ public class Customer {
      */
     @Column(length = 255)
     private String identityProviderSubject;
+
+    @Column(name = "DOB")
+    private java.time.LocalDate dob;
+
+    @Column(name = "National_ID", length = 50)
+    private String nationalId;
+
+    @Column(name = "Employment_Details", length = 255)
+    private String employmentDetails;
+
+    @Column(name = "Income_Details", precision = 18, scale = 2)
+    private java.math.BigDecimal incomeDetails;
 
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 30)

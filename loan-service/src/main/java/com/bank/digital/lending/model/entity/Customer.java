@@ -6,16 +6,21 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "Customers")
+@Table(name = "customers")
 public class Customer {
 
     @Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "Customer_ID")
-    private Long customerId;
+    @Column(name = "id")
+    private java.util.UUID customerId = java.util.UUID.randomUUID();
 
-    @Column(name = "Full_Name", nullable = false, length = 100)
+    @Column(name = "Full_Name", length = 100)
     private String fullName;
+
+    @Column(name = "firstName", length = 100)
+    private String firstName;
+
+    @Column(name = "lastName", length = 100)
+    private String lastName;
 
     @Column(name = "DOB")
     private LocalDate dob;
@@ -31,6 +36,27 @@ public class Customer {
 
     @Column(name = "Address", length = 255)
     private String address;
+
+    @Column(length = 255)
+    private String addressLine1;
+
+    @Column(length = 255)
+    private String addressLine2;
+
+    @Column(length = 100)
+    private String city;
+
+    @Column(length = 50)
+    private String state;
+
+    @Column(length = 20)
+    private String postalCode;
+
+    @Column(length = 2)
+    private String countryCode;
+
+    @Column(length = 255)
+    private String identityProviderSubject;
 
     @Column(name = "Employment_Details", length = 255)
     private String employmentDetails;
@@ -70,11 +96,11 @@ public class Customer {
 
     // Getters and Setters
 
-    public Long getCustomerId() {
+    public java.util.UUID getCustomerId() {
         return customerId;
     }
 
-    public void setCustomerId(Long customerId) {
+    public void setCustomerId(java.util.UUID customerId) {
         this.customerId = customerId;
     }
 
@@ -172,5 +198,77 @@ public class Customer {
 
     public void setLoginPassword(String loginPassword) {
         this.loginPassword = loginPassword;
+    }
+
+    public String getFirstName() {
+        return firstName;
+    }
+
+    public void setFirstName(String firstName) {
+        this.firstName = firstName;
+    }
+
+    public String getLastName() {
+        return lastName;
+    }
+
+    public void setLastName(String lastName) {
+        this.lastName = lastName;
+    }
+
+    public String getAddressLine1() {
+        return addressLine1;
+    }
+
+    public void setAddressLine1(String addressLine1) {
+        this.addressLine1 = addressLine1;
+    }
+
+    public String getAddressLine2() {
+        return addressLine2;
+    }
+
+    public void setAddressLine2(String addressLine2) {
+        this.addressLine2 = addressLine2;
+    }
+
+    public String getCity() {
+        return city;
+    }
+
+    public void setCity(String city) {
+        this.city = city;
+    }
+
+    public String getState() {
+        return state;
+    }
+
+    public void setState(String state) {
+        this.state = state;
+    }
+
+    public String getPostalCode() {
+        return postalCode;
+    }
+
+    public void setPostalCode(String postalCode) {
+        this.postalCode = postalCode;
+    }
+
+    public String getCountryCode() {
+        return countryCode;
+    }
+
+    public void setCountryCode(String countryCode) {
+        this.countryCode = countryCode;
+    }
+
+    public String getIdentityProviderSubject() {
+        return identityProviderSubject;
+    }
+
+    public void setIdentityProviderSubject(String identityProviderSubject) {
+        this.identityProviderSubject = identityProviderSubject;
     }
 }

@@ -13,7 +13,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 @Entity
-@Table(name = "LOAN_APPLICATIONS")
+@Table(name = "loan_applications")
 @Audited
 public class LoanApplication extends BaseAuditable {
 

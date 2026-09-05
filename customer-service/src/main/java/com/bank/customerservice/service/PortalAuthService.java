@@ -61,10 +61,13 @@ public class PortalAuthService {
                 .name(trim((request.firstName() + " " + request.lastName()).trim(), 100))
                 .email(email)
                 .userRole(CUSTOMER_ROLE)
+                .customerId(profile.id())
                 .build();
         user = appUserRepository.save(user);
         log.info("Portal account created: userId={}, handle={}, email={}, role={}",
                 user.getUserId(), user.getLoginId(), email, CUSTOMER_ROLE);
+
+        customerService.dispatchWelcomeNotification(email, user.getName(), user.getLoginId());
 
         return buildResponse(user, profile);
     }
@@ -88,8 +91,16 @@ public class PortalAuthService {
     @Transactional(readOnly = true)
     public PortalAuthResponse login(PortalLoginRequest request) {
         String username = request.username().trim();
-        AppUser user = appUserRepository.findByEmailIgnoreCase(username)
-                .or(() -> appUserRepository.findByLoginIdIgnoreCase(username))
+        AppUser user = appUserRepository.findFirstByEmailIgnoreCase(username)
+                .or(() -> appUserRepository.findFirstByLoginIdIgnoreCase(username))
+                .or(() -> {
+                    try {
+                        long id = Long.parseLong(username);
+                        return appUserRepository.findById(id);
+                    } catch (NumberFormatException e) {
+                        return java.util.Optional.empty();
+                    }
+                })
                 .orElseThrow(() -> new InvalidCredentialsException("Invalid username or password."));
 
         if (user.getLoginPassword() == null || !user.getLoginPassword().trim().equals(request.password().trim())) {
@@ -98,11 +109,9 @@ public class PortalAuthService {
 
         CustomerResponse profile = null;
         if (user.getEmail() != null) {
-            try {
-                profile = customerService.getByEmail(user.getEmail());
-            } catch (ResourceNotFoundException ignored) {
-                // login user without a customer profile (e.g. an employee) — still allowed to sign in
-            }
+            profile = customerRepository.findFirstByEmailIgnoreCase(user.getEmail())
+                    .map(CustomerResponse::from)
+                    .orElse(null);
         }
         return buildResponse(user, profile);
     }

@@ -18,7 +18,7 @@ import lombok.Setter;
  * ({@link com.bank.customerservice.repository.AppUserRepository#findByEmailIgnoreCase}).
  */
 @Entity
-@Table(name = "Users")
+@Table(name = "users")
 @Getter
 @Setter
 @Builder
@@ -46,4 +46,10 @@ public class AppUser {
 
     @Column(name = "user_role", length = 40)
     private String userRole;
+
+    @Column(name = "customer_id")
+    private java.util.UUID customerId;
+
+    @Column(name = "manager_id")
+    private java.util.UUID managerId;
 }

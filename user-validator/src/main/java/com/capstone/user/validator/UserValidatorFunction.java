@@ -97,7 +97,7 @@ public class UserValidatorFunction {
             connectionString = "jdbc:sqlserver://smzen-capstone.database.windows.net:1433;database=smzen-capstone-db;user=cs_admin;password=Capstone@;encrypt=true;trustServerCertificate=false;loginTimeout=30;";
         }
         
-        String query = "SELECT * FROM Users WHERE LOWER(loginid) = LOWER(?)";
+        String query = "SELECT * FROM users WHERE LOWER(loginid) = LOWER(?)";
         
         try (Connection connection = DriverManager.getConnection(connectionString);
              PreparedStatement statement = connection.prepareStatement(query)) {

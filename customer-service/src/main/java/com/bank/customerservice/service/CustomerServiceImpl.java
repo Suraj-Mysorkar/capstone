@@ -56,56 +56,66 @@ public class CustomerServiceImpl implements CustomerService {
         Customer saved = customerRepository.save(customer);
         log.info("Registered new customer id={}", saved.getId());
 
-        eventPublisher.publishCustomerRegistered(
-                CustomerRegisteredEvent.of(saved.getId(), saved.getEmail(), saved.getFirstName() + " " +  saved.getLastName(), "Register"));
-
-        // Dispatch Welcome Email directly to Notification Service
-        dispatchWelcomeNotification(saved);
+        java.util.concurrent.CompletableFuture.runAsync(() -> {
+            try {
+                eventPublisher.publishCustomerRegistered(
+                        CustomerRegisteredEvent.of(saved.getId(), saved.getEmail(), saved.getFirstName() + " " +  saved.getLastName(), "Register"));
+            } catch (Exception ex) {
+                log.warn("[CUSTOMER-SERVICE] EventGrid publish note: {}", ex.getMessage());
+            }
+        });
 
         return CustomerResponse.from(saved);
     }
 
-    private void dispatchWelcomeNotification(Customer saved) {
-        if (saved.getEmail() == null || saved.getEmail().isBlank()) return;
-        String name = (saved.getFirstName() + " " + (saved.getLastName() != null ? saved.getLastName() : "")).trim();
-        String subject = "Welcome to Digital Banking - Registration Successful";
-        String body = String.format(
-                "<html><body style=\"font-family: Arial, sans-serif; font-size: 14px; color: #333333; line-height: 1.6;\">"
-                + "<p>Dear %s,</p>"
-                + "<p>Welcome to Digital Banking! We are pleased to confirm that your customer profile has been successfully registered.</p>"
-                + "<h3>Account Information</h3>"
-                + "<table style=\"border-collapse: collapse; width: 100%%; max-width: 600px; margin-bottom: 16px;\">"
-                + "<tr><td style=\"padding: 8px; border: 1px solid #ddd; font-weight: bold;\">Customer Name</td><td style=\"padding: 8px; border: 1px solid #ddd;\">%s</td></tr>"
-                + "<tr><td style=\"padding: 8px; border: 1px solid #ddd; font-weight: bold;\">Registered Email</td><td style=\"padding: 8px; border: 1px solid #ddd;\">%s</td></tr>"
-                + "<tr><td style=\"padding: 8px; border: 1px solid #ddd; font-weight: bold;\">Account Status</td><td style=\"padding: 8px; border: 1px solid #ddd;\">ACTIVE</td></tr>"
-                + "</table>"
-                + "<p>You can now securely access the Digital Banking customer portal to calculate EMIs, apply for loans, and upload required documents.</p>"
-                + "<p>Kind regards,<br><strong>Digital Banking Customer Experience Team</strong></p>"
-                + "</body></html>",
-                name,
-                name,
-                saved.getEmail()
-        );
+    @Override
+    public void dispatchWelcomeNotification(String email, String name, String loginId) {
+        if (email == null || email.isBlank()) return;
+        java.util.concurrent.CompletableFuture.runAsync(() -> {
+            String subject = "Welcome to Digital Banking - Registration Successful";
+            String body = String.format(
+                    "<html><body style=\"font-family: Arial, sans-serif; font-size: 14px; color: #333333; line-height: 1.6;\">"
+                    + "<p>Dear %s,</p>"
+                    + "<p>Welcome to Digital Banking! We are pleased to confirm that your customer profile has been successfully registered.</p>"
+                    + "<h3>Account Information</h3>"
+                    + "<table style=\"border-collapse: collapse; width: 100%%; max-width: 600px; margin-bottom: 16px;\">"
+                    + "<tr><td style=\"padding: 8px; border: 1px solid #ddd; font-weight: bold;\">Customer Name</td><td style=\"padding: 8px; border: 1px solid #ddd;\">%s</td></tr>"
+                    + "<tr><td style=\"padding: 8px; border: 1px solid #ddd; font-weight: bold;\">Registered Email</td><td style=\"padding: 8px; border: 1px solid #ddd;\">%s</td></tr>"
+                    + "<tr><td style=\"padding: 8px; border: 1px solid #ddd; font-weight: bold;\">User ID</td><td style=\"padding: 8px; border: 1px solid #ddd;\">%s</td></tr>"
+                    + "<tr><td style=\"padding: 8px; border: 1px solid #ddd; font-weight: bold;\">Account Status</td><td style=\"padding: 8px; border: 1px solid #ddd;\">ACTIVE</td></tr>"
+                    + "</table>"
+                    + "<p>You can now securely access the Digital Banking customer portal to calculate EMIs, apply for loans, and upload required documents.</p>"
+                    + "<p>Kind regards,<br><strong>Digital Banking Customer Experience Team</strong></p>"
+                    + "</body></html>",
+                    name,
+                    name,
+                    email,
+                    loginId
+            );
 
-        String logicAppUrl = "https://prod-17.southindia.logic.azure.com:443/workflows/a4b29c1d5e814824900b41a17fa24844/triggers/When_a_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_a_HTTP_request_is_received%2Frun&sv=1.0&sig=F--JabvW3Uwr-JsZU76HgaWWTcekahkC6HBwTEImtys";
-        try {
-            String payload = String.format("{\"emailTo\":\"%s\",\"emailSubject\":\"%s\",\"emailBody\":\"%s\"}",
-                    saved.getEmail().replace("\"", "\\\""),
-                    subject.replace("\"", "\\\""),
-                    body.replace("\"", "\\\"").replace("\n", "").replace("\r", ""));
+            String logicAppUrl = "https://prod-17.southindia.logic.azure.com:443/workflows/a4b29c1d5e814824900b41a17fa24844/triggers/When_a_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_a_HTTP_request_is_received%2Frun&sv=1.0&sig=F--JabvW3Uwr-JsZU76HgaWWTcekahkC6HBwTEImtys";
+            try {
+                String payload = String.format("{\"emailTo\":\"%s\",\"emailSubject\":\"%s\",\"emailBody\":\"%s\"}",
+                        email.replace("\"", "\\\""),
+                        subject.replace("\"", "\\\""),
+                        body.replace("\"", "\\\"").replace("\n", "").replace("\r", ""));
 
-            java.net.http.HttpClient client = java.net.http.HttpClient.newHttpClient();
-            java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder()
-                    .uri(java.net.URI.create(logicAppUrl))
-                    .header("Content-Type", "application/json")
-                    .POST(java.net.http.HttpRequest.BodyPublishers.ofString(payload, java.nio.charset.StandardCharsets.UTF_8))
-                    .build();
+                java.net.http.HttpClient client = java.net.http.HttpClient.newBuilder()
+                        .connectTimeout(java.time.Duration.ofSeconds(10))
+                        .build();
+                java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder()
+                        .uri(java.net.URI.create(logicAppUrl))
+                        .header("Content-Type", "application/json")
+                        .timeout(java.time.Duration.ofSeconds(15))
+                        .POST(java.net.http.HttpRequest.BodyPublishers.ofString(payload, java.nio.charset.StandardCharsets.UTF_8))
+                        .build();
 
-            java.net.http.HttpResponse<String> resp = client.send(req, java.net.http.HttpResponse.BodyHandlers.ofString());
-            log.info("[CUSTOMER-SERVICE] ✅ Welcome email sent to {} - Logic App status: {}", saved.getEmail(), resp.statusCode());
-        } catch (Exception ex) {
-            log.warn("[CUSTOMER-SERVICE] Welcome email dispatch note: {}", ex.getMessage());
-        }
+                java.net.http.HttpResponse<String> resp = client.send(req, java.net.http.HttpResponse.BodyHandlers.ofString());
+                log.info("[CUSTOMER-SERVICE] ✅ Welcome email sent to {} - Logic App status: {}", email, resp.statusCode());
+            } catch (Exception ex) {
+                log.warn("[CUSTOMER-SERVICE] Welcome email dispatch note: {}", ex.getMessage());
+            }
+        });
     }
 
     @Override
@@ -115,7 +125,7 @@ public class CustomerServiceImpl implements CustomerService {
 
     @Override
     public CustomerResponse getByEmail(String email) {
-        Customer customer = customerRepository.findByEmailIgnoreCase(email)
+        Customer customer = customerRepository.findFirstByEmailIgnoreCase(email)
                 .orElseThrow(() -> new ResourceNotFoundException("No customer found with email " + email));
         return CustomerResponse.from(customer);
     }

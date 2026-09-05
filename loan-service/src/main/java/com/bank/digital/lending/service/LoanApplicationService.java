@@ -89,7 +89,7 @@ public class LoanApplicationService {
                 && !request.customerId().equalsIgnoreCase("CUST-1") && !request.customerId().equalsIgnoreCase("CUST-null")) {
             try {
                 String rawId = request.customerId().replace("CUST-", "").trim();
-                customer = customerRepository.findById(Long.parseLong(rawId)).orElse(null);
+                customer = customerRepository.findById(java.util.UUID.fromString(rawId)).orElse(null);
             } catch (Exception ignored) {}
         }
         if (customer == null) {

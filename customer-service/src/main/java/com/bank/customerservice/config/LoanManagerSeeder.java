@@ -31,18 +31,18 @@ public class LoanManagerSeeder implements ApplicationRunner {
 
     /** { loginid (<=20), display name, email }. */
     private static final String[][] MANAGERS = {
-            {"mgr.arjun", "Arjun Rao",      "arjun.rao@bank.example.com"},
-            {"mgr.meera", "Meera Iyer",     "meera.iyer@bank.example.com"},
-            {"mgr.karan", "Karan Malhotra", "karan.malhotra@bank.example.com"},
-            {"mgr.divya", "Divya Nair",     "divya.nair@bank.example.com"},
+            {"mgr1", "Manager One",   "manager1@bank.com"},
+            {"mgr2", "Manager Two",   "manager2@bank.com"},
+            {"mgr3", "Manager Three", "manager3@bank.com"},
+            {"mgr4", "Manager Four",  "manager4@bank.com"},
+            {"mgr5", "Manager Five",  "manager5@bank.com"},
     };
-    private static final String DEFAULT_PASSWORD = "Manager@123";
+    private static final String DEFAULT_PASSWORD = "Password@123";
     private static final String MANAGER_ROLE = "manager";
 
     private final AppUserRepository appUserRepository;
 
     @Override
-    @Transactional
     public void run(ApplicationArguments args) {
         try {
             int created = 0;
@@ -64,7 +64,7 @@ public class LoanManagerSeeder implements ApplicationRunner {
             log.info("Loan manager pool ready: {} new manager row(s) inserted, {} manager(s) total.", created, total);
         } catch (Exception ex) {
             // Never block startup on seeding; assignment will surface a clear error if the pool is empty.
-            log.error("Loan manager seeding skipped due to error: {}", ex.getMessage(), ex);
+            log.warn("Loan manager seeding note: {}", ex.getMessage());
         }
     }
 

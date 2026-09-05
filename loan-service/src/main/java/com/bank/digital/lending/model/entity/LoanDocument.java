@@ -7,7 +7,7 @@ import java.time.LocalDateTime;
 
 @Entity
 @Audited
-@Table(name = "LOAN_DOCUMENTS")
+@Table(name = "loan_documents")
 public class LoanDocument {
 
     @Id

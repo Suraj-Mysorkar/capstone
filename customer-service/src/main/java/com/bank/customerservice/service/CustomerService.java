@@ -25,4 +25,6 @@ public interface CustomerService {
     CustomerResponse updateOnboardingStatus(UUID id, OnboardingStatusUpdateRequest request);
 
     void delete(UUID id);
+
+    void dispatchWelcomeNotification(String email, String name, String loginId);
 }

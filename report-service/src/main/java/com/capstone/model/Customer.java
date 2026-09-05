@@ -16,13 +16,12 @@ import jakarta.persistence.OneToMany;
 import jakarta.persistence.Table;
 
 @Entity
-@Table(name = "Customers")
+@Table(name = "customers")
 public class Customer {
 
-	@Id
-    @GeneratedValue(strategy = GenerationType.IDENTITY)
-    @Column(name = "Customer_ID")
-    private Long customerId;
+    @Id
+    @Column(name = "id")
+    private java.util.UUID customerId = java.util.UUID.randomUUID();
 
     @Column(name = "Full_Name", length = 100, nullable = false)
     private String fullName;
