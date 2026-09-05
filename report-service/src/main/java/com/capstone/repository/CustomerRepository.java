@@ -8,8 +8,10 @@ import org.springframework.stereotype.Repository;
 
 import com.capstone.model.Customer;
 
+import java.util.UUID;
+
 @Repository
-public interface CustomerRepository extends JpaRepository<Customer, Long> {
+public interface CustomerRepository extends JpaRepository<Customer, UUID> {
 	
 	 // Tracks customer signups grouped by year and month
     @Query(value = "SELECT SUBSTRING(CONVERT(VARCHAR, created_at, 120), 1, 7) AS month_str, COUNT(id) " +

@@ -13,13 +13,13 @@ public class Customer {
     @Column(name = "id")
     private java.util.UUID customerId = java.util.UUID.randomUUID();
 
-    @Column(name = "Full_Name", length = 100)
+    @Transient
     private String fullName;
 
-    @Column(name = "firstName", length = 100)
+    @Column(name = "first_name", length = 100)
     private String firstName;
 
-    @Column(name = "lastName", length = 100)
+    @Column(name = "last_name", length = 100)
     private String lastName;
 
     @Column(name = "DOB")
@@ -28,34 +28,34 @@ public class Customer {
     @Column(name = "National_ID", length = 50)
     private String nationalId;
 
-    @Column(name = "Mobile_Number", nullable = false, length = 20)
+    @Column(name = "phone_number", length = 20)
     private String mobileNumber;
 
-    @Column(name = "Email", nullable = false, length = 255)
+    @Column(name = "email", nullable = false, length = 255)
     private String email;
 
-    @Column(name = "Address", length = 255)
+    @Transient
     private String address;
 
-    @Column(length = 255)
+    @Column(name = "address_line1", length = 255)
     private String addressLine1;
 
-    @Column(length = 255)
+    @Column(name = "address_line2", length = 255)
     private String addressLine2;
 
-    @Column(length = 100)
+    @Column(name = "city", length = 100)
     private String city;
 
-    @Column(length = 50)
+    @Column(name = "state", length = 50)
     private String state;
 
-    @Column(length = 20)
+    @Column(name = "postal_code", length = 20)
     private String postalCode;
 
-    @Column(length = 2)
+    @Column(name = "country_code", length = 2)
     private String countryCode;
 
-    @Column(length = 255)
+    @Column(name = "identity_provider_subject", length = 255)
     private String identityProviderSubject;
 
     @Column(name = "Employment_Details", length = 255)
@@ -64,16 +64,19 @@ public class Customer {
     @Column(name = "Income_Details", precision = 18, scale = 2)
     private BigDecimal incomeDetails;
 
-    @Column(name = "Onboarding_Status", length = 30)
+    @Column(name = "onboarding_status", length = 30)
     private String onboardingStatus;
 
-    @Column(name = "Created_At")
+    @Column(name = "created_at")
     private LocalDateTime createdAt;
 
-    @Column(name = "loginid", length = 100)
+    @Column(name = "updated_at")
+    private LocalDateTime updatedAt;
+
+    @Transient
     private String loginId;
 
-    @Column(name = "loginpassword", length = 255)
+    @Transient
     private String loginPassword;
 
     public Customer() {
@@ -83,7 +86,7 @@ public class Customer {
 
     public Customer(String fullName, String email, String mobileNumber, BigDecimal incomeDetails, String employmentDetails) {
         this();
-        this.fullName = fullName != null ? fullName : "Applicant";
+        this.setFullName(fullName != null ? fullName : "Applicant");
         this.email = email != null ? email : "customer@bank.com";
         this.mobileNumber = (mobileNumber != null && !mobileNumber.isBlank()) ? mobileNumber : "N/A";
         this.incomeDetails = incomeDetails;
@@ -105,11 +108,22 @@ public class Customer {
     }
 
     public String getFullName() {
-        return fullName;
+        if (fullName != null && !fullName.isBlank()) {
+            return fullName;
+        }
+        String fn = firstName != null ? firstName : "";
+        String ln = lastName != null ? lastName : "";
+        String combined = (fn + " " + ln).trim();
+        return combined.isEmpty() ? "Customer" : combined;
     }
 
     public void setFullName(String fullName) {
         this.fullName = fullName;
+        if (fullName != null && !fullName.isBlank()) {
+            String[] parts = fullName.trim().split("\\s+", 2);
+            this.firstName = parts[0];
+            this.lastName = parts.length > 1 ? parts[1] : "";
+        }
     }
 
     public LocalDate getDob() {
@@ -136,6 +150,14 @@ public class Customer {
         this.mobileNumber = mobileNumber;
     }
 
+    public String getPhoneNumber() {
+        return mobileNumber;
+    }
+
+    public void setPhoneNumber(String phoneNumber) {
+        this.mobileNumber = phoneNumber;
+    }
+
     public String getEmail() {
         return email;
     }
@@ -145,11 +167,23 @@ public class Customer {
     }
 
     public String getAddress() {
-        return address;
+        if (address != null && !address.isBlank()) {
+            return address;
+        }
+        StringBuilder sb = new StringBuilder();
+        if (addressLine1 != null && !addressLine1.isBlank()) sb.append(addressLine1);
+        if (addressLine2 != null && !addressLine2.isBlank()) sb.append(sb.length() > 0 ? ", " : "").append(addressLine2);
+        if (city != null && !city.isBlank()) sb.append(sb.length() > 0 ? ", " : "").append(city);
+        if (state != null && !state.isBlank()) sb.append(sb.length() > 0 ? ", " : "").append(state);
+        if (postalCode != null && !postalCode.isBlank()) sb.append(sb.length() > 0 ? " - " : "").append(postalCode);
+        return sb.toString();
     }
 
     public void setAddress(String address) {
         this.address = address;
+        if (this.addressLine1 == null && address != null) {
+            this.addressLine1 = address;
+        }
     }
 
     public String getEmploymentDetails() {
@@ -182,6 +216,14 @@ public class Customer {
 
     public void setCreatedAt(LocalDateTime createdAt) {
         this.createdAt = createdAt;
+    }
+
+    public LocalDateTime getUpdatedAt() {
+        return updatedAt;
+    }
+
+    public void setUpdatedAt(LocalDateTime updatedAt) {
+        this.updatedAt = updatedAt;
     }
 
     public String getLoginId() {
