@@ -1,4 +1,20 @@
-$apimKey = "e668065d6523405f912e56c3fe3c2ca9"
+# Resolve APIM Subscription Key dynamically from env, git-ignored secrets.properties, or Azure CLI
+$apimKey = $env:APIM_SUBSCRIPTION_KEY
+if ([string]::IsNullOrWhiteSpace($apimKey) -and (Test-Path "$PSScriptRoot\secrets.properties")) {
+    $secLines = Get-Content "$PSScriptRoot\secrets.properties"
+    foreach ($line in $secLines) {
+        if ($line -match '^\s*APIM_SUBSCRIPTION_KEY\s*=\s*(.+)$') {
+            $apimKey = $matches[1].Trim()
+            break
+        }
+    }
+}
+if ([string]::IsNullOrWhiteSpace($apimKey)) {
+    try {
+        $secJson = az rest --method post --uri "https://management.azure.com/subscriptions/79c18ee7-2ea9-4478-b706-11ab0fe0ba07/resourceGroups/SurajM-RG/providers/Microsoft.ApiManagement/service/team6-api-management/subscriptions/master/listSecrets?api-version=2022-08-01" 2>$null | ConvertFrom-Json
+        $apimKey = $secJson.primaryKey
+    } catch {}
+}
 
 Write-Host "`n=== 1. Testing Employee Auth via APIM ===" -ForegroundColor Cyan
 $empBody = @{ username = "mgr1"; password = "Password@123" } | ConvertTo-Json

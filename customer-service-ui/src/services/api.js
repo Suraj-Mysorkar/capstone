@@ -12,7 +12,7 @@ const DEFAULT_BASE = 'https://team6-api-management.azure-api.net/customers/api/c
 const BASE_KEY = 'cs_ui_api_base';
 const TOKEN_KEY = 'cs_ui_token';   // legacy manual override (Settings page)
 const AUTH_TOKEN_KEY = 'csp_token'; // JWT from the portal login (AuthContext)
-const APIM_KEY = 'e668065d6523405f912e56c3fe3c2ca9';
+const APIM_KEY = import.meta.env.VITE_APIM_SUBSCRIPTION_KEY || '';
 
 function readLS(key) {
   try {

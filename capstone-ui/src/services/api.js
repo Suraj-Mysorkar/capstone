@@ -1,6 +1,6 @@
 const BASE = import.meta.env.VITE_LOAN_API_URL || 'https://team6-api-management.azure-api.net/loan-applications/api/v1/loans';
 const DOC_BASE = import.meta.env.VITE_DOC_API_URL || 'https://team6-api-management.azure-api.net/documents/api/v1/documents';
-const APIM_KEY = 'e668065d6523405f912e56c3fe3c2ca9';
+const APIM_KEY = import.meta.env.VITE_APIM_SUBSCRIPTION_KEY || '';
 
 // ── JWT Auth Header Helpers ──────────────────────────────────────────
 export const getAuthToken = () => {

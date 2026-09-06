@@ -14,7 +14,23 @@
 $ErrorActionPreference = "Continue"
 
 $APIM_BASE_URL = "https://team6-api-management.azure-api.net"
-$APIM_KEY      = "e668065d6523405f912e56c3fe3c2ca9"
+# Resolve APIM Subscription Key dynamically from env, git-ignored secrets.properties, or Azure CLI
+$APIM_KEY = $env:APIM_SUBSCRIPTION_KEY
+if ([string]::IsNullOrWhiteSpace($APIM_KEY) -and (Test-Path "$PSScriptRoot\secrets.properties")) {
+    $secLines = Get-Content "$PSScriptRoot\secrets.properties"
+    foreach ($line in $secLines) {
+        if ($line -match '^\s*APIM_SUBSCRIPTION_KEY\s*=\s*(.+)$') {
+            $APIM_KEY = $matches[1].Trim()
+            break
+        }
+    }
+}
+if ([string]::IsNullOrWhiteSpace($APIM_KEY)) {
+    try {
+        $secJson = az rest --method post --uri "https://management.azure.com/subscriptions/79c18ee7-2ea9-4478-b706-11ab0fe0ba07/resourceGroups/SurajM-RG/providers/Microsoft.ApiManagement/service/team6-api-management/subscriptions/master/listSecrets?api-version=2022-08-01" 2>$null | ConvertFrom-Json
+        $APIM_KEY = $secJson.primaryKey
+    } catch {}
+}
 $NOTIF_SVC_URL = "https://team6-notification-service-function-app-f3afbxhbfnbbaner.southindia-01.azurewebsites.net"
 
 $TOTAL_TESTS  = 0

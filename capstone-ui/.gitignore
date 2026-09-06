@@ -37,9 +37,12 @@ HELP.md
 
 # --- Secrets and Environment Configurations ---
 .env
-.env.local
+.env.*
+!.env.example
 *.properties.local
 *.yml.local
+node_modules/
+dist/
 
 # =========================================================================
 # IDE Specific Files
