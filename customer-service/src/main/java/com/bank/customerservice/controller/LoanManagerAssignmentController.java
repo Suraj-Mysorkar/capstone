@@ -9,6 +9,7 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -19,11 +20,11 @@ import java.util.UUID;
  * <p>
  * {@code POST} is a server-to-server integration endpoint: the loan-service
  * calls it right after a customer submits a loan application, and customer-service
- * assigns one of its loan managers and notifies the customer. {@code GET} lets
- * the portal show the customer who is handling their application.
+ * assigns one of its loan managers and notifies the customer. It carries no user
+ * context, so it is left open in {@link com.bank.customerservice.config.SecurityConfig}.
  * <p>
- * Public (no bearer token) — same trust model as {@code /api/customers/auth/**};
- * see {@code SecurityConfig.PUBLIC_PATHS}.
+ * {@code GET} lets the portal show the customer who is handling their application
+ * and requires an APIM identity ({@code ROLE_CUSTOMER} / staff).
  */
 @RestController
 @RequestMapping("/api/customers/loan-manager-assignments")
@@ -41,7 +42,11 @@ public class LoanManagerAssignmentController {
 
     @GetMapping
     @Operation(summary = "List a customer's loan manager assignments (most recent first)")
-    public ResponseEntity<List<LoanManagerAssignmentResponse>> byCustomer(@RequestParam UUID customerId) {
+    @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_EMPLOYEE', 'ROLE_MANAGER', 'CUSTOMER', 'EMPLOYEE', 'MANAGER')")
+    public ResponseEntity<List<LoanManagerAssignmentResponse>> byCustomer(
+            @RequestParam UUID customerId,
+            @RequestHeader(value = "X-User-Id", required = false) String userId,
+            @RequestHeader(value = "X-User-Role", required = false) String userRole) {
         return ResponseEntity.ok(assignmentService.forCustomer(customerId));
     }
 }

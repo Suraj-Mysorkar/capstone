@@ -88,15 +88,20 @@ public class PortalAuthService {
         return (s != null && s.length() > max) ? s.substring(0, max) : s;
     }
 
+    /**
+     * Sign in with the <b>customer id</b> — the {@code Users.loginid} handle
+     * ({@code cmto55vth5x}) or the numeric {@code User_ID}. The customer's email
+     * is <b>not</b> a credential; it is looked up from the matched row here and
+     * returned in the response so the portal can prefill the loan application.
+     */
     @Transactional(readOnly = true)
     public PortalAuthResponse login(PortalLoginRequest request) {
-        String username = request.username().trim();
-        AppUser user = appUserRepository.findFirstByEmailIgnoreCase(username)
-                .or(() -> appUserRepository.findFirstByLoginIdIgnoreCase(username))
+        String customerId = request.username().trim();
+
+        AppUser user = appUserRepository.findFirstByLoginIdIgnoreCase(customerId)
                 .or(() -> {
                     try {
-                        long id = Long.parseLong(username);
-                        return appUserRepository.findById(id);
+                        return appUserRepository.findById(Long.parseLong(customerId));
                     } catch (NumberFormatException e) {
                         return java.util.Optional.empty();
                     }
@@ -107,12 +112,14 @@ public class PortalAuthService {
             throw new InvalidCredentialsException("Invalid username or password.");
         }
 
+        // Fetch the email (and the customer profile) for the matched account.
         CustomerResponse profile = null;
-        if (user.getEmail() != null) {
+        if (user.getEmail() != null && !user.getEmail().isBlank()) {
             profile = customerRepository.findFirstByEmailIgnoreCase(user.getEmail())
                     .map(CustomerResponse::from)
                     .orElse(null);
         }
+        log.info("Portal login: customerId={}, userId={}, email={}", customerId, user.getUserId(), user.getEmail());
         return buildResponse(user, profile);
     }
 

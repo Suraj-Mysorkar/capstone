@@ -73,11 +73,7 @@
             <artifactId>flyway-sqlserver</artifactId>
         </dependency>
 
-        <!-- Security: validates JWTs issued by Microsoft Entra ID (via APIM) -->
-        <dependency>
-            <groupId>org.springframework.boot</groupId>
-            <artifactId>spring-boot-starter-oauth2-resource-server</artifactId>
-        </dependency>
+        <!-- Security: role-based authz from the APIM-injected X-User-Id / X-User-Role headers -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-security</artifactId>

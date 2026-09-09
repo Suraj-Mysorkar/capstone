@@ -129,6 +129,12 @@ export const registerCustomer = (payload) =>
 export const getCustomer = (id) =>
   fetch(`${apiBase()}/${id}`, { headers: headers() }).then(handle);
 
+// The signed-in customer's own profile. The login token carries only the
+// customer id (no email), so the portal calls this right after login to pull
+// the email + profile from the DB and fill the session.
+export const getMyProfile = () =>
+  fetch(`${apiBase()}/me`, { headers: headers() }).then(handle);
+
 export const getCustomerByEmail = (email) =>
   fetch(`${apiBase()}?email=${encodeURIComponent(email)}`, { headers: headers() }).then(handle);
 

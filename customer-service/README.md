@@ -7,12 +7,14 @@ Grid for downstream consumers (Notification Service, Reporting Dashboard).
 
 ## Architecture fit
 
-- **Client Layer** → Angular/Vue web app & mobile app call APIM
-- **API Gateway Layer** → APIM validates the Entra ID JWT and routes
-  `/api/customers/*` here (rate limiting handled centrally by APIM)
-- **This service** → validates the JWT again (defense in depth), enforces
-  authorization via scopes/roles, applies business rules, persists to Azure
-  SQL, publishes `CustomerRegisteredEvent` / `CustomerStatusChangedEvent`
+- **Client Layer** → customer portal & officer console call APIM
+- **API Gateway Layer** → APIM authenticates the caller and forwards their
+  identity as `X-User-Id` / `X-User-Role` headers (rate limiting handled
+  centrally by APIM)
+- **This service** → trusts those headers, enforces **role-based authorization**
+  (`ROLE_CUSTOMER` / `ROLE_EMPLOYEE` / `ROLE_MANAGER`) via `@PreAuthorize`,
+  applies business rules, persists to Azure SQL, publishes
+  `CustomerRegisteredEvent` / `CustomerStatusChangedEvent`
 - **Messaging & Events Layer** → Azure Event Grid topic, consumed by
   Notification Service and other event-driven services
 - **Azure Managed Data Stores** → shared Azure SQL Database `smzen-capstone-db`
@@ -23,7 +25,9 @@ Grid for downstream consumers (Notification Service, Reporting Dashboard).
 
 - Java 17, Spring Boot 3.3
 - Spring Web, Spring Data JPA, Bean Validation
-- Spring Security OAuth2 Resource Server (validates Entra ID-issued JWTs)
+- Spring Security — pre-authenticated `X-User-Id` / `X-User-Role` header filter
+  (APIM-injected identity), method-level `@PreAuthorize` role checks. Same
+  pattern as `document-service` / `report-service`.
 - Azure SDK: `azure-messaging-eventgrid`, `azure-identity` (Managed Identity)
 - Flyway for schema migrations
 - mssql-jdbc driver (Azure SQL Database)
@@ -71,18 +75,37 @@ contains other services' tables.
 
 ## API
 
-| Method | Path                                  | Auth (scope/role)               | Description                        |
+Roles come from the APIM-injected `X-User-Role` header (`ROLE_CUSTOMER` /
+`ROLE_EMPLOYEE` / `ROLE_MANAGER`); "staff" = `ROLE_EMPLOYEE` or `ROLE_MANAGER`.
+
+| Method | Path                                  | Allowed roles                   | Description                        |
 |--------|----------------------------------------|----------------------------------|-------------------------------------|
-| POST   | `/api/customers`                       | `customers.write` / `customer_admin` | Register a new customer             |
-| GET    | `/api/customers/{id}`                  | `customers.read`                 | Get profile by id                   |
-| GET    | `/api/customers?email=`                | `customers.read`                 | Look up by email                    |
-| GET    | `/api/customers?status=&page=&size=`   | `customers.read`                 | List/filter by onboarding status    |
-| PATCH  | `/api/customers/{id}`                  | `customers.write`                | Update profile fields               |
-| PATCH  | `/api/customers/{id}/onboarding-status`| `customers.write`                | Transition onboarding status        |
-| DELETE | `/api/customers/{id}`                  | `customer_admin`                 | Delete a customer profile           |
-| GET    | `/api/customers/ping`                  | none                              | Liveness check                      |
-| POST   | `/api/customers/loan-manager-assignments` | none (server-to-server)      | Assign a loan manager to a customer's loan application & notify the customer |
-| GET    | `/api/customers/loan-manager-assignments?customerId=` | none              | List a customer's loan manager assignments |
+| POST   | `/api/customers/auth/register`         | public                           | Portal self-registration (returns a JWT) |
+| POST   | `/api/customers/auth/login`            | public                           | Portal login                        |
+| POST   | `/api/customers`                       | staff                            | Register a customer profile (officer console) |
+| GET    | `/api/customers/me`                    | any signed-in user               | The caller's own profile, resolved from `X-User-Id` (portal uses this after login to fetch the email) |
+| GET    | `/api/customers/{id}`                  | customer, staff                  | Get profile by id                   |
+| GET    | `/api/customers?email=`                | customer, staff                  | Look up by email                    |
+| GET    | `/api/customers?status=&page=&size=`   | staff                            | List/filter by onboarding status    |
+| PATCH  | `/api/customers/{id}`                  | customer, staff                  | Update profile fields               |
+| PATCH  | `/api/customers/{id}/onboarding-status`| staff                            | Transition onboarding status        |
+| DELETE | `/api/customers/{id}`                  | manager                          | Delete a customer profile           |
+| GET    | `/api/customers/ping`                  | public                           | Liveness check                      |
+| POST   | `/api/customers/loan-manager-assignments` | public (server-to-server)     | Assign a loan manager to a customer's loan application & notify the customer |
+| GET    | `/api/customers/loan-manager-assignments?customerId=` | customer, staff   | List a customer's loan manager assignments |
+
+Calling protected endpoints directly (bypassing APIM) requires the headers, e.g.
+`-H 'X-User-Id: 1001' -H 'X-User-Role: ROLE_EMPLOYEE'`.
+
+### Portal login & the email
+
+Customers sign in with their **customer id** — the `Users.loginid` handle (or the
+numeric `User_ID`), never the email. `PortalAuthService.login()` matches on that
+and reads the email from the row. The gateway login flow
+(`/auth/customer/login` → user-validator) mints a token that carries only the id,
+so the portal calls `GET /api/customers/me` right after login to pull the email
+and profile from the DB (`X-User-Id` → `Users` row → `customer_profiles`) and fill
+the session — no email is added to the login token or response.
 
 ### Loan manager assignment
 
@@ -92,8 +115,7 @@ application id / loan details). customer-service then:
 
 1. picks the loan manager carrying the fewest current assignments from the pool
    in the shared `Users` table (`user_role = 'manager'`, seeded at startup by
-   `LoanManagerSeeder` — `mgr.arjun` / `mgr.meera` / `mgr.karan` / `mgr.divya`,
-   password `Manager@123`),
+   `LoanManagerSeeder` — `mgr1`…`mgr5`, password `Password@123`),
 2. records the assignment in `loan_manager_assignments` (idempotent per
    `applicationId`),
 3. publishes `com.bank.customer.loanmanagerassigned` to Event Grid so the

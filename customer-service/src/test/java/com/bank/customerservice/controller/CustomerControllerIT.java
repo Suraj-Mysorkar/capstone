@@ -9,7 +9,6 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.boot.test.mock.mockito.MockBean;
-import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.test.context.support.WithMockUser;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -31,14 +30,8 @@ class CustomerControllerIT {
     @MockBean
     private EventGridPublisherClient<CloudEvent> eventGridPublisherClient;
 
-    // Prevents the real JwtDecoder bean (which calls out to the Entra ID
-    // discovery endpoint on construction) from being created during tests.
-    // @WithMockUser bypasses actual token decoding entirely.
-    @MockBean
-    private JwtDecoder jwtDecoder;
-
     @Test
-    @WithMockUser(authorities = {"SCOPE_customers.write"})
+    @WithMockUser(authorities = {"ROLE_EMPLOYEE"})
     void registerCustomer_returns201() throws Exception {
         CustomerRegistrationRequest request = new CustomerRegistrationRequest(
                 "Jane", "Doe", "jane.doe+it@example.com", "+15551234567",
@@ -53,18 +46,30 @@ class CustomerControllerIT {
     }
 
     @Test
-    void registerCustomer_withoutAuth_returns401() throws Exception {
+    void registerCustomer_withoutIdentity_returns403() throws Exception {
         CustomerRegistrationRequest request = new CustomerRegistrationRequest(
                 "Jane", "Doe", "jane.unauth@example.com", null, null, null, null, null, null, null);
 
         mockMvc.perform(post("/api/customers")
                         .contentType("application/json")
                         .content(objectMapper.writeValueAsString(request)))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isForbidden());
     }
 
     @Test
-    @WithMockUser(authorities = {"SCOPE_customers.write"})
+    @WithMockUser(authorities = {"ROLE_CUSTOMER"})
+    void registerCustomer_asCustomer_returns403() throws Exception {
+        CustomerRegistrationRequest request = new CustomerRegistrationRequest(
+                "Jane", "Doe", "jane.customer@example.com", null, null, null, null, null, null, null);
+
+        mockMvc.perform(post("/api/customers")
+                        .contentType("application/json")
+                        .content(objectMapper.writeValueAsString(request)))
+                .andExpect(status().isForbidden());
+    }
+
+    @Test
+    @WithMockUser(authorities = {"ROLE_EMPLOYEE"})
     void registerCustomer_invalidEmail_returns400() throws Exception {
         CustomerRegistrationRequest request = new CustomerRegistrationRequest(
                 "Jane", "Doe", "not-an-email", null, null, null, null, null, null, null);
@@ -77,7 +82,7 @@ class CustomerControllerIT {
     }
 
     @Test
-    @WithMockUser(authorities = {"SCOPE_customers.read"})
+    @WithMockUser(authorities = {"ROLE_EMPLOYEE"})
     void getById_notFound_returns404() throws Exception {
         mockMvc.perform(get("/api/customers/" + java.util.UUID.randomUUID()))
                 .andExpect(status().isNotFound());

@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useState } from 'react';
-import { authLogin, authRegister } from '../services/api';
+import { authLogin, authRegister, getMyProfile } from '../services/api';
 
 const AuthContext = createContext(null);
 
@@ -74,9 +74,30 @@ export function AuthProvider({ children }) {
     setAuthError('');
     try {
       const res = await authLogin(username.trim(), password);
-      const user = toUser(res, username.trim().toLowerCase());
-      setCurrentUser(user);
+      let user = toUser(res, username.trim().toLowerCase());
+      // Persist first so the follow-up request carries the bearer token.
       persist(user);
+
+      // The login token only carries the customer id — pull the email + profile
+      // from customer-service so the loan application form can be used.
+      if (!user.email || !user.customerServiceId) {
+        try {
+          const me = await getMyProfile();
+          user = {
+            ...user,
+            email: me.email || user.email,
+            name: user.name || `${me.firstName || ''} ${me.lastName || ''}`.trim() || user.name,
+            customerServiceId: me.id || user.customerServiceId,
+            onboardingStatus: me.onboardingStatus || user.onboardingStatus,
+            phoneNumber: me.phoneNumber || user.phoneNumber,
+          };
+          persist(user);
+        } catch {
+          /* profile lookup failed — portal still usable, email stays as derived */
+        }
+      }
+
+      setCurrentUser(user);
       return user;
     } catch (err) {
       setAuthError(err.message || 'Invalid username or password.');
