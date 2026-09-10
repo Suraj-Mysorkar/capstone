@@ -278,23 +278,16 @@ export default function ApplicationDetailPage() {
 
   // Quick action for manager to verify or reject a document directly
   const handleQuickDocAction = async (docId, newStatus) => {
-    let remarks = '';
-    if (newStatus === 'REJECTED') {
-      const inputRemarks = window.prompt(
-        'Enter rejection reason to notify customer for re-upload:',
-        'Document is unclear / illegible or does not meet compliance requirements. Please upload a clear valid copy.'
-      );
-      if (inputRemarks === null) return; // User cancelled
-      remarks = inputRemarks.trim() || 'Document rejected during underwriting review. Please re-upload.';
-    } else {
-      remarks = 'Document verified and approved by underwriting manager.';
-    }
+    const defaultRemarks = newStatus === 'REJECTED'
+      ? 'Document is unclear or does not meet compliance requirements. Please upload a clear valid copy.'
+      : 'Document verified and approved by underwriting manager.';
+    const reviewRemarks = remarks.trim() || defaultRemarks;
 
     setActionInProgressDocId(docId);
     try {
       await updateDocumentStatus(docId, {
         status: newStatus,
-        remarks,
+        remarks: reviewRemarks,
         reviewerId: managerId || 'mgr1'
       });
       await load();

@@ -42,7 +42,7 @@ public class LoanManagerAssignmentController {
 
     @GetMapping
     @Operation(summary = "List a customer's loan manager assignments (most recent first)")
-    @PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_EMPLOYEE', 'ROLE_MANAGER', 'CUSTOMER', 'EMPLOYEE', 'MANAGER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_EMPLOYEE', 'ROLE_MANAGER')")
     public ResponseEntity<List<LoanManagerAssignmentResponse>> byCustomer(
             @RequestParam UUID customerId,
             @RequestHeader(value = "X-User-Id", required = false) String userId,

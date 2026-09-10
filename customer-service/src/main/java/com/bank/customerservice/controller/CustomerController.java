@@ -42,13 +42,13 @@ public class CustomerController {
 
     /** Bank staff only. */
     private static final String STAFF =
-            "hasAnyRole('ROLE_EMPLOYEE', 'ROLE_MANAGER', 'EMPLOYEE', 'MANAGER')";
+            "hasAnyAuthority('ROLE_EMPLOYEE', 'ROLE_MANAGER')";
     /** The customer themselves, or bank staff. */
     private static final String CUSTOMER_OR_STAFF =
-            "hasAnyRole('ROLE_CUSTOMER', 'ROLE_EMPLOYEE', 'ROLE_MANAGER', 'CUSTOMER', 'EMPLOYEE', 'MANAGER')";
+            "hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_EMPLOYEE', 'ROLE_MANAGER')";
     /** Managers only. */
     private static final String MANAGER =
-            "hasAnyRole('ROLE_MANAGER', 'MANAGER')";
+            "hasAnyAuthority('ROLE_MANAGER')";
 
     private final CustomerService customerService;
     private final AppUserRepository appUserRepository;
@@ -86,9 +86,10 @@ public class CustomerController {
             }
         }
         if (userName != null && !userName.isBlank()) {
-            var byLogin = appUserRepository.findFirstByLoginIdIgnoreCase(userName.trim());
-            if (byLogin.isPresent()) {
-                return byLogin.get();
+            var account = appUserRepository.findFirstByLoginIdIgnoreCase(userName.trim())
+                    .or(() -> appUserRepository.findFirstByEmailIgnoreCase(userName.trim()));
+            if (account.isPresent()) {
+                return account.get();
             }
         }
         throw new ResourceNotFoundException("Signed-in user could not be resolved from the request identity.");
@@ -127,7 +128,7 @@ public class CustomerController {
 
     @GetMapping
     @Operation(summary = "List customers, optionally filtered by onboarding status")
-    @PreAuthorize(STAFF)
+    @PreAuthorize(CUSTOMER_OR_STAFF)
     public ResponseEntity<Page<CustomerResponse>> list(
             @RequestParam(required = false) OnboardingStatus status,
             @RequestHeader(value = "X-User-Id", required = false) String userId,

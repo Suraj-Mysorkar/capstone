@@ -16,7 +16,6 @@ export const getAuthHeaders = (extraHeaders = {}) => {
   const headers = {
     'Ocp-Apim-Subscription-Key': APIM_KEY,
     'client-key': APIM_KEY,
-    'X-User-Role': 'ROLE_EMPLOYEE',
     ...extraHeaders
   };
   if (token) {

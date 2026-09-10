@@ -53,81 +53,34 @@ export const loanBaseSource = () =>
 export const docBaseSource = () =>
   readLS(DOC_KEY) ? 'browser override' : import.meta.env.VITE_DOC_API_URL ? 'build-time env' : 'default (Azure)';
 
+async function authFetch(url, options = {}) {
+  const res = await fetch(url, options);
+  if (res.status === 401) {
+    try {
+      localStorage.removeItem('csp_user');
+      localStorage.removeItem('csp_token');
+      window.dispatchEvent(new Event('auth:unauthorized'));
+    } catch {}
+  }
+  return res;
+}
+
 // ── Schemes ─────────────────────────────────────────────────────────────
 export const fetchSchemes = () =>
-  fetch(`${loanBase()}/schemes`, { headers: getAuthHeaders() }).then((r) => {
+  authFetch(`${loanBase()}/schemes`, { headers: getAuthHeaders() }).then((r) => {
     if (!r.ok) throw new Error(`Failed to fetch schemes (${r.status})`);
     return r.json();
   });
 
 export const fetchSchemeById = (id) =>
-  fetch(`${loanBase()}/schemes/${id}`, { headers: getAuthHeaders() }).then((r) => {
+  authFetch(`${loanBase()}/schemes/${id}`, { headers: getAuthHeaders() }).then((r) => {
     if (!r.ok) throw new Error(`Failed to fetch scheme (${r.status})`);
     return r.json();
   });
 
-// loan-service Customers table (the one capstone-ui's Apply page reads).
-export const fetchLoanCustomers = () =>
-  fetch(`${loanBase()}/customers`, { headers: getAuthHeaders() }).then((r) => {
-    if (!r.ok) throw new Error(`Failed to fetch customers (${r.status})`);
-    return r.json();
-  });
-
-// Create / upsert (keyed by email) a row in the shared Customers table without a
-// loan application, so a newly-registered customer is immediately visible to the
-// loan officer console (capstone-ui). Returns { customerCode: 'CUST-n', ... }.
-export const registerLoanCustomer = (payload) =>
-  fetch(`${loanBase()}/customers`, {
-    method: 'POST',
-    headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
-    body: JSON.stringify(payload),
-  }).then(async (r) => {
-    const data = await r.json().catch(() => ({}));
-    if (!r.ok) throw new Error(data.message || `Customer sync failed (${r.status})`);
-    return { ...data, customerCode: data.customerCode || `CUST-${data.customerId}` };
-  });
-
-// Resolve the loan-service customer code (CUST-<n>) for an email, if one exists.
-export const resolveLoanCustomer = async (email) => {
-  if (!email) return null;
-  try {
-    const list = await fetchLoanCustomers();
-    const match = (Array.isArray(list) ? list : []).find(
-      (c) => (c.email || '').toLowerCase() === email.toLowerCase(),
-    );
-    if (!match) return null;
-    return {
-      ...match,
-      customerCode: match.customerCode || `CUST-${match.customerId}`,
-    };
-  } catch {
-    return null;
-  }
-};
-
-// Ensure the logged-in customer has a loan-service record; create one if missing.
-// Returns the CUST-<n> code, or null if it could not be resolved/created.
-export const ensureLoanCustomer = async ({ email, fullName, mobileNumber, onboardingStatus, externalRef, incomeDetails }) => {
-  const existing = await resolveLoanCustomer(email);
-  if (existing?.customerCode) return existing.customerCode;
-  try {
-    const created = await registerLoanCustomer({
-      fullName: fullName || email,
-      email,
-      mobileNumber: mobileNumber || null,
-      onboardingStatus: onboardingStatus || 'REGISTERED',
-      externalRef: externalRef || null,
-      incomeDetails: incomeDetails ?? null,
-    });
-    return created.customerCode || null;
-  } catch {
-    return null;
-  }
-};
-
 // ── EMI Calculator ──────────────────────────────────────────────────────
 export const calculateEmi = (body) =>
-  fetch(`${loanBase()}/calculate-emi`, {
+  authFetch(`${loanBase()}/calculate-emi`, {
     method: 'POST',
     headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(body),
@@ -139,14 +92,14 @@ export const calculateEmi = (body) =>
 // ── Applications ────────────────────────────────────────────────────────
 export const fetchApplications = (status) => {
   const url = status ? `${loanBase()}/applications?status=${status}` : `${loanBase()}/applications`;
-  return fetch(url, { headers: getAuthHeaders() }).then((r) => {
+  return authFetch(url, { headers: getAuthHeaders() }).then((r) => {
     if (!r.ok) throw new Error(`Failed to fetch applications (${r.status})`);
     return r.json();
   });
 };
 
 export const applyLoan = (body) =>
-  fetch(`${loanBase()}/apply`, {
+  authFetch(`${loanBase()}/apply`, {
     method: 'POST',
     headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(body),
@@ -157,26 +110,26 @@ export const applyLoan = (body) =>
   });
 
 export const fetchApplicationById = (id) =>
-  fetch(`${loanBase()}/applications/${id}`, { headers: getAuthHeaders() }).then((r) => {
+  authFetch(`${loanBase()}/applications/${id}`, { headers: getAuthHeaders() }).then((r) => {
     if (!r.ok) throw new Error(`Application not found (${r.status})`);
     return r.json();
   });
 
 export const fetchApplicationStatus = (id) =>
-  fetch(`${loanBase()}/applications/${id}/status`, { headers: getAuthHeaders() }).then((r) => {
+  authFetch(`${loanBase()}/applications/${id}/status`, { headers: getAuthHeaders() }).then((r) => {
     if (!r.ok) throw new Error(`Failed to fetch status (${r.status})`);
     return r.json();
   });
 
 export const fetchAuditLogs = (id) =>
-  fetch(`${loanBase()}/applications/${id}/audit-logs`, { headers: getAuthHeaders() }).then((r) => {
+  authFetch(`${loanBase()}/applications/${id}/audit-logs`, { headers: getAuthHeaders() }).then((r) => {
     if (!r.ok) throw new Error(`Failed to fetch audit logs (${r.status})`);
     return r.json();
   });
 
 // Customer submits verification documents → advances the durable workflow.
 export const notifyDocumentUploaded = (id, body) =>
-  fetch(`${loanBase()}/applications/${id}/document-uploaded`, {
+  authFetch(`${loanBase()}/applications/${id}/document-uploaded`, {
     method: 'POST',
     headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
     body: JSON.stringify(body),
@@ -188,7 +141,7 @@ export const notifyDocumentUploaded = (id, body) =>
 // ── Documents ───────────────────────────────────────────────────────────
 export const fetchDocumentTypes = async () => {
   try {
-    const r = await fetch(`${docBase()}/types`, { headers: getAuthHeaders() });
+    const r = await authFetch(`${docBase()}/types`, { headers: getAuthHeaders() });
     if (r.ok) return await r.json();
   } catch (e) {
     console.warn('Could not fetch dynamic document types, using defaults', e);
@@ -205,14 +158,14 @@ export const fetchDocumentTypes = async () => {
 
 export const uploadDocument = async (formData) => {
   try {
-    const res = await fetch(`${docBase()}/upload`, { method: 'POST', headers: getAuthHeaders(), body: formData });
+    const res = await authFetch(`${docBase()}/upload`, { method: 'POST', headers: getAuthHeaders(), body: formData });
     if (res.ok) return await res.json();
     const err = await res.json().catch(() => ({ message: `Upload failed (${res.status})` }));
     throw new Error(err.message || `Upload failed with status ${res.status}`);
   } catch (docErr) {
     console.warn('Document service upload failed, attempting loan-service fallback:', docErr);
     try {
-      const res = await fetch(`${loanBase()}/documents/upload`, { method: 'POST', headers: getAuthHeaders(), body: formData });
+      const res = await authFetch(`${loanBase()}/documents/upload`, { method: 'POST', headers: getAuthHeaders(), body: formData });
       if (res.ok) return await res.json();
       const err = await res.json().catch(() => ({ message: `Loan service upload failed (${res.status})` }));
       throw new Error(err.message || docErr.message);
@@ -224,7 +177,7 @@ export const uploadDocument = async (formData) => {
 
 export const fetchCustomerDocuments = async (customerId) => {
   try {
-    const r = await fetch(`${docBase()}/customer/${encodeURIComponent(customerId)}`, { headers: getAuthHeaders() });
+    const r = await authFetch(`${docBase()}/customer/me`, { headers: getAuthHeaders() });
     if (r.ok) return await r.json();
   } catch (e) {
     /* ignore */
@@ -234,7 +187,7 @@ export const fetchCustomerDocuments = async (customerId) => {
 
 export const fetchApplicationDocuments = async (applicationId) => {
   try {
-    const r = await fetch(`${docBase()}/application/${encodeURIComponent(applicationId)}`, { headers: getAuthHeaders() });
+    const r = await authFetch(`${docBase()}/application/${encodeURIComponent(applicationId)}`, { headers: getAuthHeaders() });
     if (r.ok) return await r.json();
   } catch (e) {
     /* ignore */
@@ -246,7 +199,7 @@ export const fetchDocumentBlobUrl = async (documentId, contentType = 'applicatio
   const cleanId = String(documentId).trim().replace(/^DOC-/i, '');
   if (!isNaN(cleanId)) {
     try {
-      const res = await fetch(`${docBase()}/${cleanId}/download`, { headers: getAuthHeaders() });
+      const res = await authFetch(`${docBase()}/${cleanId}/download`, { headers: getAuthHeaders() });
       if (res.ok) {
         const blob = await res.blob();
         return URL.createObjectURL(blob);
@@ -260,7 +213,7 @@ export const fetchDocumentBlobUrl = async (documentId, contentType = 'applicatio
 
 export const deleteDocumentById = async (documentId) => {
   const cleanId = String(documentId).trim().replace(/^DOC-/i, '');
-  const res = await fetch(`${docBase()}/${cleanId}`, { method: 'DELETE', headers: getAuthHeaders() });
+  const res = await authFetch(`${docBase()}/${cleanId}`, { method: 'DELETE', headers: getAuthHeaders() });
   if (!res.ok && res.status !== 204) {
     const err = await res.json().catch(() => ({ message: 'Delete failed' }));
     throw new Error(err.message || 'Failed to delete document');

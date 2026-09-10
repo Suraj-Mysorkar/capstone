@@ -1,10 +1,11 @@
-package com.capstone.document.config;
+package com.bank.digital.lending.config;
 
 import java.util.Collections;
 import java.util.List;
 
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.context.annotation.Profile;
 import org.springframework.security.authentication.ProviderManager;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
@@ -16,7 +17,6 @@ import org.springframework.security.web.authentication.preauth.RequestHeaderAuth
 import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 import org.springframework.security.web.util.matcher.NegatedRequestMatcher;
 import org.springframework.security.web.util.matcher.OrRequestMatcher;
-import org.springframework.context.annotation.Profile;
 
 @Configuration
 @Profile("!local")
@@ -34,14 +34,14 @@ public class SecurityConfig {
 
         filter.setExceptionIfHeaderMissing(false);
 
-        // Tell the filter to bypass Swagger UI, API Docs, and document types catalog
+        // FIX: Tell the filter to bypass Swagger UI, API Docs, and Schemes paths completely
         filter.setRequiresAuthenticationRequestMatcher(new NegatedRequestMatcher(
             new OrRequestMatcher(
                 new AntPathRequestMatcher("/v3/api-docs/**"),
                 new AntPathRequestMatcher("/swagger-ui/**"),
                 new AntPathRequestMatcher("/swagger-ui.html"),
-                new AntPathRequestMatcher("/api/v1/documents/types"),
-                new AntPathRequestMatcher("/types")
+                new AntPathRequestMatcher("/api/v1/loans/schemes"),
+                new AntPathRequestMatcher("/api/v1/loans/schemes/**")
             )
         ));
 
@@ -49,14 +49,8 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .addFilter(filter) 
             .authorizeHttpRequests(auth -> auth
-                // Allow public access to Swagger and document types catalog
-                .requestMatchers(
-                    "/v3/api-docs/**",
-                    "/swagger-ui/**",
-                    "/swagger-ui.html",
-                    "/api/v1/documents/types",
-                    "/types"
-                ).permitAll() 
+                // Allow public access to Swagger and Schemes
+                .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/api/v1/loans/schemes", "/api/v1/loans/schemes/**").permitAll() 
                 // Everything else requires the APIM headers
                 .anyRequest().authenticated() 
             );
@@ -71,18 +65,12 @@ public class SecurityConfig {
         // Maps the text inside the "X-User-Role" header straight into Spring Security Granted Authorities
         provider.setPreAuthenticatedUserDetailsService(token -> {
             String username = (String) token.getPrincipal();
-            String role = (String) token.getCredentials(); // Will contain "ROLE_CUSTOMER", "ROLE_EMPLOYEE", or "ROLE_MANAGER"
+            String role = (String) token.getCredentials(); // Will contain "ROLE_CUSTOMER" or "ROLE_EMPLOYEE"
             
-            if (role == null || role.isBlank()) {
-                role = "ROLE_ANONYMOUS";
-            } else if (!role.startsWith("ROLE_")) {
-                role = "ROLE_" + role;
-            }
-
             List<SimpleGrantedAuthority> authorities = Collections.singletonList(new SimpleGrantedAuthority(role));
             
             return new org.springframework.security.core.userdetails.User(
-                username != null ? username : "anonymous", "", true, true, true, true, authorities
+                username, "", true, true, true, true, authorities
             );
         });
 

@@ -12,11 +12,13 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+import org.springframework.security.access.prepost.PreAuthorize;
 
 @RestController
 @RequestMapping("/api/v1/loans")
 @Tag(name = "Loan Applications", description = "Endpoints for applying, tracking, and calculating retail loans")
 @CrossOrigin(origins = "*")
+@PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_EMPLOYEE', 'ROLE_MANAGER', 'CUSTOMER', 'EMPLOYEE', 'MANAGER')")
 public class LoanApplicationController {
 
     private final LoanApplicationService applicationService;
@@ -29,8 +31,9 @@ public class LoanApplicationController {
     }
 
     @GetMapping("/customers")
+    @PreAuthorize("hasAnyRole('ROLE_EMPLOYEE', 'ROLE_MANAGER', 'EMPLOYEE', 'MANAGER')")
     @Operation(summary = "List all registered customers",
-               description = "Retrieves customer records from Customers table")
+               description = "Retrieves customer records from Customers table (Bank staff only)")
     public ResponseEntity<List<CustomerResponse>> listCustomers() {
         return ResponseEntity.ok(applicationService.listCustomers());
     }

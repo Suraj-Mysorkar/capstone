@@ -81,3 +81,10 @@ out/
 Thumbs.db
 ehthumbs.db
 Desktop.ini
+
+# Logs and local sample artifacts
+loan_logs/
+sample_bank_statement.pdf
+sample_pan_card.pdf
+sample_pan_card.png
+sample_salary_slip.pdf

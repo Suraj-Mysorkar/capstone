@@ -1,43 +1,21 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { fetchApplications } from '../services/api';
 
-const API_BASE_URL = import.meta.env.VITE_LOAN_API_URL || 'https://team6-loan-service.azurewebsites.net/api/v1/loans';
-
-const STATUSES = ['ALL', 'APPROVED', 'REJECTED', 'MANUAL_REVIEW_REQUIRED', 'DOCUMENT_REVIEW_PENDING', 'SUBMITTED', 'VALIDATING', 'CREDIT_ASSESSMENT'];
+const STATUSES = ['ALL', 'APPROVED', 'REJECTED', 'MANUAL_REVIEW_REQUIRED', 'DOCUMENT_REVIEW_PENDING', 'DOCUMENTS_SUBMITTED', 'SUBMITTED', 'VALIDATING', 'CREDIT_ASSESSMENT'];
 
 function statusBadge(s) {
   if (s === 'APPROVED') return <span className="badge badge-approved">Approved</span>;
   if (s === 'REJECTED') return <span className="badge badge-rejected">Rejected</span>;
   if (s === 'MANUAL_REVIEW_REQUIRED') return <span className="badge badge-review">Manual Review</span>;
+  if (s === 'DOCUMENTS_SUBMITTED') return <span className="badge" style={{ background: 'rgba(0, 210, 255, 0.15)', color: 'var(--accent)', border: '1px solid var(--accent)' }}>Documents Submitted</span>;
   if (s === 'DOCUMENT_REVIEW_PENDING') return <span className="badge badge-warning" style={{ background: '#f59e0b20', color: '#d97706', border: '1px solid #d97706' }}>Awaiting Documents</span>;
-  return <span className="badge badge-default">{s}</span>;
+  return <span className="badge badge-default">{(s || '').replace(/_/g, ' ')}</span>;
 }
 
 function fmt(n) {
-  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n);
+  return new Intl.NumberFormat('en-IN', { style: 'currency', currency: 'INR', maximumFractionDigits: 0 }).format(n || 0);
 }
-
-// API service function
-const fetchApplications = async (status) => {
-  try {
-    const url = status
-      ? `${API_BASE_URL}/applications?status=${status}`
-      : `${API_BASE_URL}/applications`;
-
-    const response = await fetch(url);
-
-    if (!response.ok) {
-      throw new Error(`HTTP error! status: ${response.status}`);
-    }
-
-    const data = await response.json();
-    console.log('API Response:', data);
-    return data;
-  } catch (error) {
-    console.error('Error fetching applications:', error);
-    throw error;
-  }
-};
 
 export default function ApplicationsPage() {
   const [apps, setApps] = useState([]);

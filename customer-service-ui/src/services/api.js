@@ -64,7 +64,6 @@ export function getAuthHeaders(extra = {}) {
   const baseHeaders = {
     'Ocp-Apim-Subscription-Key': APIM_KEY,
     'client-key': APIM_KEY,
-    'X-User-Role': 'ROLE_CUSTOMER',
     ...extra,
   };
   return token ? { ...baseHeaders, Authorization: `Bearer ${token}` } : baseHeaders;
@@ -73,6 +72,13 @@ export function getAuthHeaders(extra = {}) {
 const headers = getAuthHeaders;
 
 async function handle(res) {
+  if (res.status === 401) {
+    try {
+      localStorage.removeItem('csp_user');
+      localStorage.removeItem('csp_token');
+      window.dispatchEvent(new Event('auth:unauthorized'));
+    } catch {}
+  }
   const text = await res.text();
   let body = null;
   if (text) {
@@ -106,7 +112,6 @@ export const authLogin = (username, password) =>
       'Content-Type': 'application/json',
       'Ocp-Apim-Subscription-Key': APIM_KEY,
       'client-key': APIM_KEY,
-      'X-User-Role': 'ROLE_CUSTOMER',
     },
     body: JSON.stringify({ username: username.trim(), password }),
   }).then(handle);

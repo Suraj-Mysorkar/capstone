@@ -105,12 +105,20 @@ try {
 }
 
 try {
+    if ([string]::IsNullOrEmpty($custToken)) {
+        $preLogin = Invoke-RestMethod -Uri "$APIM_BASE_URL/auth/customer/login" `
+                                      -Headers (Get-ApimHeaders -Role "ROLE_CUSTOMER" -IncludeJson) `
+                                      -Body (@{ username = "cmto55vth5x"; password = "password1" } | ConvertTo-Json) `
+                                      -Method Post -TimeoutSec 20
+        $custToken = $preLogin.access_token
+    }
+
     $tempDocPath = [System.IO.Path]::GetTempFileName() + ".pdf"
     [System.IO.File]::WriteAllBytes($tempDocPath, [System.Text.Encoding]::UTF8.GetBytes("%PDF-1.4 dummy test document"))
     $upResRaw = & curl.exe -s -X POST "$APIM_BASE_URL/documents/api/v1/documents/upload" `
                            -H "Ocp-Apim-Subscription-Key: $APIM_KEY" `
                            -H "client-key: $APIM_KEY" `
-                           -H "X-User-Role: ROLE_CUSTOMER" `
+                           -H "Authorization: Bearer $custToken" `
                            -F "customerId=CUST-06195662-545d-4e12-9b96-9d0e9ea323cb" `
                            -F "applicationId=APP-37155A60" `
                            -F "documentType=IDENTITY_PROOF" `

@@ -127,7 +127,6 @@ export default function DocumentsPage() {
     setUploadError('');
     setUploadResult(null);
     const fd = new FormData();
-    fd.append('customerId', activeCustomerId);
     if (uploadAppId.trim()) fd.append('applicationId', uploadAppId.trim());
     fd.append('documentType', uploadDocType);
     fd.append('docType', uploadDocType);
@@ -164,7 +163,7 @@ export default function DocumentsPage() {
           <div>
             <h2 style={{ fontSize: '1.25rem', fontWeight: 800, margin: 0 }}>My Documents</h2>
             <p style={{ color: 'var(--muted)', fontSize: '0.78rem', margin: 0 }}>
-              Upload and manage your KYC &amp; income proofs. Filed under <span className="font-mono">{activeCustomerId || '—'}</span>.
+              Upload and manage your KYC &amp; income proofs.
             </p>
           </div>
           <div className="tabs" style={{ margin: 0 }}>
@@ -388,10 +387,6 @@ export default function DocumentsPage() {
               </div>
             )}
             <div className="form-grid" style={{ gridTemplateColumns: '1fr', gap: 10 }}>
-              <div className="form-group" style={{ marginBottom: 0 }}>
-                <label className="form-label">Filed under (your customer ID)</label>
-                <input className="form-input" value={activeCustomerId} readOnly style={{ opacity: 0.8, background: 'rgba(255,255,255,0.04)' }} />
-              </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Associated Loan Application *</label>
                 {activeApps.length > 0 ? (

@@ -99,6 +99,7 @@ public class PortalAuthService {
         String customerId = request.username().trim();
 
         AppUser user = appUserRepository.findFirstByLoginIdIgnoreCase(customerId)
+                .or(() -> appUserRepository.findFirstByEmailIgnoreCase(customerId))
                 .or(() -> {
                     try {
                         return appUserRepository.findById(Long.parseLong(customerId));

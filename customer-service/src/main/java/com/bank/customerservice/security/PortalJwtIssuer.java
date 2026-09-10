@@ -29,27 +29,38 @@ public class PortalJwtIssuer {
     private final ObjectMapper mapper = new ObjectMapper();
     private static final Base64.Encoder B64 = Base64.getUrlEncoder().withoutPadding();
 
+    private final String issuer;
+    private final String audience;
+
     public PortalJwtIssuer(
-            @Value("${app.portal.jwt.secret:customer-service-portal-dev-secret-change-me}") String secret,
-            @Value("${app.portal.jwt.ttl-seconds:86400}") long ttlSeconds) {
+            @Value("${app.portal.jwt.secret:YourSuperLongAndSecureSecretKeyThatIsAtLeast256BitsLong!!}") String secret,
+            @Value("${app.portal.jwt.ttl-seconds:86400}") long ttlSeconds,
+            @Value("${app.portal.jwt.issuer:https://azure-api.net}") String issuer,
+            @Value("${app.portal.jwt.audience:7f273f15-d6cd-40d7-8aa8-f39d1fb9406f}") String audience) {
         this.secret = secret.getBytes(StandardCharsets.UTF_8);
         this.ttlSeconds = ttlSeconds;
+        this.issuer = issuer;
+        this.audience = audience;
     }
 
     public String issue(String subject, String name, String role, Object userId, String email, String customerId) {
         Instant now = Instant.now();
+        String roleStr = (role == null ? "CUSTOMER" : role.toUpperCase().replace("ROLE_", ""));
+        String roleClaim = "ROLE_" + roleStr;
+
         Map<String, Object> claims = new LinkedHashMap<>();
+        claims.put("iss", issuer);
+        claims.put("aud", audience);
+        claims.put("exp", now.plusSeconds(ttlSeconds).getEpochSecond());
+        claims.put("iat", now.getEpochSecond());
         claims.put("sub", subject);
         claims.put("preferred_username", subject);
-        claims.put("name", name);
-        claims.put("roles", "ROLE_" + (role == null ? "customer" : role));
-        claims.put("role", role == null ? "customer" : role);
-        claims.put("userId", userId);
-        claims.put("email", email);
-        claims.put("customerId", customerId);
-        claims.put("iat", now.getEpochSecond());
-        claims.put("exp", now.plusSeconds(ttlSeconds).getEpochSecond());
-        claims.put("iss", "customer-service-portal");
+        claims.put("userId", userId != null ? String.valueOf(userId) : "0");
+        claims.put("name", name != null ? name : "anonymous");
+        claims.put("roles", roleClaim);
+        claims.put("role", roleStr.toLowerCase());
+        claims.put("email", email != null ? email : "");
+        claims.put("customerId", customerId != null ? customerId : "");
 
         try {
             String header = B64.encodeToString("{\"alg\":\"HS256\",\"typ\":\"JWT\"}".getBytes(StandardCharsets.UTF_8));

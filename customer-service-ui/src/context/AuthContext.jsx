@@ -24,7 +24,32 @@ function parseJwt(token) {
 function readUser() {
   try {
     const raw = localStorage.getItem(USER_KEY);
-    return raw ? JSON.parse(raw) : null;
+    if (!raw) return null;
+    const user = JSON.parse(raw);
+    if (!user || !user.token) {
+      localStorage.removeItem(USER_KEY);
+      localStorage.removeItem(TOKEN_KEY);
+      return null;
+    }
+    const claims = parseJwt(user.token);
+    if (!claims) {
+      localStorage.removeItem(USER_KEY);
+      localStorage.removeItem(TOKEN_KEY);
+      return null;
+    }
+    // Expired token check
+    if (claims.exp && claims.exp * 1000 <= Date.now()) {
+      localStorage.removeItem(USER_KEY);
+      localStorage.removeItem(TOKEN_KEY);
+      return null;
+    }
+    // APIM issuer check (tokens from dev server or other issuers are cleared)
+    if (claims.iss && claims.iss !== 'https://azure-api.net') {
+      localStorage.removeItem(USER_KEY);
+      localStorage.removeItem(TOKEN_KEY);
+      return null;
+    }
+    return user;
   } catch {
     return null;
   }
@@ -68,6 +93,15 @@ export function AuthProvider({ children }) {
   const [currentUser, setCurrentUser] = useState(readUser);
   const [loading, setLoading] = useState(false);
   const [authError, setAuthError] = useState('');
+
+  React.useEffect(() => {
+    const handleUnauthorized = () => {
+      setCurrentUser(null);
+      setAuthError('Session expired or access denied. Please sign in again.');
+    };
+    window.addEventListener('auth:unauthorized', handleUnauthorized);
+    return () => window.removeEventListener('auth:unauthorized', handleUnauthorized);
+  }, []);
 
   const login = useCallback(async (username, password) => {
     setLoading(true);

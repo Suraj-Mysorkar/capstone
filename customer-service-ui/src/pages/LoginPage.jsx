@@ -2,12 +2,11 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { User, Lock, Eye, EyeOff, LogIn, AlertCircle, Loader2, Landmark } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { resolveLoanCustomer } from '../services/loanApi';
 
 export default function LoginPage() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { isAuthenticated, login, updateUser, loading, authError, setAuthError } = useAuth();
+  const { isAuthenticated, login, loading, authError, setAuthError } = useAuth();
 
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -26,12 +25,7 @@ export default function LoginPage() {
       return;
     }
     try {
-      const user = await login(username, password);
-      // Link to the shared loan Customers table if a record already exists.
-      try {
-        const loanCust = await resolveLoanCustomer(user.email);
-        if (loanCust?.customerCode) updateUser({ loanCustomerId: loanCust.customerCode });
-      } catch { /* offline — linked later on apply */ }
+      await login(username, password);
       navigate(location.state?.from?.pathname || '/', { replace: true });
     } catch {
       /* authError shown below */

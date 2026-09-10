@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
 import { UserPlus, Wand2, Loader2, Landmark } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
-import { registerLoanCustomer } from '../services/loanApi';
 import { ISO_COUNTRIES } from '../lib/onboarding';
 
 const EMPTY = {
@@ -86,24 +85,7 @@ export default function RegisterPage() {
         countryCode: form.countryCode,
         password: form.password,
       };
-      const user = await register(payload); // creates account + signs in
-
-      // Mirror into the shared loan Customers table so a loan officer can help
-      // this customer in capstone-ui straight away.
-      try {
-        const linked = await registerLoanCustomer({
-          fullName: `${form.firstName} ${form.lastName}`.trim(),
-          email: user.email,
-          mobileNumber: form.phoneNumber || null,
-          address: [form.addressLine1, form.city, form.state, form.countryCode].filter(Boolean).join(', ') || null,
-          onboardingStatus: user.onboardingStatus || 'REGISTERED',
-          externalRef: user.customerServiceId || null,
-        });
-        if (linked.customerCode) updateUser({ loanCustomerId: linked.customerCode });
-      } catch (syncErr) {
-        console.warn('loan-service customer sync failed (non-fatal):', syncErr);
-      }
-
+      await register(payload); // creates account + signs in
       navigate('/', { replace: true });
     } catch (e) {
       if (e.status === 400 && e.body?.fieldErrors) setFieldErrors(e.body.fieldErrors);

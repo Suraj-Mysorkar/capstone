@@ -71,6 +71,18 @@ public class SecurityConfig {
         // Public endpoints are reached without the headers — don't 500 when they're absent.
         apimHeaderFilter.setExceptionIfHeaderMissing(false);
 
+        // Bypass public paths in the pre-auth filter
+        apimHeaderFilter.setRequiresAuthenticationRequestMatcher(new org.springframework.security.web.util.matcher.NegatedRequestMatcher(
+            new org.springframework.security.web.util.matcher.OrRequestMatcher(
+                new org.springframework.security.web.util.matcher.AntPathRequestMatcher("/v3/api-docs/**"),
+                new org.springframework.security.web.util.matcher.AntPathRequestMatcher("/swagger-ui/**"),
+                new org.springframework.security.web.util.matcher.AntPathRequestMatcher("/swagger-ui.html"),
+                new org.springframework.security.web.util.matcher.AntPathRequestMatcher("/api/customers/ping"),
+                new org.springframework.security.web.util.matcher.AntPathRequestMatcher("/api/customers/auth/**"),
+                new org.springframework.security.web.util.matcher.AntPathRequestMatcher("/actuator/**")
+            )
+        ));
+
         http
             .csrf(csrf -> csrf.disable())
             .cors(cors -> cors.configurationSource(corsSource()))
@@ -100,8 +112,9 @@ public class SecurityConfig {
             if (role.isEmpty()) {
                 throw new BadCredentialsException("Missing X-User-Role header");
             }
+            String normalizedRole = role.startsWith("ROLE_") ? role : "ROLE_" + role;
             List<SimpleGrantedAuthority> authorities =
-                    Collections.singletonList(new SimpleGrantedAuthority(role));
+                    Collections.singletonList(new SimpleGrantedAuthority(normalizedRole));
             return new User(username, "", true, true, true, true, authorities);
         });
 

@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { FileText, Loader2, FolderUp, CheckCircle, X, AlertCircle } from 'lucide-react';
 import {
-  fetchSchemes, applyLoan, resolveLoanCustomer, ensureLoanCustomer,
+  fetchSchemes, applyLoan,
   fetchDocumentTypes, uploadDocument, notifyDocumentUploaded, deleteDocumentById,
 } from '../services/loanApi';
 import { useSession } from '../lib/session';
@@ -18,14 +18,6 @@ export default function ApplyPage() {
 
   const [schemes, setSchemes] = useState([]);
   const [docTypes, setDocTypes] = useState([]);
-  const [linking, setLinking] = useState(true);
-  const [loanCustomerId, setLoanCustomerId] = useState(session?.loanCustomerId || '');
-
-  const effectiveCustomerId =
-    loanCustomerId ||
-    session?.loanCustomerId ||
-    (session?.customerServiceId ? `CUST-${session.customerServiceId}` : '') ||
-    (session?.userId ? `CUST-${session.userId}` : '');
 
   const [form, setForm] = useState({
     monthlyIncome: 75000,
@@ -59,41 +51,13 @@ export default function ApplyPage() {
     });
   }, []);
 
-  // Make sure this customer has a loan-service record BEFORE they upload docs /
-  // apply, so everything is filed under one customer id the officer console shares.
-  useEffect(() => {
-    let alive = true;
-    (async () => {
-      setLinking(true);
-      if (!session?.email) { setLinking(false); return; }
-      let cid = session.loanCustomerId;
-      if (!cid) {
-        cid = await ensureLoanCustomer({
-          email: session.email,
-          fullName: session.name || form.customerName,
-          mobileNumber: session.phoneNumber || form.customerPhone,
-          onboardingStatus: session.onboardingStatus,
-          externalRef: session.customerServiceId,
-          incomeDetails: Number(form.monthlyIncome) || null,
-        });
-        if (cid && alive) update({ loanCustomerId: cid });
-      }
-      if (alive) { setLoanCustomerId(cid || ''); setLinking(false); }
-    })();
-    return () => { alive = false; };
-    // eslint-disable-next-line
-  }, [session?.email]);
-
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
   const addDocument = async () => {
     if (!pendingFile) { setDocError('Choose a file first.'); return; }
-    const cid = loanCustomerId || session?.loanCustomerId || session?.email;
-    if (!cid) { setDocError('Still linking your profile — try again in a moment.'); return; }
     setUploading(true);
     setDocError('');
     const fd = new FormData();
-    fd.append('customerId', cid);
     fd.append('documentType', pendingType);
     fd.append('docType', pendingType);
     fd.append('documentName', pendingFile.name);
@@ -124,9 +88,8 @@ export default function ApplyPage() {
     try {
       const documentIds = docs.map((d) => String(d.id));
       const body = {
-        customerId: effectiveCustomerId || undefined,
         customerName: form.customerName,
-        customerEmail: session.email,
+        customerEmail: session?.email,
         customerPhone: form.customerPhone,
         monthlyIncome: parseFloat(form.monthlyIncome),
         existingLiabilities: parseFloat(form.existingLiabilities || 0),
@@ -147,7 +110,7 @@ export default function ApplyPage() {
         try {
           const advanced = await notifyDocumentUploaded(res.applicationId, {
             documentIds,
-            customerId: body.customerId || res.customerId,
+            customerId: res.customerId,
           });
           if (advanced?.status) res = { ...res, ...advanced };
         } catch (e) {
@@ -156,9 +119,7 @@ export default function ApplyPage() {
       }
 
       setResult(res);
-      const loanCust = await resolveLoanCustomer(session.email);
-      if (loanCust?.customerCode) update({ loanCustomerId: loanCust.customerCode });
-      else if (res.customerId) update({ loanCustomerId: res.customerId });
+      if (res.customerId) update({ loanCustomerId: res.customerId });
 
       // Trigger real-time customer alert popup and chime
       const mgrName = res.assignedManagerName || (res.assignedManager === 'markj' ? 'Mark Johnson' : res.assignedManager || 'Dedicated Manager');
@@ -259,15 +220,6 @@ export default function ApplyPage() {
           <div className="form-group">
             <label className="form-label">Email (your login)</label>
             <input className="form-input" value={session?.email || ''} readOnly style={{ opacity: 0.8, background: 'rgba(255,255,255,0.04)' }} />
-          </div>
-          <div className="form-group">
-            <label className="form-label">Customer ID</label>
-            <input
-              className="form-input font-mono"
-              value={effectiveCustomerId || (linking ? 'Linking…' : '(assigned on submit)')}
-              readOnly
-              style={{ opacity: 0.9, background: 'rgba(255,255,255,0.04)', color: 'var(--accent)', fontWeight: 600 }}
-            />
           </div>
           <div className="form-group">
             <label className="form-label">Full Name *</label>
@@ -371,7 +323,7 @@ export default function ApplyPage() {
           </div>
         </div>
 
-        <button className="btn btn-primary" onClick={submit} disabled={loading || linking || !form.customerName || !session?.email}>
+        <button className="btn btn-primary" onClick={submit} disabled={loading || !form.customerName || !session?.email}>
           {loading ? <><Loader2 size={16} className="spin" /> Submitting Application…</> : '🚀 Submit Application'}
         </button>
 

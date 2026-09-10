@@ -6,6 +6,7 @@ import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
@@ -24,6 +25,7 @@ public class NotificationController {
         this.notificationService = notificationService;
     }
 
+    @PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_EMPLOYEE', 'ROLE_MANAGER')")
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @Operation(summary = "Subscribe to Real-time Notification Stream (SSE)",
                description = "Establishes a persistent Server-Sent Events stream for instant notification push without page refresh")
@@ -31,14 +33,16 @@ public class NotificationController {
         return notificationService.registerClient(username);
     }
 
+    @PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_EMPLOYEE', 'ROLE_MANAGER')")
     @GetMapping
     @Operation(summary = "Get Notifications History",
-               description = "Retrieves recent notifications list for a specific employee / manager")
+               description = "Retrieves recent notifications list for a specific employee / manager / customer")
     public ResponseEntity<List<NotificationDTO>> getNotifications(
             @RequestParam(name = "username", defaultValue = "markj") String username) {
         return ResponseEntity.ok(notificationService.getNotificationsForUser(username));
     }
 
+    @PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_EMPLOYEE', 'ROLE_MANAGER')")
     @PostMapping("/{id}/read")
     @Operation(summary = "Mark Notification as Read")
     public ResponseEntity<Map<String, Boolean>> markAsRead(@PathVariable("id") String id) {
@@ -46,6 +50,7 @@ public class NotificationController {
         return ResponseEntity.ok(Map.of("success", success));
     }
 
+    @PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_EMPLOYEE', 'ROLE_MANAGER')")
     @PostMapping("/read-all")
     @Operation(summary = "Mark All Notifications as Read")
     public ResponseEntity<Map<String, Boolean>> markAllAsRead(
@@ -54,6 +59,7 @@ public class NotificationController {
         return ResponseEntity.ok(Map.of("success", true));
     }
 
+    @PreAuthorize("hasAnyAuthority('ROLE_EMPLOYEE', 'ROLE_MANAGER')")
     @PostMapping("/test")
     @Operation(summary = "Send Test Notification (for validation)")
     public ResponseEntity<NotificationDTO> triggerTestNotification(
