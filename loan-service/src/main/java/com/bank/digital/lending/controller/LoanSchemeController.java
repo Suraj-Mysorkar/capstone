@@ -5,6 +5,7 @@ import com.bank.digital.lending.service.LoanSchemeService;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -13,6 +14,7 @@ import java.util.List;
 @RequestMapping("/api/v1/loans/schemes")
 @Tag(name = "Loan Schemes Catalog", description = "Endpoints for discovering active loan products and terms")
 @CrossOrigin(origins = "*")
+@PreAuthorize("permitAll()")
 public class LoanSchemeController {
 
     private final LoanSchemeService schemeService;

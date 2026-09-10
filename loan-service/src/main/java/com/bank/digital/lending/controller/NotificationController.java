@@ -17,6 +17,7 @@ import java.util.Map;
 @RequestMapping("/api/v1/notifications")
 @Tag(name = "Live Notifications", description = "Real-time SSE event stream and notification management for loan officers and managers")
 @CrossOrigin(origins = "*")
+@PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_EMPLOYEE', 'ROLE_MANAGER')")
 public class NotificationController {
 
     private final NotificationService notificationService;

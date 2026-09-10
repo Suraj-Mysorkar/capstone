@@ -8,6 +8,7 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -17,6 +18,7 @@ import java.io.IOException;
 @RequestMapping("/api/v1/loans/documents")
 @Tag(name = "Document Storage Proxy", description = "Endpoints for uploading KYC and supporting loan documents to Azure Blob Storage")
 @CrossOrigin(origins = "*")
+@PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_EMPLOYEE', 'ROLE_MANAGER', 'CUSTOMER', 'EMPLOYEE', 'MANAGER')")
 public class DocumentStorageController {
 
     private final DocumentStorageProxyService documentStorageProxy;
