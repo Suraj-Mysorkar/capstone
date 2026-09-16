@@ -71,35 +71,6 @@ export default function DocumentsPage() {
     }
   };
 
-  const loadDocs = async () => {
-    setLoadingDocs(true);
-    setDocError('');
-    try {
-      if (activeCustomerId) {
-        const list = await fetchCustomerDocuments(activeCustomerId);
-        const arr = Array.isArray(list) ? list : [];
-        setCustomerDocs(arr);
-        if (arr.length > 0) selectAndPreviewDoc(arr[0]);
-        else { setSelectedDoc(null); setPreviewBlobUrl(null); }
-      }
-      const email = (session?.email || '').toLowerCase();
-      const apps = await fetchApplications();
-      const mine = (Array.isArray(apps) ? apps : []).filter(
-        (a) => (a.customerEmail || '').toLowerCase() === email || (activeCustomerId && a.customerId === activeCustomerId)
-      );
-      setActiveApps(mine);
-    } catch (e) {
-      setDocError(e.message || 'Failed to load your documents.');
-    } finally {
-      setLoadingDocs(false);
-    }
-  };
-
-  useEffect(() => {
-    loadDocs();
-    // eslint-disable-next-line
-  }, [activeCustomerId, session?.email]);
-
   const handleDelete = async (e, doc) => {
     e.stopPropagation();
     const docId = doc.documentId || doc.id;
@@ -137,7 +108,39 @@ export default function DocumentsPage() {
     setUploadResult(null);
     const input = document.getElementById('cs-file-input');
     if (input) input.value = '';
+    if (newTab === 'list') {
+      loadDocs();
+    }
   };
+
+  const loadDocs = async () => {
+    setLoadingDocs(true);
+    setDocError('');
+    try {
+      const cid = activeCustomerId || docCustomerId(session);
+      const list = await fetchCustomerDocuments(cid);
+      const arr = Array.isArray(list) ? list : [];
+      setCustomerDocs(arr);
+      if (arr.length > 0) selectAndPreviewDoc(arr[0]);
+      else { setSelectedDoc(null); setPreviewBlobUrl(null); }
+
+      const email = (session?.email || '').toLowerCase();
+      const apps = await fetchApplications();
+      const mine = (Array.isArray(apps) ? apps : []).filter(
+        (a) => (a.customerEmail || '').toLowerCase() === email || (cid && a.customerId === cid)
+      );
+      setActiveApps(mine);
+    } catch (e) {
+      setDocError(e.message || 'Failed to load your documents.');
+    } finally {
+      setLoadingDocs(false);
+    }
+  };
+
+  useEffect(() => {
+    loadDocs();
+    // eslint-disable-next-line
+  }, [activeCustomerId, session?.email, session?.customerId]);
 
   const doUpload = async () => {
     if (!activeCustomerId || !uploadFile) {

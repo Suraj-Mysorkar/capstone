@@ -187,12 +187,59 @@ export const uploadDocument = async (formData) => {
 };
 
 export const fetchCustomerDocuments = async (customerId) => {
+  let cid = customerId;
+  if (!cid) {
+    try {
+      const rawUser = localStorage.getItem('csp_user');
+      if (rawUser) {
+        const u = JSON.parse(rawUser);
+        cid = u.customerId || u.customerServiceId || u.loanCustomerId;
+      }
+      if (!cid) {
+        const token = localStorage.getItem('csp_token');
+        if (token) {
+          const claims = JSON.parse(decodeURIComponent(escape(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))));
+          cid = claims?.customerId;
+        }
+      }
+    } catch {
+      /* ignore */
+    }
+  }
+
+  if (cid) {
+    try {
+      const r = await authFetch(`${docBase()}/customer/${encodeURIComponent(cid)}`, { headers: getAuthHeaders() });
+      if (r.ok) {
+        const docs = await r.json();
+        if (Array.isArray(docs) && docs.length > 0) return docs;
+      }
+    } catch (e) {
+      /* ignore */
+    }
+
+    try {
+      const altCid = cid.startsWith('CUST-') ? cid.replace(/^CUST-/, '') : `CUST-${cid}`;
+      const r2 = await authFetch(`${docBase()}/customer/${encodeURIComponent(altCid)}`, { headers: getAuthHeaders() });
+      if (r2.ok) {
+        const docs2 = await r2.json();
+        if (Array.isArray(docs2) && docs2.length > 0) return docs2;
+      }
+    } catch (e) {
+      /* ignore */
+    }
+  }
+
   try {
     const r = await authFetch(`${docBase()}/customer/me`, { headers: getAuthHeaders() });
-    if (r.ok) return await r.json();
+    if (r.ok) {
+      const docs = await r.json();
+      if (Array.isArray(docs)) return docs;
+    }
   } catch (e) {
     /* ignore */
   }
+
   return [];
 };
 

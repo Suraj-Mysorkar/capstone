@@ -4,9 +4,18 @@
 
 import { useAuth } from '../context/AuthContext';
 
-/** The identifier used for document uploads / lookups and capstone-ui search. */
 export function docCustomerId(session) {
-  return session?.loanCustomerId || session?.email || '';
+  if (!session) {
+    try {
+      const rawUser = localStorage.getItem('csp_user');
+      if (rawUser) {
+        const u = JSON.parse(rawUser);
+        return u.customerId || u.customerServiceId || u.loanCustomerId || u.email || '';
+      }
+    } catch {}
+    return '';
+  }
+  return session?.customerId || session?.customerServiceId || session?.loanCustomerId || session?.email || '';
 }
 
 /** { session, update, logout } — session is the authenticated user object. */

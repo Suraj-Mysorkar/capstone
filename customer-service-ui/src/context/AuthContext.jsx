@@ -81,6 +81,7 @@ function toUser(res, fallbackUsername) {
     role: role,
     userId: res.userId ?? claims?.userId ?? null,
     token: token,
+    customerId: res.customerId || claims?.customerId || null,
     customerServiceId: res.customerId || claims?.customerId || null,
     onboardingStatus: res.onboardingStatus || null,
     phoneNumber: res.phoneNumber || null,
