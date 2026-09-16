@@ -127,6 +127,18 @@ export default function DocumentsPage() {
     try { setUploadFilePreviewUrl(URL.createObjectURL(f)); } catch {}
   };
 
+  const handleTabChange = (newTab) => {
+    setTab(newTab);
+    setUploadFile(null);
+    setUploadFilePreviewUrl(null);
+    setUploadDocName('');
+    setUploadAppId('');
+    setUploadError('');
+    setUploadResult(null);
+    const input = document.getElementById('cs-file-input');
+    if (input) input.value = '';
+  };
+
   const doUpload = async () => {
     if (!activeCustomerId || !uploadFile) {
       setUploadError('A file is required.');
@@ -136,6 +148,7 @@ export default function DocumentsPage() {
     setUploadError('');
     setUploadResult(null);
     const fd = new FormData();
+    if (activeCustomerId) fd.append('customerId', activeCustomerId);
     if (uploadAppId.trim()) fd.append('applicationId', uploadAppId.trim());
     fd.append('documentType', uploadDocType);
     fd.append('docType', uploadDocType);
@@ -144,6 +157,13 @@ export default function DocumentsPage() {
     try {
       const res = await uploadDocument(fd);
       setUploadResult(res);
+      setUploadFile(null);
+      setUploadFilePreviewUrl(null);
+      setUploadDocName('');
+      setUploadAppId('');
+      setUploadError('');
+      const input = document.getElementById('cs-file-input');
+      if (input) input.value = '';
       await loadDocs();
     } catch (e) {
       setUploadError(e.message || 'Failed to upload document.');
@@ -176,10 +196,10 @@ export default function DocumentsPage() {
             </p>
           </div>
           <div className="tabs" style={{ margin: 0 }}>
-            <button className={`tab-btn${tab === 'list' ? ' active' : ''}`} onClick={() => setTab('list')} style={{ padding: '6px 14px', fontSize: '.82rem', display: 'flex', gap: 6, alignItems: 'center' }}>
+            <button className={`tab-btn${tab === 'list' ? ' active' : ''}`} onClick={() => handleTabChange('list')} style={{ padding: '6px 14px', fontSize: '.82rem', display: 'flex', gap: 6, alignItems: 'center' }}>
               <Eye size={15} /> My Documents
             </button>
-            <button className={`tab-btn${tab === 'upload' ? ' active' : ''}`} onClick={() => setTab('upload')} style={{ padding: '6px 14px', fontSize: '.82rem', display: 'flex', gap: 6, alignItems: 'center' }}>
+            <button className={`tab-btn${tab === 'upload' ? ' active' : ''}`} onClick={() => handleTabChange('upload')} style={{ padding: '6px 14px', fontSize: '.82rem', display: 'flex', gap: 6, alignItems: 'center' }}>
               <FolderUp size={15} /> Upload
             </button>
           </div>

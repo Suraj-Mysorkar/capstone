@@ -158,6 +158,25 @@ export const fetchDocumentTypes = async () => {
 
 export const uploadDocument = async (formData) => {
   try {
+    if (formData instanceof FormData && !formData.get('customerId')) {
+      try {
+        const rawUser = localStorage.getItem('csp_user');
+        if (rawUser) {
+          const user = JSON.parse(rawUser);
+          const cid = user.customerServiceId || user.loanCustomerId || user.customerId;
+          if (cid) formData.append('customerId', cid);
+        }
+        if (!formData.get('customerId')) {
+          const token = localStorage.getItem('csp_token');
+          if (token) {
+            const claims = JSON.parse(decodeURIComponent(escape(atob(token.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))));
+            if (claims?.customerId) formData.append('customerId', claims.customerId);
+          }
+        }
+      } catch {
+        /* ignore */
+      }
+    }
     const res = await authFetch(`${docBase()}/upload`, { method: 'POST', headers: getAuthHeaders(), body: formData });
     if (res.ok) return await res.json();
     const err = await res.json().catch(() => ({ message: `Upload failed (${res.status})` }));

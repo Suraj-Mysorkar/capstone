@@ -58,6 +58,8 @@ export default function ApplyPage() {
     setUploading(true);
     setDocError('');
     const fd = new FormData();
+    const cid = session?.customerServiceId || session?.loanCustomerId || session?.customerId;
+    if (cid) fd.append('customerId', cid);
     fd.append('documentType', pendingType);
     fd.append('docType', pendingType);
     fd.append('documentName', pendingFile.name);

@@ -431,6 +431,13 @@ export default function DocumentsPage() {
     try {
       const res = await uploadDocument(fd);
       setUploadResult(res);
+      setUploadFile(null);
+      setUploadFilePreviewUrl(null);
+      setUploadDocName('');
+      setUploadAppId('');
+      setUploadError('');
+      const input = document.getElementById('standalone-file-input');
+      if (input) input.value = '';
       setSearchCustomerId(uploadCustId.trim());
     } catch (e) {
       setUploadError(e.message || 'Failed to upload document.');

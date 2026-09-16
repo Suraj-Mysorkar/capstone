@@ -81,9 +81,9 @@ export const fetchDocumentTypes = async () => {
 };
 
 export const uploadDocument = async (formData) => {
-  // 1. Primary: Upload to Loan Service document storage proxy
+  // Upload to Document Service
   try {
-    const res = await fetch(`${BASE}/documents/upload`, {
+    const res = await fetch(`${DOC_BASE}/upload`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: formData
@@ -91,10 +91,10 @@ export const uploadDocument = async (formData) => {
     if (res.ok) {
       return await res.json();
     }
-    const err = await res.json().catch(() => ({ message: `Loan service upload failed (${res.status})` }));
+    const err = await res.json().catch(() => ({ message: `Document service upload failed (${res.status})` }));
     throw new Error(err.message || `Upload failed with status ${res.status}`);
-  } catch (loanErr) {
-    throw new Error(loanErr.message || 'Failed to upload document.');
+  } catch (docErr) {
+    throw new Error(docErr.message || 'Failed to upload document.');
   }
 };
 

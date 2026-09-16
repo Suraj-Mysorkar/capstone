@@ -779,11 +779,31 @@ class DocumentControllerTest {
     // =========================================================
 
     @Test
-    void testCustomerCannotAccessDocuments()
+    void testCustomerCanAccessDocuments()
         throws Exception {
+
+        when(documentService.getDocument(1L)).thenReturn(sampleResponse);
 
         mockMvc.perform(
             get("/api/v1/documents/1")
+                .header("X-User-Id", CUSTOMER_USER_ID)
+                .header("X-User-Role", "CUSTOMER")
+                .with(customerUser())
+        )
+        .andExpect(status().isOk());
+
+        verify(
+            documentService,
+            times(1)
+        ).getDocument(1L);
+    }
+
+    @Test
+    void testCustomerCannotDeleteDocuments()
+        throws Exception {
+
+        mockMvc.perform(
+            delete("/api/v1/documents/1")
                 .header("X-User-Id", CUSTOMER_USER_ID)
                 .header("X-User-Role", "CUSTOMER")
                 .with(customerUser())
@@ -793,7 +813,7 @@ class DocumentControllerTest {
         verify(
             documentService,
             times(0)
-        ).getDocument(any());
+        ).deleteDocument(any());
     }
 
 
