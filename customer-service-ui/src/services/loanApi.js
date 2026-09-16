@@ -163,15 +163,7 @@ export const uploadDocument = async (formData) => {
     const err = await res.json().catch(() => ({ message: `Upload failed (${res.status})` }));
     throw new Error(err.message || `Upload failed with status ${res.status}`);
   } catch (docErr) {
-    console.warn('Document service upload failed, attempting loan-service fallback:', docErr);
-    try {
-      const res = await authFetch(`${loanBase()}/documents/upload`, { method: 'POST', headers: getAuthHeaders(), body: formData });
-      if (res.ok) return await res.json();
-      const err = await res.json().catch(() => ({ message: `Loan service upload failed (${res.status})` }));
-      throw new Error(err.message || docErr.message);
-    } catch (loanErr) {
-      throw new Error(docErr.message || loanErr.message || 'Failed to upload document.');
-    }
+    throw new Error(docErr.message || 'Failed to upload document.');
   }
 };
 

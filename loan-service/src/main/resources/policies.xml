@@ -76,7 +76,7 @@
 
         <!-- 3. Inject verified Customer / Manager claims into Body for POST/PUT requests -->
         <choose>
-            <when condition='@(context.Request.Method == "POST" || context.Request.Method == "PUT")'>
+            <when condition='@((context.Request.Method == "POST" || context.Request.Method == "PUT") &amp;&amp; context.Request.Headers.GetValueOrDefault("Content-Type", "").Contains("application/json"))'>
                 <set-body>@{
                     var jwt = context.Request.Headers.GetValueOrDefault("Authorization","").Split(' ').Last().AsJwt();
                     if (jwt != null) 

@@ -39,6 +39,15 @@ export default function DocumentsPage() {
   const [uploadResult, setUploadResult] = useState(null);
   const [uploadError, setUploadError] = useState('');
 
+  const handleUploadTypeChange = (newType) => {
+    setUploadDocType(newType);
+    setUploadFile(null);
+    setUploadDocName('');
+    setUploadFilePreviewUrl(null);
+    setUploadError('');
+    setUploadResult(null);
+  };
+
   useEffect(() => {
     fetchDocumentTypes().then((types) => {
       if (Array.isArray(types) && types.length > 0) {
@@ -206,7 +215,7 @@ export default function DocumentsPage() {
                   className="btn btn-ghost"
                   style={{ fontSize: '.75rem', padding: '4px 10px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(245, 158, 11, 0.4)', color: '#fff' }}
                   onClick={() => {
-                    setUploadDocType(btn.type);
+                    handleUploadTypeChange(btn.type);
                     if (activeApps[0]?.applicationId) setUploadAppId(activeApps[0].applicationId);
                     setTab('upload');
                   }}
@@ -409,7 +418,7 @@ export default function DocumentsPage() {
               </div>
               <div className="form-group" style={{ marginBottom: 0 }}>
                 <label className="form-label">Document Type *</label>
-                <select className="form-select" value={uploadDocType} onChange={(e) => setUploadDocType(e.target.value)} style={{ padding: '7px 12px', fontSize: '.85rem' }}>
+                <select className="form-select" value={uploadDocType} onChange={(e) => handleUploadTypeChange(e.target.value)} style={{ padding: '7px 12px', fontSize: '.85rem' }}>
                   {docTypesList.length > 0 ? docTypesList.map((t) => (
                     <option key={t.typeCode || t.code} value={t.typeCode || t.code}>
                       {t.categoryName || t.description || t.typeCode} ({t.typeCode || t.code})

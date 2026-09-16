@@ -81,9 +81,9 @@ export const fetchDocumentTypes = async () => {
 };
 
 export const uploadDocument = async (formData) => {
-  // 1. Primary: Upload to Azure Document Service (connects to Azure Blob Storage)
+  // 1. Primary: Upload to Loan Service document storage proxy
   try {
-    const res = await fetch(`${DOC_BASE}/upload`, {
+    const res = await fetch(`${BASE}/documents/upload`, {
       method: 'POST',
       headers: getAuthHeaders(),
       body: formData
@@ -91,25 +91,10 @@ export const uploadDocument = async (formData) => {
     if (res.ok) {
       return await res.json();
     }
-    const err = await res.json().catch(() => ({ message: `Upload failed (${res.status})` }));
+    const err = await res.json().catch(() => ({ message: `Loan service upload failed (${res.status})` }));
     throw new Error(err.message || `Upload failed with status ${res.status}`);
-  } catch (docErr) {
-    console.warn('Document service upload encountered error, attempting loan-service fallback:', docErr);
-    // 2. Fallback: Upload to Loan Service document storage proxy
-    try {
-      const res = await fetch(`${BASE}/documents/upload`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: formData
-      });
-      if (res.ok) {
-        return await res.json();
-      }
-      const err = await res.json().catch(() => ({ message: `Loan service upload failed (${res.status})` }));
-      throw new Error(err.message || docErr.message);
-    } catch (loanErr) {
-      throw new Error(docErr.message || loanErr.message || 'Failed to upload document.');
-    }
+  } catch (loanErr) {
+    throw new Error(loanErr.message || 'Failed to upload document.');
   }
 };
 

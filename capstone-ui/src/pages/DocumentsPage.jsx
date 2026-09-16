@@ -88,6 +88,15 @@ export default function DocumentsPage() {
   const [uploadResult, setUploadResult] = useState(null);
   const [uploadError, setUploadError] = useState('');
 
+  const handleUploadTypeChange = (newType) => {
+    setUploadDocType(newType);
+    setUploadFile(null);
+    setUploadDocName('');
+    setUploadFilePreviewUrl(null);
+    setUploadError('');
+    setUploadResult(null);
+  };
+
   // Load document types and customer documents on mount
   useEffect(() => {
     fetchDocumentTypes().then(types => {
@@ -1096,7 +1105,7 @@ export default function DocumentsPage() {
                 <select
                   className="form-select"
                   value={uploadDocType}
-                  onChange={e => setUploadDocType(e.target.value)}
+                  onChange={e => handleUploadTypeChange(e.target.value)}
                   style={{ padding: '7px 12px', fontSize: '0.85rem' }}
                 >
                   {docTypesList.length > 0 ? (
