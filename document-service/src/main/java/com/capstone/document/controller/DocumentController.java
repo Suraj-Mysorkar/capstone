@@ -192,7 +192,7 @@ public class DocumentController {
         return ResponseEntity.ok(documentService.updateStatus(documentId, request));
     }
 
-    @PreAuthorize("hasAnyAuthority('ROLE_EMPLOYEE', 'ROLE_MANAGER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_EMPLOYEE', 'ROLE_MANAGER')")
     @DeleteMapping("/{documentId}")
     public ResponseEntity<Void> deleteDocument(@PathVariable Long documentId,
             @RequestHeader(value = "X-User-Id", required = false) Long userId,

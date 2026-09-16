@@ -207,40 +207,43 @@ export const fetchCustomerDocuments = async (customerId) => {
     }
   }
 
+  const docMap = new Map();
+  const addDocs = (items) => {
+    if (Array.isArray(items)) {
+      for (const d of items) {
+        const id = d.documentId || d.id;
+        if (id && !docMap.has(String(id))) {
+          docMap.set(String(id), d);
+        }
+      }
+    }
+  };
+
   if (cid) {
     try {
       const r = await authFetch(`${docBase()}/customer/${encodeURIComponent(cid)}`, { headers: getAuthHeaders() });
-      if (r.ok) {
-        const docs = await r.json();
-        if (Array.isArray(docs) && docs.length > 0) return docs;
-      }
-    } catch (e) {
+      if (r.ok) addDocs(await r.json());
+    } catch {
       /* ignore */
     }
 
     try {
       const altCid = cid.startsWith('CUST-') ? cid.replace(/^CUST-/, '') : `CUST-${cid}`;
       const r2 = await authFetch(`${docBase()}/customer/${encodeURIComponent(altCid)}`, { headers: getAuthHeaders() });
-      if (r2.ok) {
-        const docs2 = await r2.json();
-        if (Array.isArray(docs2) && docs2.length > 0) return docs2;
-      }
-    } catch (e) {
+      if (r2.ok) addDocs(await r2.json());
+    } catch {
       /* ignore */
     }
   }
 
   try {
     const r = await authFetch(`${docBase()}/customer/me`, { headers: getAuthHeaders() });
-    if (r.ok) {
-      const docs = await r.json();
-      if (Array.isArray(docs)) return docs;
-    }
-  } catch (e) {
+    if (r.ok) addDocs(await r.json());
+  } catch {
     /* ignore */
   }
 
-  return [];
+  return Array.from(docMap.values());
 };
 
 export const fetchApplicationDocuments = async (applicationId) => {
