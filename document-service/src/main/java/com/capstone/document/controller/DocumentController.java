@@ -35,7 +35,7 @@ public class DocumentController {
      * Upload document (supports multipart/form-data for Postman and UI).
      * Accepts customerId, applicationId, documentType, documentName (optional), and file.
      */
-    @PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_EMPLOYEE', 'ROLE_MANAGER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_MANAGER')")
     @PostMapping(value = {"", "/upload"}, consumes = "multipart/form-data")
     public ResponseEntity<DocumentResponse> uploadDocument(
             @RequestHeader(value = "X-User-Id", required = false) Long userId,
@@ -84,7 +84,7 @@ public class DocumentController {
         return ResponseEntity.ok(documentService.getAllDocumentTypes());
     }
 
-    @PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_EMPLOYEE', 'ROLE_MANAGER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_MANAGER')")
     @GetMapping("/{documentId}")
     public ResponseEntity<DocumentResponse> getDocument(@PathVariable Long documentId,
             @RequestHeader(value = "X-User-Id", required = false) Long userId,
@@ -93,7 +93,7 @@ public class DocumentController {
         return ResponseEntity.ok(documentService.getDocument(documentId));
     }
 
-    @PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_EMPLOYEE', 'ROLE_MANAGER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_MANAGER')")
     @GetMapping("/{documentId}/download")
     public ResponseEntity<Resource> downloadDocument(@PathVariable Long documentId,
             @RequestHeader(value = "X-User-Id", required = false) Long userId,
@@ -102,7 +102,7 @@ public class DocumentController {
         return documentService.downloadDocument(documentId);
     }
 
-    @PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_EMPLOYEE', 'ROLE_MANAGER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_MANAGER')")
     @GetMapping("/{documentId}/sas-url")
     public ResponseEntity<String> getSecureDownloadUrl(@PathVariable Long documentId,
             @RequestHeader(value = "X-User-Id", required = false) Long userId,
@@ -111,7 +111,7 @@ public class DocumentController {
         return ResponseEntity.ok(documentService.getSecureDownloadUrl(documentId));
     }
 
-    @PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_EMPLOYEE', 'ROLE_MANAGER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_MANAGER')")
     @GetMapping("/customer/me")
     public ResponseEntity<List<DocumentResponse>> getMyDocuments(
             @RequestHeader(value = "X-Customer-Id", required = false) String customerHeader,
@@ -119,7 +119,7 @@ public class DocumentController {
         return ResponseEntity.ok(documentService.getCustomerDocuments(resolveCustomerId(customerHeader, null, authorization)));
     }
 
-    @PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_EMPLOYEE', 'ROLE_MANAGER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_MANAGER')")
     @GetMapping("/customer/{customerId}")
     public ResponseEntity<List<DocumentResponse>> getCustomerDocuments(@PathVariable String customerId,
             @RequestHeader(value = "X-User-Id", required = false) Long userId,
@@ -149,7 +149,7 @@ public class DocumentController {
         throw new IllegalArgumentException("Customer identity must come from the authenticated gateway token.");
     }
 
-    @PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_EMPLOYEE', 'ROLE_MANAGER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_MANAGER')")
     @GetMapping("/application/{applicationId}")
     public ResponseEntity<List<DocumentResponse>> getApplicationDocuments(@PathVariable String applicationId,
             @RequestHeader(value = "X-User-Id", required = false) Long userId,
@@ -158,7 +158,7 @@ public class DocumentController {
         return ResponseEntity.ok(documentService.getApplicationDocuments(applicationId));
     }
 
-    @PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_EMPLOYEE', 'ROLE_MANAGER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_MANAGER')")
     @GetMapping("/{documentId}/versions")
     public ResponseEntity<List<DocumentVersionResponse>> getDocumentVersions(@PathVariable Long documentId,
             @RequestHeader(value = "X-User-Id", required = false) Long userId,
@@ -167,7 +167,7 @@ public class DocumentController {
         return ResponseEntity.ok(documentService.getDocumentVersions(documentId));
     }
 
-    @PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_EMPLOYEE', 'ROLE_MANAGER')")
+    @PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_MANAGER')")
     @PostMapping(value = "/{documentId}/versions", consumes = "multipart/form-data")
     public ResponseEntity<DocumentVersionResponse> uploadNewVersion(
             @PathVariable Long documentId, 
@@ -181,7 +181,7 @@ public class DocumentController {
                 .body(response);
     }
 
-    @PreAuthorize("hasAnyAuthority('ROLE_EMPLOYEE', 'ROLE_MANAGER')")
+    @PreAuthorize("hasAuthority('ROLE_MANAGER')")
     @PutMapping("/{documentId}/status")
     public ResponseEntity<DocumentResponse> updateStatus(
             @PathVariable Long documentId,
@@ -192,7 +192,7 @@ public class DocumentController {
         return ResponseEntity.ok(documentService.updateStatus(documentId, request));
     }
 
-    @PreAuthorize("hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_EMPLOYEE', 'ROLE_MANAGER')")
+    @PreAuthorize("hasAuthority('ROLE_MANAGER')")
     @DeleteMapping("/{documentId}")
     public ResponseEntity<Void> deleteDocument(@PathVariable Long documentId,
             @RequestHeader(value = "X-User-Id", required = false) Long userId,

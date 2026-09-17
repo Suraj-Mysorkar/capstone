@@ -123,7 +123,7 @@
                                         body["customerEmail"] = email;
                                     }
                                 }
-                                else if (roles.Contains("MANAGER") || roles.Contains("EMPLOYEE"))
+                                else if (roles.Contains("MANAGER"))
                                 {
                                     if (!string.IsNullOrEmpty(userId)) {
                                         body["managerId"] = userId;

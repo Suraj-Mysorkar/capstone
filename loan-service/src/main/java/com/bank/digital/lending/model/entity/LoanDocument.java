@@ -36,6 +36,15 @@ public class LoanDocument {
     @Column(name = "FILE_SIZE_BYTES", nullable = false)
     private Long fileSizeBytes;
 
+    @Column(name = "VERIFICATION_STATUS", length = 50)
+    private String verificationStatus = "PENDING";
+
+    @Column(name = "REVIEWED_BY", length = 100)
+    private String reviewedBy;
+
+    @Column(name = "REVIEW_REMARKS", length = 500)
+    private String reviewRemarks;
+
     @Column(name = "UPLOADED_AT", nullable = false)
     private LocalDateTime uploadedAt = LocalDateTime.now();
 
@@ -52,6 +61,7 @@ public class LoanDocument {
         this.contentType = contentType;
         this.blobStoragePath = blobStoragePath;
         this.fileSizeBytes = fileSizeBytes;
+        this.verificationStatus = "PENDING";
         this.uploadedAt = LocalDateTime.now();
     }
 
@@ -117,6 +127,30 @@ public class LoanDocument {
 
     public void setFileSizeBytes(Long fileSizeBytes) {
         this.fileSizeBytes = fileSizeBytes;
+    }
+
+    public String getVerificationStatus() {
+        return verificationStatus;
+    }
+
+    public void setVerificationStatus(String verificationStatus) {
+        this.verificationStatus = verificationStatus;
+    }
+
+    public String getReviewedBy() {
+        return reviewedBy;
+    }
+
+    public void setReviewedBy(String reviewedBy) {
+        this.reviewedBy = reviewedBy;
+    }
+
+    public String getReviewRemarks() {
+        return reviewRemarks;
+    }
+
+    public void setReviewRemarks(String reviewRemarks) {
+        this.reviewRemarks = reviewRemarks;
     }
 
     public LocalDateTime getUploadedAt() {

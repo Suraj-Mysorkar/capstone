@@ -18,7 +18,7 @@ import org.springframework.security.access.prepost.PreAuthorize;
 @RequestMapping("/api/v1/loans")
 @Tag(name = "Loan Applications", description = "Endpoints for applying, tracking, and calculating retail loans")
 @CrossOrigin(origins = "*")
-@PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_EMPLOYEE', 'ROLE_MANAGER', 'CUSTOMER', 'EMPLOYEE', 'MANAGER')")
+@PreAuthorize("hasAnyRole('CUSTOMER', 'MANAGER')")
 public class LoanApplicationController {
 
     private final LoanApplicationService applicationService;
@@ -31,7 +31,7 @@ public class LoanApplicationController {
     }
 
     @GetMapping("/customers")
-    @PreAuthorize("hasAnyRole('ROLE_EMPLOYEE', 'ROLE_MANAGER', 'EMPLOYEE', 'MANAGER')")
+    @PreAuthorize("hasRole('MANAGER')")
     @Operation(summary = "List all registered customers",
                description = "Retrieves customer records from Customers table (Bank staff only)")
     public ResponseEntity<List<CustomerResponse>> listCustomers() {
@@ -49,6 +49,7 @@ public class LoanApplicationController {
     }
 
     @PostMapping("/applications/{id}/document-uploaded")
+    @PreAuthorize("permitAll()")
     @Operation(summary = "Notify service that documents have been uploaded",
                description = "Sets the documentProvided flag, links documents, and transitions status to DOCUMENTS_SUBMITTED")
     public ResponseEntity<LoanApplicationResponse> documentUploaded(@PathVariable("id") String applicationId,
@@ -57,7 +58,17 @@ public class LoanApplicationController {
         return ResponseEntity.ok(response);
     }
 
+    @DeleteMapping("/documents/{documentId}")
+    @PreAuthorize("permitAll()")
+    @Operation(summary = "Delete loan document metadata",
+               description = "Removes document metadata from loan_documents table")
+    public ResponseEntity<Void> deleteDocument(@PathVariable("documentId") String documentId) {
+        applicationService.deleteDocument(documentId);
+        return ResponseEntity.noContent().build();
+    }
+
     @PostMapping("/applications/{id}/document-reviewed")
+    @PreAuthorize("permitAll()")
     @Operation(summary = "Notify service that document review decision was recorded",
                description = "Advances workflow upon document verification: auto-approves if low risk, or routes to Underwriter if moderate risk")
     public ResponseEntity<LoanApplicationResponse> documentReviewed(@PathVariable("id") String applicationId,

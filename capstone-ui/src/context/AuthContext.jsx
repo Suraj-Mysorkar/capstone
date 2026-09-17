@@ -42,7 +42,7 @@ export function AuthProvider({ children }) {
 
       const userData = {
         username: jwtClaims?.preferred_username || res.username || username,
-        role: jwtClaims?.roles?.replace(/^ROLE_/, '') || res.role || 'Employee',
+        role: jwtClaims?.roles?.replace(/^ROLE_/, '') || res.role || 'Manager',
         name: jwtClaims?.name || res.name || (username === 'markj' ? 'Mark Jack' : username),
         userId: jwtClaims?.userId || res.userId || '3',
         token: token,

@@ -433,7 +433,9 @@ public class LoanApplicationService {
                 .orElseThrow(() -> new IllegalArgumentException("Loan application not found with ID: " + applicationId));
 
         // ── 1. Persist document metadata in LOAN_DOCUMENTS table ──────────────────────────
-        String docId = "DOC-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
+        String incomingDocId = (request.documentIds() != null && !request.documentIds().isEmpty() && request.documentIds().get(0) != null)
+                ? request.documentIds().get(0)
+                : "DOC-" + UUID.randomUUID().toString().substring(0, 8).toUpperCase();
         DocType docType = request.resolvedDocType();
         String blobUrl   = request.blobUrl()   != null ? request.blobUrl()   : "";
         String blobPath  = request.blobPath()  != null ? request.blobPath()  : blobUrl;
@@ -442,22 +444,29 @@ public class LoanApplicationService {
         long   fileSize  = request.fileSizeBytes() != null ? request.fileSizeBytes() : 0L;
         String customerId = request.customerId() != null ? request.customerId() : app.getCustomerId();
 
-        // Only save if we have a real blob URL (i.e., the upload actually went to Azure)
-        if (!blobUrl.isBlank()) {
-            LoanDocument loanDoc = new LoanDocument(
-                    docId,
-                    applicationId,
-                    customerId,
-                    docType,
-                    fileName,
-                    mime,
-                    blobPath.isBlank() ? blobUrl : blobPath,
-                    fileSize
-            );
-            loanDocumentRepository.save(loanDoc);
-            log.info("[LOAN-SERVICE] ✅ LOAN_DOCUMENTS persisted: docId={}, appId={}, type={}, blobUrl={}",
-                    docId, applicationId, docType, blobUrl);
+        // Always persist document metadata in LOAN_DOCUMENTS table
+        java.util.Optional<LoanDocument> existingOpt = loanDocumentRepository.findByApplicationIdAndDocType(applicationId, docType);
+        if (existingOpt.isPresent()) {
+            loanDocumentRepository.delete(existingOpt.get());
+            loanDocumentRepository.flush();
         }
+        LoanDocument loanDoc = new LoanDocument(
+                incomingDocId,
+                applicationId,
+                customerId,
+                docType,
+                fileName,
+                mime,
+                blobPath.isBlank() ? (blobUrl.isBlank() ? "documents/" + incomingDocId : blobUrl) : blobPath,
+                fileSize
+        );
+        loanDoc.setVerificationStatus("PENDING");
+        loanDoc.setReviewRemarks(null);
+        loanDoc.setReviewedBy(null);
+        loanDoc.setUploadedAt(java.time.LocalDateTime.now());
+        loanDocumentRepository.save(loanDoc);
+        log.info("[LOAN-SERVICE] ✅ LOAN_DOCUMENTS persisted: docId={}, appId={}, type={}, blobUrl={}",
+                incomingDocId, applicationId, docType, blobUrl);
 
         // ── 2. Link legacy doc IDs (backward compat for pre-document-service uploads) ─────
         if (request.documentIds() != null && !request.documentIds().isEmpty()) {
@@ -472,29 +481,33 @@ public class LoanApplicationService {
         int totalUploaded = appDocs != null ? appDocs.size() : 0;
         int requiredDocCount = 3; // Mandatory 3 documents: Identity Proof, Income Verification, Bank Statement
 
+        long rejectedCount = (appDocs != null) ? appDocs.stream()
+                .filter(d -> "REJECTED".equalsIgnoreCase(d.getVerificationStatus()) || "ACTION_REQUIRED".equalsIgnoreCase(d.getVerificationStatus()))
+                .count() : 0;
+
         int score = app.getRiskScore() != null ? app.getRiskScore() : 50;
         String dti  = app.getDtiRatio() != null ? app.getDtiRatio().toString() : "—";
-        String manager = app.getAssignedManager() != null ? app.getAssignedManager() : "markj";
+        String manager = app.getAssignedManager() != null ? app.getAssignedManager() : "mgr1";
 
-        if (totalUploaded >= requiredDocCount) {
+        if (totalUploaded >= requiredDocCount && rejectedCount == 0) {
             app.setDocumentProvided(true);
             app.setStatus(LoanStatus.DOCUMENTS_SUBMITTED);
             app.setDecisionRemarks(
                     "📄 All required verification documents (" + totalUploaded + "/" + requiredDocCount + ") submitted for application " + applicationId + " (" + fileName + ") (Risk Score: " + score + "/100, DTI: " + dti + "%). "
                     + "Awaiting Credit Manager (" + manager + ") document verification and review.");
             recordAuditLog(applicationId, previousStatus, LoanStatus.DOCUMENTS_SUBMITTED,
-                    "DOC_UPLOAD_SERVICE",
-                    "All required documents received (" + totalUploaded + "/" + requiredDocCount + ") for application " + applicationId + ". Advanced to DOCUMENTS_SUBMITTED queue.");
+                    "APPLICANT",
+                    "Document uploaded: " + fileName + " (" + docType.name() + "). All " + totalUploaded + " required documents submitted. Advanced to DOCUMENTS_SUBMITTED for manager review.");
             eventBusPublisher.publishLoanStatusEvent(app, "LOAN_DOCUMENTS_SUBMITTED", app.getDecisionRemarks());
         } else {
-            // Under mandatory requirement: keep status as DOCUMENT_REVIEW_PENDING
+            // Under mandatory requirement or has rejected documents: keep status as DOCUMENT_REVIEW_PENDING
             app.setDocumentProvided(false);
             app.setStatus(LoanStatus.DOCUMENT_REVIEW_PENDING);
             app.setDecisionRemarks(
                     "⏳ Incomplete documents for application " + applicationId + ": Applicant submitted " + totalUploaded + " of " + requiredDocCount + " required documents (" + fileName + ", " + docType.name() + "). "
                     + "Application remains in DOCUMENT_REVIEW_PENDING until all required documents for this loan are received.");
             recordAuditLog(applicationId, previousStatus, LoanStatus.DOCUMENT_REVIEW_PENDING,
-                    "DOC_UPLOAD_SERVICE",
+                    "APPLICANT",
                     "Document uploaded (" + fileName + "). Status remains DOCUMENT_REVIEW_PENDING (" + totalUploaded + "/" + requiredDocCount + " received for application " + applicationId + ").");
             eventBusPublisher.publishLoanStatusEvent(app, "LOAN_DOCUMENT_REVIEW_PENDING", app.getDecisionRemarks());
         }
@@ -502,7 +515,7 @@ public class LoanApplicationService {
         LoanApplication saved = applicationRepository.save(app);
 
         // Dispatch Real-time Notification for Document Upload to Employee manager
-        String targetManager = saved.getAssignedManager() != null ? saved.getAssignedManager() : "markj";
+        String targetManager = saved.getAssignedManager() != null ? saved.getAssignedManager() : "mgr1";
         notificationService.sendNotification(new NotificationDTO(
                 targetManager,
                 "Documents Submitted: " + saved.getCustomerName(),
@@ -516,13 +529,28 @@ public class LoanApplicationService {
         return mapToResponse(saved);
     }
 
+    @Transactional
+    public void deleteDocument(String documentId) {
+        if (documentId == null || documentId.isBlank()) return;
+        String cleanId = documentId.trim();
+        String docPrefixId = cleanId.startsWith("DOC-") ? cleanId : "DOC-" + cleanId;
+        String strippedId = cleanId.replaceFirst("^DOC-", "");
+
+        loanDocumentRepository.findById(cleanId).ifPresent(loanDocumentRepository::delete);
+        loanDocumentRepository.findById(docPrefixId).ifPresent(loanDocumentRepository::delete);
+        loanDocumentRepository.findById(strippedId).ifPresent(loanDocumentRepository::delete);
+        log.info("[LOAN-SERVICE] 🗑️ Loan document deleted from LOAN_DOCUMENTS: documentId={}", documentId);
+    }
+
     /**
      * Handles document review callback (when Manager Approves or Rejects a document).
-     * If all documents are verified:
-     *   - Low Risk (Score ≤ 30): DOCUMENT_REVIEW_PENDING / DOCUMENTS_SUBMITTED → APPROVED (Auto-Approved by Credit Engine)
-     *   - Medium Risk (31–69):   DOCUMENT_REVIEW_PENDING / DOCUMENTS_SUBMITTED → MANUAL_REVIEW_REQUIRED (Underwriter Review)
-     * If document is rejected:
-     *   - Transitions to DOCUMENT_REVIEW_PENDING (Action Required: Re-upload needed).
+     * If any document is rejected:
+     *   - Reverts status to DOCUMENT_REVIEW_PENDING (Applicant action required to re-upload).
+     * If all required documents (>= 3) are approved:
+     *   - Low Risk (Score ≤ 30): Moves to APPROVED (Auto-Approved by Credit Engine).
+     *   - Medium Risk (31–69):   Moves to MANUAL_REVIEW_REQUIRED (Underwriter Review).
+     * If partially approved and none rejected:
+     *   - Remains in DOCUMENTS_SUBMITTED awaiting remaining reviews.
      */
     @Transactional
     public LoanApplicationResponse handleDocumentReviewed(String applicationId,
@@ -532,43 +560,93 @@ public class LoanApplicationService {
 
         String status = request.status() != null ? request.status().toUpperCase() : "VERIFIED";
         String docId = request.documentId() != null ? request.documentId() : "DOC";
-        String docType = request.documentType() != null ? request.documentType() : "Document";
+        String docTypeStr = request.documentType() != null ? request.documentType() : "Document";
         String remarks = request.remarks() != null ? request.remarks() : "";
-        String reviewer = request.verifiedBy() != null ? request.verifiedBy() : (app.getAssignedManager() != null ? app.getAssignedManager() : "Operations Manager");
+        String reviewer = request.verifiedBy() != null ? request.verifiedBy() : (app.getAssignedManager() != null ? app.getAssignedManager() : "Credit Manager");
+
+        // 1. Update the reviewed document in loanDocumentRepository
+        String cleanId = docId.trim();
+        String docPrefixId = cleanId.startsWith("DOC-") ? cleanId : "DOC-" + cleanId;
+        String strippedId = cleanId.replaceFirst("^DOC-", "");
+
+        java.util.Optional<LoanDocument> docOpt = loanDocumentRepository.findById(cleanId)
+                .or(() -> loanDocumentRepository.findById(docPrefixId))
+                .or(() -> loanDocumentRepository.findById(strippedId));
+
+        if (docOpt.isEmpty()) {
+            try {
+                DocType resolvedDocType = DocType.valueOf(docTypeStr.toUpperCase());
+                docOpt = loanDocumentRepository.findByApplicationIdAndDocType(applicationId, resolvedDocType);
+            } catch (Exception ignored) {}
+        }
+
+        if (docOpt.isPresent()) {
+            LoanDocument ld = docOpt.get();
+            ld.setVerificationStatus(status);
+            ld.setReviewedBy(reviewer);
+            ld.setReviewRemarks(remarks);
+            loanDocumentRepository.save(ld);
+            log.info("[LOAN-SERVICE] ✅ Updated document review status in LOAN_DOCUMENTS: docId={}, status={}, reviewer={}",
+                    ld.getDocumentId(), status, reviewer);
+        }
 
         LoanStatus previousStatus = app.getStatus();
 
-        if ("VERIFIED".equalsIgnoreCase(status) || "APPROVED".equalsIgnoreCase(status)) {
-            // Level 1: Document Review Passed!
+        // 2. Evaluate all documents for this application
+        List<LoanDocument> allDocs = loanDocumentRepository.findByApplicationId(applicationId);
+        int totalDocs = allDocs != null ? allDocs.size() : 0;
+        int requiredDocs = 3;
+
+        long rejectedDocs = (allDocs != null) ? allDocs.stream()
+                .filter(d -> "REJECTED".equalsIgnoreCase(d.getVerificationStatus()) || "ACTION_REQUIRED".equalsIgnoreCase(d.getVerificationStatus()))
+                .count() : 0;
+        long approvedDocs = (allDocs != null) ? allDocs.stream()
+                .filter(d -> "APPROVED".equalsIgnoreCase(d.getVerificationStatus()) || "VERIFIED".equalsIgnoreCase(d.getVerificationStatus()))
+                .count() : 0;
+
+        if ("REJECTED".equalsIgnoreCase(status) || "ACTION_REQUIRED".equalsIgnoreCase(status) || rejectedDocs > 0) {
+            // Document Rejected -> Application goes back to DOCUMENT_REVIEW_PENDING
+            app.setStatus(LoanStatus.DOCUMENT_REVIEW_PENDING);
+            String reasonText = !remarks.isBlank() ? remarks : "Document verification failed. Please re-upload.";
+            app.setDecisionRemarks("❌ Document Action Required: " + docTypeStr + " was rejected by " + reviewer + ". Reason: " + reasonText + ". Awaiting new document upload from applicant.");
+            recordAuditLog(applicationId, previousStatus, LoanStatus.DOCUMENT_REVIEW_PENDING, reviewer,
+                    "Document " + docTypeStr + " (" + docId + ") REJECTED by " + reviewer + ". Reason: " + reasonText + ". Application status reverted to DOCUMENT_REVIEW_PENDING.");
+            eventBusPublisher.publishLoanStatusEvent(app, "LOAN_DOCUMENT_REVIEW_PENDING", app.getDecisionRemarks());
+        } else if (approvedDocs >= requiredDocs && rejectedDocs == 0) {
+            // ALL required documents verified and approved!
             int score = app.getRiskScore() != null ? app.getRiskScore() : 30;
             if (score <= 30) {
                 // Low Risk -> Auto Approved after Document Verification
                 app.setStatus(LoanStatus.APPROVED);
-                app.setDecisionRemarks("✅ Level 1 (Document Review) passed: Document " + docId + " (" + docType + ") verified by " + reviewer + ". Low-risk application auto-approved.");
-                recordAuditLog(applicationId, previousStatus, LoanStatus.APPROVED, "SYSTEM_CREDIT_ENGINE", app.getDecisionRemarks());
+                app.setDecisionRemarks("✅ Document Verification Complete: All " + approvedDocs + " required documents verified and approved by " + reviewer + ". Low-risk application (Risk Score: " + score + "/100) approved.");
+                recordAuditLog(applicationId, previousStatus, LoanStatus.APPROVED, reviewer,
+                        "Document " + docTypeStr + " (" + docId + ") APPROVED by " + reviewer + ". All " + approvedDocs + " required documents verified. Application APPROVED.");
                 eventBusPublisher.publishLoanStatusEvent(app, "LOAN_APPROVED", app.getDecisionRemarks());
+                eventBusPublisher.publishLoanCompletedEvent(app);
             } else {
-                // Moderate Risk -> Route to Manager Underwriter Review
+                // Moderate Risk -> Route to Underwriter
                 app.setStatus(LoanStatus.MANUAL_REVIEW_REQUIRED);
-                app.setDecisionRemarks("✅ Level 1 (Document Review) passed: Document " + docId + " (" + docType + ") verified by " + reviewer + ". Application routed to Underwriter (" + app.getAssignedManager() + ") for final loan decision.");
-                recordAuditLog(applicationId, previousStatus, LoanStatus.MANUAL_REVIEW_REQUIRED, "DOC_REVIEW_SERVICE", app.getDecisionRemarks());
+                app.setDecisionRemarks("✅ Document Verification Complete: All " + approvedDocs + " required documents verified by " + reviewer + ". Application routed to Underwriter (" + reviewer + ") for final loan decision.");
+                recordAuditLog(applicationId, previousStatus, LoanStatus.MANUAL_REVIEW_REQUIRED, reviewer,
+                        "Document " + docTypeStr + " (" + docId + ") APPROVED by " + reviewer + ". All " + approvedDocs + " documents verified. Routed to Underwriter for final decision.");
                 eventBusPublisher.publishLoanStatusEvent(app, "LOAN_MANUAL_REVIEW_REQUIRED", app.getDecisionRemarks());
             }
-        } else if ("REJECTED".equalsIgnoreCase(status) || "ACTION_REQUIRED".equalsIgnoreCase(status)) {
-            // Document Rejected -> Move back to DOCUMENT_REVIEW_PENDING (Action Required)
-            app.setStatus(LoanStatus.DOCUMENT_REVIEW_PENDING);
-            app.setDecisionRemarks("❌ Document Action Required: " + docType + " (" + docId + ") was rejected by " + reviewer + ". Reason: " + remarks + ". Awaiting new document upload from applicant.");
-            recordAuditLog(applicationId, previousStatus, LoanStatus.DOCUMENT_REVIEW_PENDING, "DOC_REVIEW_SERVICE", app.getDecisionRemarks());
-            eventBusPublisher.publishLoanStatusEvent(app, "LOAN_DOCUMENT_REVIEW_PENDING", app.getDecisionRemarks());
+        } else {
+            // Partial approval (e.g. 1/3 or 2/3 approved, none rejected) -> Stays in DOCUMENTS_SUBMITTED
+            app.setStatus(LoanStatus.DOCUMENTS_SUBMITTED);
+            app.setDecisionRemarks("Document " + docTypeStr + " (" + docId + ") approved by " + reviewer + ". (" + approvedDocs + "/" + Math.max(totalDocs, requiredDocs) + " documents verified). Remaining documents awaiting review.");
+            recordAuditLog(applicationId, previousStatus, LoanStatus.DOCUMENTS_SUBMITTED, reviewer,
+                    "Document " + docTypeStr + " (" + docId + ") APPROVED by " + reviewer + ". (" + approvedDocs + "/" + Math.max(totalDocs, requiredDocs) + " verified).");
+            eventBusPublisher.publishLoanStatusEvent(app, "LOAN_DOCUMENTS_SUBMITTED", app.getDecisionRemarks());
         }
 
         LoanApplication saved = applicationRepository.save(app);
 
         // Notify manager & customer
-        String targetManager = saved.getAssignedManager() != null ? saved.getAssignedManager() : "markj";
+        String targetManager = saved.getAssignedManager() != null ? saved.getAssignedManager() : "mgr1";
         notificationService.sendNotification(new NotificationDTO(
                 targetManager,
-                "Document Review: " + docType + " (" + status + ")",
+                "Document Review: " + docTypeStr + " (" + status + ")",
                 "Application " + applicationId + " document " + docId + " review was marked " + status + " by " + reviewer + ".",
                 "DOCUMENT_REVIEW",
                 saved.getCustomerId(),
@@ -832,25 +910,29 @@ public class LoanApplicationService {
 
     private boolean dispatchEmailViaLogicApp(String to, String subject, String htmlBody) {
         String logicAppUrl = "https://prod-17.southindia.logic.azure.com:443/workflows/a4b29c1d5e814824900b41a17fa24844/triggers/When_a_HTTP_request_is_received/paths/invoke?api-version=2016-10-01&sp=%2Ftriggers%2FWhen_a_HTTP_request_is_received%2Frun&sv=1.0&sig=F--JabvW3Uwr-JsZU76HgaWWTcekahkC6HBwTEImtys";
-        try {
-            String payload = String.format("{\"emailTo\":\"%s\",\"emailSubject\":\"%s\",\"emailBody\":\"%s\"}",
-                    to.replace("\"", "\\\""),
-                    subject.replace("\"", "\\\""),
-                    htmlBody.replace("\"", "\\\"").replace("\n", "").replace("\r", ""));
+        java.util.concurrent.CompletableFuture.runAsync(() -> {
+            try {
+                String payload = String.format("{\"emailTo\":\"%s\",\"emailSubject\":\"%s\",\"emailBody\":\"%s\"}",
+                        to.replace("\"", "\\\""),
+                        subject.replace("\"", "\\\""),
+                        htmlBody.replace("\"", "\\\"").replace("\n", "").replace("\r", ""));
 
-            java.net.http.HttpClient client = java.net.http.HttpClient.newHttpClient();
-            java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder()
-                    .uri(java.net.URI.create(logicAppUrl))
-                    .header("Content-Type", "application/json")
-                    .POST(java.net.http.HttpRequest.BodyPublishers.ofString(payload, java.nio.charset.StandardCharsets.UTF_8))
-                    .build();
+                java.net.http.HttpClient client = java.net.http.HttpClient.newBuilder()
+                        .connectTimeout(java.time.Duration.ofSeconds(3))
+                        .build();
+                java.net.http.HttpRequest req = java.net.http.HttpRequest.newBuilder()
+                        .uri(java.net.URI.create(logicAppUrl))
+                        .timeout(java.time.Duration.ofSeconds(5))
+                        .header("Content-Type", "application/json")
+                        .POST(java.net.http.HttpRequest.BodyPublishers.ofString(payload, java.nio.charset.StandardCharsets.UTF_8))
+                        .build();
 
-            java.net.http.HttpResponse<String> resp = client.send(req, java.net.http.HttpResponse.BodyHandlers.ofString());
-            log.info("[LOAN-SERVICE] Logic App email dispatch response code: {}", resp.statusCode());
-            return resp.statusCode() >= 200 && resp.statusCode() < 300;
-        } catch (Exception ex) {
-            log.warn("[LOAN-SERVICE] Could not deliver email directly via Logic App: {}. Email logged for verification.", ex.getMessage());
-            return false;
-        }
+                java.net.http.HttpResponse<String> resp = client.send(req, java.net.http.HttpResponse.BodyHandlers.ofString());
+                log.info("[LOAN-SERVICE] Logic App email dispatch response code: {}", resp.statusCode());
+            } catch (Exception ex) {
+                log.warn("[LOAN-SERVICE] Could not deliver email directly via Logic App: {}. Email logged for verification.", ex.getMessage());
+            }
+        });
+        return true;
     }
 }

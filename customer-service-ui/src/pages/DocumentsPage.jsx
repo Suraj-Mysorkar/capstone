@@ -223,20 +223,21 @@ export default function DocumentsPage() {
                   Action Required: Documents Requested by Your Loan Manager ({activeApps[0]?.assignedManagerName || (activeApps[0]?.assignedManager === 'markj' ? 'Mark Johnson' : activeApps[0]?.assignedManager || 'Dedicated Officer')})
                 </div>
                 <div style={{ fontSize: '.78rem', color: 'var(--muted)', marginTop: 2 }}>
-                  Application: <strong style={{ color: '#fff' }}>{activeApps[0]?.applicationId}</strong> · Please upload the required documents to advance your application:
+                  Application: <strong style={{ color: '#fff' }}>{activeApps[0]?.applicationId}</strong> · Please upload all {activeApps[0]?.requestedDocuments?.length || 4} required documents to advance your application:
                 </div>
               </div>
             </div>
             <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
               {[
-                { label: '🪪 Identity Proof (Aadhaar/Passport)', type: 'IDENTITY_PROOF' },
+                { label: '🪪 Identity Proof (PAN/Aadhaar)', type: 'IDENTITY_PROOF' },
+                { label: '🏠 Address Proof (Utility/Rent)', type: 'ADDRESS_PROOF' },
                 { label: '💵 Income Proof (Salary Slips)', type: 'INCOME_PROOF' },
                 { label: '🏦 Bank Statement (Last 6 Months)', type: 'BANK_STATEMENT' },
               ].map((btn) => (
                 <button
                   key={btn.type}
                   className="btn btn-ghost"
-                  style={{ fontSize: '.75rem', padding: '4px 10px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(245, 158, 11, 0.4)', color: '#fff' }}
+                  style={{ fontSize: '.75rem', padding: '5px 12px', background: 'rgba(255,255,255,0.06)', border: '1px solid rgba(245, 158, 11, 0.4)', color: '#fff', fontWeight: 600 }}
                   onClick={() => {
                     handleUploadTypeChange(btn.type);
                     if (activeApps[0]?.applicationId) setUploadAppId(activeApps[0].applicationId);

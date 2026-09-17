@@ -12,7 +12,7 @@ Grid for downstream consumers (Notification Service, Reporting Dashboard).
   identity as `X-User-Id` / `X-User-Role` headers (rate limiting handled
   centrally by APIM)
 - **This service** → trusts those headers, enforces **role-based authorization**
-  (`ROLE_CUSTOMER` / `ROLE_EMPLOYEE` / `ROLE_MANAGER`) via `@PreAuthorize`,
+  (`ROLE_CUSTOMER` / `ROLE_MANAGER`) via `@PreAuthorize`,
   applies business rules, persists to Azure SQL, publishes
   `CustomerRegisteredEvent` / `CustomerStatusChangedEvent`
 - **Messaging & Events Layer** → Azure Event Grid topic, consumed by
@@ -76,7 +76,7 @@ contains other services' tables.
 ## API
 
 Roles come from the APIM-injected `X-User-Role` header (`ROLE_CUSTOMER` /
-`ROLE_EMPLOYEE` / `ROLE_MANAGER`); "staff" = `ROLE_EMPLOYEE` or `ROLE_MANAGER`.
+`ROLE_MANAGER`); "staff" = `ROLE_MANAGER`.
 
 | Method | Path                                  | Allowed roles                   | Description                        |
 |--------|----------------------------------------|----------------------------------|-------------------------------------|
@@ -95,7 +95,7 @@ Roles come from the APIM-injected `X-User-Role` header (`ROLE_CUSTOMER` /
 | GET    | `/api/customers/loan-manager-assignments?customerId=` | customer, staff   | List a customer's loan manager assignments |
 
 Calling protected endpoints directly (bypassing APIM) requires the headers, e.g.
-`-H 'X-User-Id: 1001' -H 'X-User-Role: ROLE_EMPLOYEE'`.
+`-H 'X-User-Id: 1001' -H 'X-User-Role: ROLE_MANAGER'`.
 
 ### Portal login & the email
 

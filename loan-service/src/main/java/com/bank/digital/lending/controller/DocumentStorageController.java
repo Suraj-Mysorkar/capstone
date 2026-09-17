@@ -18,7 +18,7 @@ import java.io.IOException;
 @RequestMapping("/api/v1/loans/documents")
 @Tag(name = "Document Storage Proxy", description = "Endpoints for uploading KYC and supporting loan documents to Azure Blob Storage")
 @CrossOrigin(origins = "*")
-@PreAuthorize("hasAnyRole('ROLE_CUSTOMER', 'ROLE_EMPLOYEE', 'ROLE_MANAGER', 'CUSTOMER', 'EMPLOYEE', 'MANAGER')")
+@PreAuthorize("hasAnyRole('CUSTOMER', 'MANAGER')")
 public class DocumentStorageController {
 
     private final DocumentStorageProxyService documentStorageProxy;

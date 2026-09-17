@@ -37,7 +37,6 @@ public class LocalSecurityConfig {
                     throws jakarta.servlet.ServletException, java.io.IOException {
                 var authorities = List.of(
                         new SimpleGrantedAuthority("ROLE_CUSTOMER"),
-                        new SimpleGrantedAuthority("ROLE_EMPLOYEE"),
                         new SimpleGrantedAuthority("ROLE_MANAGER"));
                 var authentication = new UsernamePasswordAuthenticationToken("local-user", "", authorities);
                 SecurityContextHolder.getContext().setAuthentication(authentication);

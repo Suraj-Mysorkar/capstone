@@ -31,7 +31,7 @@ class CustomerControllerIT {
     private EventGridPublisherClient<CloudEvent> eventGridPublisherClient;
 
     @Test
-    @WithMockUser(authorities = {"ROLE_EMPLOYEE"})
+    @WithMockUser(authorities = {"ROLE_MANAGER"})
     void registerCustomer_returns201() throws Exception {
         CustomerRegistrationRequest request = new CustomerRegistrationRequest(
                 "Jane", "Doe", "jane.doe+it@example.com", "+15551234567",
@@ -69,7 +69,7 @@ class CustomerControllerIT {
     }
 
     @Test
-    @WithMockUser(authorities = {"ROLE_EMPLOYEE"})
+    @WithMockUser(authorities = {"ROLE_MANAGER"})
     void registerCustomer_invalidEmail_returns400() throws Exception {
         CustomerRegistrationRequest request = new CustomerRegistrationRequest(
                 "Jane", "Doe", "not-an-email", null, null, null, null, null, null, null);
@@ -82,7 +82,7 @@ class CustomerControllerIT {
     }
 
     @Test
-    @WithMockUser(authorities = {"ROLE_EMPLOYEE"})
+    @WithMockUser(authorities = {"ROLE_MANAGER"})
     void getById_notFound_returns404() throws Exception {
         mockMvc.perform(get("/api/customers/" + java.util.UUID.randomUUID()))
                 .andExpect(status().isNotFound());

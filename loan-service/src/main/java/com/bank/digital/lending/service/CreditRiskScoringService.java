@@ -72,18 +72,20 @@ public class CreditRiskScoringService {
         int totalRiskScore = Math.min(95, Math.max(5, dtiPoints + employmentPoints + multiplePoints));
 
         // Decision Classification
+        // NOTE: The credit engine never auto-rejects. REJECTED status can only be set by a
+        // human manager after document review. The risk score is advisory only.
         LoanStatus initialStatus;
         String reason;
 
         if (totalRiskScore <= 30) {
-            initialStatus = LoanStatus.APPROVED;
-            reason = String.format("Auto-Approved by Credit Engine (Risk Score: %d/100, DTI: %s%%)", totalRiskScore, dtiRatio);
+            initialStatus = LoanStatus.APPROVED;         // Low risk → recommend approval (manager still reviews docs)
+            reason = String.format("Low Risk Profile — likely approval pending document verification (Risk Score: %d/100, DTI: %s%%)", totalRiskScore, dtiRatio);
         } else if (totalRiskScore >= 70) {
-            initialStatus = LoanStatus.REJECTED;
-            reason = String.format("Auto-Rejected by Credit Engine: High debt burden or leverage (Risk Score: %d/100, DTI: %s%%)", totalRiskScore, dtiRatio);
+            initialStatus = LoanStatus.MANUAL_REVIEW_REQUIRED; // High risk → flag for heightened manager scrutiny (not auto-rejected)
+            reason = String.format("⚠️ High Risk Profile — heightened manager scrutiny required (Risk Score: %d/100, DTI: %s%%). Manager must review documents before deciding.", totalRiskScore, dtiRatio);
         } else {
-            initialStatus = LoanStatus.MANUAL_REVIEW_REQUIRED;
-            reason = String.format("Escalated for Underwriter Human Review: Moderate risk profile (Risk Score: %d/100, DTI: %s%%)", totalRiskScore, dtiRatio);
+            initialStatus = LoanStatus.MANUAL_REVIEW_REQUIRED; // Medium risk → manual underwriter review after docs
+            reason = String.format("Moderate Risk Profile — manual underwriter review required (Risk Score: %d/100, DTI: %s%%)", totalRiskScore, dtiRatio);
         }
 
         log.info("[CREDIT ASSESSMENT ENGINE] Evaluated App: {} | DTI: {}% | Score: {}/100 -> Status: {}",

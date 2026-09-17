@@ -60,12 +60,18 @@ public class SecurityConfig {
         // Maps the text inside the "X-User-Role" header straight into Spring Security Granted Authorities
         provider.setPreAuthenticatedUserDetailsService(token -> {
             String username = (String) token.getPrincipal();
-            String role = (String) token.getCredentials(); // Will contain "ROLE_CUSTOMER" or "ROLE_EMPLOYEE"
+            String role = (String) token.getCredentials(); // Will contain "ROLE_CUSTOMER" or "ROLE_MANAGER"
+            
+            if (role == null || role.isBlank()) {
+                role = "ROLE_ANONYMOUS";
+            } else if (!role.startsWith("ROLE_")) {
+                role = "ROLE_" + role;
+            }
             
             List<SimpleGrantedAuthority> authorities = Collections.singletonList(new SimpleGrantedAuthority(role));
             
             return new org.springframework.security.core.userdetails.User(
-                username, "", true, true, true, true, authorities
+                username != null ? username : "anonymous", "", true, true, true, true, authorities
             );
         });
 

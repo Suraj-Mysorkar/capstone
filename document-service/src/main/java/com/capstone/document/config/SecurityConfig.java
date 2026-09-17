@@ -71,7 +71,7 @@ public class SecurityConfig {
         // Maps the text inside the "X-User-Role" header straight into Spring Security Granted Authorities
         provider.setPreAuthenticatedUserDetailsService(token -> {
             String username = (String) token.getPrincipal();
-            String role = (String) token.getCredentials(); // Will contain "ROLE_CUSTOMER", "ROLE_EMPLOYEE", or "ROLE_MANAGER"
+            String role = (String) token.getCredentials(); // Will contain "ROLE_CUSTOMER" or "ROLE_MANAGER"
             
             if (role == null || role.isBlank()) {
                 role = "ROLE_ANONYMOUS";

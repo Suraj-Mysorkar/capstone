@@ -53,6 +53,33 @@ export default function ApplyPage() {
 
   const set = (k) => (e) => setForm((f) => ({ ...f, [k]: e.target.value }));
 
+  // ── Real-time eligibility pre-check ──────────────────────────────────────
+  const eligibility = React.useMemo(() => {
+    const income = parseFloat(form.monthlyIncome) || 0;
+    const liabilities = parseFloat(form.existingLiabilities) || 0;
+    const amount = parseFloat(form.loanAmount) || 0;
+    const tenure = parseInt(form.tenureMonths) || 24;
+    const empType = form.employmentType;
+
+    if (income <= 0 || amount <= 0) return null;
+
+    // Approximate EMI using simple formula (same as backend)
+    const annualRate = 0.12; // approximate 12% p.a.
+    const r = annualRate / 12;
+    const emi = (amount * r * Math.pow(1 + r, tenure)) / (Math.pow(1 + r, tenure) - 1);
+    const dti = ((liabilities + emi) / income) * 100;
+
+    // Risk score approximation (mirrors CreditRiskScoringService)
+    let dtiPoints = dti <= 25 ? 5 : dti <= 40 ? 18 : dti <= 55 ? 42 : 75;
+    let empPoints = empType === 'SALARIED' ? 5 : empType === 'SELF_EMPLOYED' ? 15 : empType === 'BUSINESS' ? 20 : 25;
+    let loanMultiple = amount / (income * 12);
+    let multiplePoints = loanMultiple <= 2.5 ? 5 : loanMultiple <= 4.5 ? 15 : 25;
+    let score = Math.min(95, Math.max(5, dtiPoints + empPoints + multiplePoints));
+
+    const level = score <= 30 ? 'low' : score >= 70 ? 'high' : 'medium';
+    return { dti: dti.toFixed(1), emi: Math.round(emi), score, level };
+  }, [form.monthlyIncome, form.existingLiabilities, form.loanAmount, form.tenureMonths, form.employmentType]);
+
   const addDocument = async () => {
     if (!pendingFile) { setDocError('Choose a file first.'); return; }
     setUploading(true);
@@ -144,7 +171,12 @@ export default function ApplyPage() {
     }
   };
 
-  const statusColor = (s) => (s === 'APPROVED' ? 'var(--green)' : s === 'REJECTED' ? 'var(--red)' : 'var(--yellow)');
+  const statusColor = (s) => (
+    s === 'APPROVED' ? 'var(--green)'
+    : s === 'REJECTED' ? 'var(--red)'
+    : s === 'DOCUMENT_REVIEW_PENDING' ? 'var(--yellow)'
+    : 'var(--yellow)'
+  );
 
   const mgrName = result?.assignedManagerName || (result?.assignedManager === 'markj' ? 'Mark Johnson' : result?.assignedManager || 'Dedicated Officer');
   const mgrPhone = result?.assignedManagerPhone || '+1 (555) 019-2834';
@@ -215,6 +247,49 @@ export default function ApplyPage() {
           <FileText size={18} /> Loan Application Form
         </div>
 
+        {/* ── Real-time Eligibility Indicator ── */}
+        {eligibility && (
+          <div style={{
+            marginBottom: 20, padding: '14px 18px', borderRadius: 12,
+            background: eligibility.level === 'low'
+              ? 'rgba(16,185,129,0.10)'
+              : eligibility.level === 'high'
+                ? 'rgba(239,68,68,0.10)'
+                : 'rgba(234,179,8,0.10)',
+            border: `1.5px solid ${
+              eligibility.level === 'low' ? 'rgba(16,185,129,0.45)'
+              : eligibility.level === 'high' ? 'rgba(239,68,68,0.45)'
+              : 'rgba(234,179,8,0.45)'}`,
+          }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 10 }}>
+              <AlertCircle size={16} color={
+                eligibility.level === 'low' ? 'var(--green)'
+                : eligibility.level === 'high' ? 'var(--red)'
+                : 'var(--yellow)'} />
+              <span style={{
+                fontWeight: 700, fontSize: '.88rem',
+                color: eligibility.level === 'low' ? 'var(--green)'
+                  : eligibility.level === 'high' ? 'var(--red)'
+                  : 'var(--yellow)'
+              }}>
+                {eligibility.level === 'low' && '✅ Good Eligibility Profile'}
+                {eligibility.level === 'medium' && '⚠️ Moderate Risk — Manager Review Required'}
+                {eligibility.level === 'high' && '🔴 High Risk Profile — Heightened Scrutiny'}
+              </span>
+            </div>
+            <div style={{ display: 'flex', gap: 24, flexWrap: 'wrap', fontSize: '.82rem', color: 'var(--text-muted)' }}>
+              <span>Approx. EMI: <strong style={{ color: '#fff' }}>₹{eligibility.emi.toLocaleString()}/mo</strong></span>
+              <span>DTI Ratio: <strong style={{ color: '#fff' }}>{eligibility.dti}%</strong></span>
+              <span>Risk Score: <strong style={{ color: '#fff' }}>{eligibility.score}/100</strong></span>
+            </div>
+            {eligibility.level === 'high' && (
+              <div style={{ marginTop: 8, fontSize: '.80rem', color: 'var(--text-muted)', lineHeight: 1.5 }}>
+                💡 Your application will still be accepted and reviewed by your assigned manager.
+                Consider reducing the loan amount, increasing tenure, or lowering existing liabilities to improve your profile.
+              </div>
+            )}
+          </div>
+        )}
         <div style={{ marginBottom: 20, fontWeight: 600, color: 'var(--muted)', fontSize: '.8rem', textTransform: 'uppercase', letterSpacing: '.5px' }}>
           Your Details
         </div>

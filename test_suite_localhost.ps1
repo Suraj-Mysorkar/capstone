@@ -91,7 +91,7 @@ if ($createdAppId) {
     # Query application by ID 
     try {
         $getAppUrl = "$LOAN_SVC_URL/api/v1/loans/applications/$createdAppId"
-        $getApp = Invoke-RestMethod -Uri $getAppUrl -Headers (Get-LocalHeaders -Role "ROLE_EMPLOYEE") -Method Get -TimeoutSec 20
+        $getApp = Invoke-RestMethod -Uri $getAppUrl -Headers (Get-LocalHeaders -Role "ROLE_MANAGER") -Method Get -TimeoutSec 20
         Report-Result -TestName "GET /api/v1/loans/applications/$createdAppId (Query Application by ID)" `
                       -Success ($getApp.applicationId -eq $createdAppId) `
                       -Details "Verified Status: $($getApp.status) | EMI: ₹$($getApp.calculatedEMI)"
@@ -114,7 +114,7 @@ if ($createdAppId) {
     # Query audit logs
     try {
         $auditUrl = "$LOAN_SVC_URL/api/v1/loans/applications/$createdAppId/audit-logs"
-        $auditLogs = Invoke-RestMethod -Uri $auditUrl -Headers (Get-LocalHeaders -Role "ROLE_EMPLOYEE") -Method Get -TimeoutSec 20
+        $auditLogs = Invoke-RestMethod -Uri $auditUrl -Headers (Get-LocalHeaders -Role "ROLE_MANAGER") -Method Get -TimeoutSec 20
         $logCount = ($auditLogs | Measure-Object).Count
         Report-Result -TestName "GET /api/v1/loans/applications/$createdAppId/audit-logs (Application Audit Trail)" `
                       -Success ($logCount -ge 1) `

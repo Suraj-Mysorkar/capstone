@@ -30,8 +30,7 @@ import java.util.UUID;
  *
  * <ul>
  *   <li><b>ROLE_CUSTOMER</b> — self-service portal (read / update a profile)</li>
- *   <li><b>ROLE_EMPLOYEE</b> — bank officer console (create, list, onboarding)</li>
- *   <li><b>ROLE_MANAGER</b>  — everything an employee can do, plus delete</li>
+ *   <li><b>ROLE_MANAGER</b>  — bank officer console (create, list, onboarding, delete)</li>
  * </ul>
  */
 @RestController
@@ -40,15 +39,15 @@ import java.util.UUID;
 @Tag(name = "Customers", description = "Profile management & onboarding status tracking")
 public class CustomerController {
 
-    /** Bank staff only. */
+    /** Bank staff only (Managers). */
     private static final String STAFF =
-            "hasAnyAuthority('ROLE_EMPLOYEE', 'ROLE_MANAGER')";
+            "hasAuthority('ROLE_MANAGER')";
     /** The customer themselves, or bank staff. */
     private static final String CUSTOMER_OR_STAFF =
-            "hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_EMPLOYEE', 'ROLE_MANAGER')";
+            "hasAnyAuthority('ROLE_CUSTOMER', 'ROLE_MANAGER')";
     /** Managers only. */
     private static final String MANAGER =
-            "hasAnyAuthority('ROLE_MANAGER')";
+            "hasAuthority('ROLE_MANAGER')";
 
     private final CustomerService customerService;
     private final AppUserRepository appUserRepository;
@@ -128,7 +127,7 @@ public class CustomerController {
 
     @GetMapping
     @Operation(summary = "List customers, optionally filtered by onboarding status")
-    @PreAuthorize(CUSTOMER_OR_STAFF)
+    @PreAuthorize(STAFF)
     public ResponseEntity<Page<CustomerResponse>> list(
             @RequestParam(required = false) OnboardingStatus status,
             @RequestHeader(value = "X-User-Id", required = false) String userId,

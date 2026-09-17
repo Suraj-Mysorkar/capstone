@@ -288,32 +288,53 @@ public class LoanDurableOrchestrator {
         // Step 3: DecisionGatewayActivity
         log.info("[MOCK AZURE DURABLE FUNCTION] [Step 3/3] Executing Activity: 'DecisionGatewayActivity'...");
 
+        // ── ALL applications proceed to DOCUMENT_REVIEW_PENDING ─────────────────────────────────
+        // Policy: No application is auto-rejected purely by the credit engine risk score.
+        // The credit risk score is advisory. The final APPROVE/REJECT decision is always made
+        // by a human manager AFTER reviewing the submitted KYC/income documents.
+        //
+        // High-risk applications are clearly flagged in the remarks so the manager can factor
+        // the risk assessment into their document review and final decision.
+        //
+        // BRANCH A: Low Risk (Score ≤ 30) — likely approval, pending doc verification
+        // BRANCH B: Medium Risk (31–69)   — manual underwriter review after doc verification
+        // BRANCH C: High Risk (Score ≥ 70) — flagged for heightened scrutiny, but doc review
+        //                                    must still proceed; manager decides final outcome
+
+        String managerName = app.getAssignedManager() != null ? app.getAssignedManager() : "assigned manager";
+
         if (result.initialStatus() == LoanStatus.REJECTED) {
-            // ── BRANCH C: High Risk (Score ≥ 70) ── Direct Auto-Rejection ──────────────────────
-            app.setStatus(LoanStatus.REJECTED);
-            app.setDecisionRemarks("Auto-Rejected by Credit Engine: High debt burden or excessive leverage detected. "
-                    + "(Risk Score: " + result.riskScore() + "/100, DTI: " + result.dtiRatio() + "%). "
-                    + "Application ineligible for further review.");
-            log.info("[MOCK AZURE DURABLE FUNCTION] Decision Gateway: High Risk → Auto-Rejection. Score={}/100, DTI={}%",
+            // High Risk — do NOT auto-reject; escalate to manager with risk warning
+            app.setStatus(LoanStatus.DOCUMENT_REVIEW_PENDING);
+            app.setDecisionRemarks("⚠️ HIGH RISK FLAG — Credit Engine Assessment: Risk Score "
+                    + result.riskScore() + "/100, DTI: " + result.dtiRatio() + "%. "
+                    + "Application flagged for heightened scrutiny. "
+                    + "Manager (" + managerName + ") must review all submitted documents "
+                    + "before making the final approval or rejection decision. "
+                    + "No application is auto-rejected without document verification.");
+            log.info("[MOCK AZURE DURABLE FUNCTION] Decision Gateway: High Risk (Score={}/100, DTI={}%) "
+                    + "→ DOCUMENT_REVIEW_PENDING (escalated to manager for doc review, NOT auto-rejected).",
                     result.riskScore(), result.dtiRatio());
 
-        } else if (result.initialStatus() == LoanStatus.APPROVED || result.initialStatus() == LoanStatus.MANUAL_REVIEW_REQUIRED) {
-            // ── Both Low Risk and Moderate Risk require Document Submission and Manager Review ──
+        } else if (result.initialStatus() == LoanStatus.APPROVED) {
+            // Low Risk — proceed to document review before final approval
+            app.setStatus(LoanStatus.DOCUMENT_REVIEW_PENDING);
+            app.setDecisionRemarks("Application Under Review — Low Risk Profile (Risk Score: " + result.riskScore()
+                    + "/100, DTI: " + result.dtiRatio() + "%). "
+                    + "Mandatory KYC and Income verification documents must be submitted and reviewed by Credit Manager ("
+                    + managerName + ") before final approval decision.");
+            log.info("[MOCK AZURE DURABLE FUNCTION] Decision Gateway: Low Risk → DOCUMENT_REVIEW_PENDING. Score={}/100, DTI={}%",
+                    result.riskScore(), result.dtiRatio());
+
+        } else {
+            // Medium Risk (MANUAL_REVIEW_REQUIRED) or any other — escalate for doc review + underwriter
             app.setStatus(LoanStatus.DOCUMENT_REVIEW_PENDING);
             app.setDecisionRemarks("Application Under Review (Risk Score: " + result.riskScore() + "/100, DTI: "
                     + result.dtiRatio() + "%). "
                     + "Mandatory KYC and Income verification documents must be submitted and reviewed by Credit Manager ("
-                    + (app.getAssignedManager() != null ? app.getAssignedManager() : "markj")
-                    + ") before final approval decision.");
+                    + managerName + ") before final approval decision.");
             log.info("[MOCK AZURE DURABLE FUNCTION] Decision Gateway: Risk Score={}/100, DTI={}% → DOCUMENT_REVIEW_PENDING. Awaiting Manager Document Review.",
                     result.riskScore(), result.dtiRatio());
-
-        } else {
-            // Fallback
-            app.setStatus(LoanStatus.DOCUMENT_REVIEW_PENDING);
-            app.setDecisionRemarks("Underwriting Review Pending (Risk Score: " + result.riskScore()
-                    + "/100, DTI: " + result.dtiRatio() + "%). Awaiting document review and Manager decision.");
-            log.info("[MOCK AZURE DURABLE FUNCTION] Decision Gateway: DOCUMENT_REVIEW_PENDING. Manager underwriting review follows.");
         }
         log.info("================================================================================");
     }

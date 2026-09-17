@@ -34,14 +34,17 @@ public class SecurityConfig {
 
         filter.setExceptionIfHeaderMissing(false);
 
-        // FIX: Tell the filter to bypass Swagger UI, API Docs, and Schemes paths completely
+        // FIX: Tell the filter to bypass Swagger UI, API Docs, Schemes, and inter-service callback paths completely
         filter.setRequiresAuthenticationRequestMatcher(new NegatedRequestMatcher(
             new OrRequestMatcher(
                 new AntPathRequestMatcher("/v3/api-docs/**"),
                 new AntPathRequestMatcher("/swagger-ui/**"),
                 new AntPathRequestMatcher("/swagger-ui.html"),
                 new AntPathRequestMatcher("/api/v1/loans/schemes"),
-                new AntPathRequestMatcher("/api/v1/loans/schemes/**")
+                new AntPathRequestMatcher("/api/v1/loans/schemes/**"),
+                new AntPathRequestMatcher("/api/v1/loans/applications/*/document-uploaded"),
+                new AntPathRequestMatcher("/api/v1/loans/applications/*/document-reviewed"),
+                new AntPathRequestMatcher("/api/v1/loans/documents/**")
             )
         ));
 
@@ -49,8 +52,17 @@ public class SecurityConfig {
             .csrf(csrf -> csrf.disable())
             .addFilter(filter) 
             .authorizeHttpRequests(auth -> auth
-                // Allow public access to Swagger and Schemes
-                .requestMatchers("/v3/api-docs/**", "/swagger-ui/**", "/swagger-ui.html", "/api/v1/loans/schemes", "/api/v1/loans/schemes/**").permitAll() 
+                // Allow public access to Swagger, Schemes, and inter-service callbacks
+                .requestMatchers(
+                    "/v3/api-docs/**",
+                    "/swagger-ui/**",
+                    "/swagger-ui.html",
+                    "/api/v1/loans/schemes",
+                    "/api/v1/loans/schemes/**",
+                    "/api/v1/loans/applications/*/document-uploaded",
+                    "/api/v1/loans/applications/*/document-reviewed",
+                    "/api/v1/loans/documents/**"
+                ).permitAll() 
                 // Everything else requires the APIM headers
                 .anyRequest().authenticated() 
             );
@@ -65,12 +77,18 @@ public class SecurityConfig {
         // Maps the text inside the "X-User-Role" header straight into Spring Security Granted Authorities
         provider.setPreAuthenticatedUserDetailsService(token -> {
             String username = (String) token.getPrincipal();
-            String role = (String) token.getCredentials(); // Will contain "ROLE_CUSTOMER" or "ROLE_EMPLOYEE"
+            String role = (String) token.getCredentials(); // Will contain "ROLE_CUSTOMER" or "ROLE_MANAGER"
             
+            if (role == null || role.isBlank()) {
+                role = "ROLE_ANONYMOUS";
+            } else if (!role.startsWith("ROLE_")) {
+                role = "ROLE_" + role;
+            }
+
             List<SimpleGrantedAuthority> authorities = Collections.singletonList(new SimpleGrantedAuthority(role));
             
             return new org.springframework.security.core.userdetails.User(
-                username, "", true, true, true, true, authorities
+                username != null ? username : "anonymous", "", true, true, true, true, authorities
             );
         });
 

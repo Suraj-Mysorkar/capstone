@@ -84,7 +84,7 @@ Write-Host "--- 1. Testing Master Data via APIM Gateway ---" -ForegroundColor Wh
 
 try {
     $schemesUrl = "$APIM_BASE_URL/loan-applications/api/v1/loans/schemes"
-    $schemes = Invoke-RestMethod -Uri $schemesUrl -Headers (Get-ApimHeaders -Role "ROLE_EMPLOYEE") -Method Get -TimeoutSec 20
+    $schemes = Invoke-RestMethod -Uri $schemesUrl -Headers (Get-ApimHeaders -Role "ROLE_MANAGER") -Method Get -TimeoutSec 20
     $schemeCount = ($schemes | Measure-Object).Count
     Report-Result -TestName "GET /loan-applications/api/v1/loans/schemes (Schemes Catalog)" `
                   -Success ($schemeCount -ge 5) `
@@ -95,7 +95,7 @@ try {
 
 try {
     $docTypesUrl = "$APIM_BASE_URL/documents/api/v1/documents/types"
-    $docTypes = Invoke-RestMethod -Uri $docTypesUrl -Headers (Get-ApimHeaders -Role "ROLE_EMPLOYEE") -Method Get -TimeoutSec 20
+    $docTypes = Invoke-RestMethod -Uri $docTypesUrl -Headers (Get-ApimHeaders -Role "ROLE_MANAGER") -Method Get -TimeoutSec 20
     $dtCount = ($docTypes | Measure-Object).Count
     Report-Result -TestName "GET /documents/api/v1/documents/types (Master Document Types Catalog)" `
                   -Success ($dtCount -ge 3) `
@@ -197,7 +197,7 @@ try {
     $mgrPayload = @{ username = "mgr1"; password = "Password@123" } | ConvertTo-Json
     $mgrLoginUrl = "$APIM_BASE_URL/auth/internal/login"
     $mgrLoginRes = Invoke-RestMethod -Uri $mgrLoginUrl -Method Post `
-                                     -Headers (Get-ApimHeaders -Role "ROLE_EMPLOYEE" -IncludeJson) `
+                                     -Headers (Get-ApimHeaders -Role "ROLE_MANAGER" -IncludeJson) `
                                      -Body $mgrPayload -TimeoutSec 20
     $mgrToken = $mgrLoginRes.access_token
     Report-Result -TestName "POST /auth/internal/login (Manager Login via APIM: mgr1)" `
@@ -272,7 +272,7 @@ if ($createdAppId) {
     # Query application by ID via APIM
     try {
         $getAppUrl = "$APIM_BASE_URL/loan-applications/api/v1/loans/applications/$createdAppId"
-        $getApp = Invoke-RestMethod -Uri $getAppUrl -Headers (Get-ApimHeaders -Role "ROLE_EMPLOYEE" -Token $mgrToken) -Method Get -TimeoutSec 20
+        $getApp = Invoke-RestMethod -Uri $getAppUrl -Headers (Get-ApimHeaders -Role "ROLE_MANAGER" -Token $mgrToken) -Method Get -TimeoutSec 20
         Report-Result -TestName "GET /loan-applications/api/v1/loans/applications/$createdAppId (Query Application by ID via APIM)" `
                       -Success ($getApp.applicationId -eq $createdAppId) `
                       -Details "Verified Status: $($getApp.status) | EMI: ₹$($getApp.calculatedEMI)"
@@ -295,7 +295,7 @@ if ($createdAppId) {
     # Query audit logs via APIM
     try {
         $auditUrl = "$APIM_BASE_URL/loan-applications/api/v1/loans/applications/$createdAppId/audit-logs"
-        $auditLogs = Invoke-RestMethod -Uri $auditUrl -Headers (Get-ApimHeaders -Role "ROLE_EMPLOYEE" -Token $mgrToken) -Method Get -TimeoutSec 20
+        $auditLogs = Invoke-RestMethod -Uri $auditUrl -Headers (Get-ApimHeaders -Role "ROLE_MANAGER" -Token $mgrToken) -Method Get -TimeoutSec 20
         $logCount = ($auditLogs | Measure-Object).Count
         Report-Result -TestName "GET /loan-applications/api/v1/loans/applications/$createdAppId/audit-logs (Application Audit Trail via APIM)" `
                       -Success ($logCount -ge 1) `
@@ -312,7 +312,7 @@ Write-Host "`n--- 4. Testing Report Service via APIM Gateway ---" -ForegroundCol
 
 try {
     $summaryUrl = "$APIM_BASE_URL/api/v1/reports/operations/summary"
-    $summary = Invoke-RestMethod -Uri $summaryUrl -Headers (Get-ApimHeaders -Role "ROLE_EMPLOYEE" -Token $mgrToken) -Method Get -TimeoutSec 20
+    $summary = Invoke-RestMethod -Uri $summaryUrl -Headers (Get-ApimHeaders -Role "ROLE_MANAGER" -Token $mgrToken) -Method Get -TimeoutSec 20
     $hasSummary = ($null -ne $summary.statusCounts)
     Report-Result -TestName "GET /api/v1/reports/operations/summary (APIM Role-Authorized Summary)" `
                   -Success $hasSummary `
@@ -323,7 +323,7 @@ try {
 
 try {
     $metricsUrl = "$APIM_BASE_URL/api/v1/reports/executives/metrics"
-    $metrics = Invoke-RestMethod -Uri $metricsUrl -Headers (Get-ApimHeaders -Role "ROLE_EMPLOYEE" -Token $mgrToken) -Method Get -TimeoutSec 20
+    $metrics = Invoke-RestMethod -Uri $metricsUrl -Headers (Get-ApimHeaders -Role "ROLE_MANAGER" -Token $mgrToken) -Method Get -TimeoutSec 20
     $metricsCount = ($metrics | Measure-Object).Count
     Report-Result -TestName "GET /api/v1/reports/executives/metrics (APIM Executive Analytics)" `
                   -Success ($metricsCount -ge 1) `
@@ -340,7 +340,7 @@ Write-Host "`n--- 5. Testing Notification Service & Alerts ---" -ForegroundColor
 # 5.1 Manager In-App Notifications Queue via APIM Gateway
 try {
     $notifsUrl = "$APIM_BASE_URL/loan-applications/api/v1/notifications?username=mgr1"
-    $mgrNotifs = Invoke-RestMethod -Uri $notifsUrl -Headers (Get-ApimHeaders -Role "ROLE_EMPLOYEE" -Token $mgrToken) -Method Get -TimeoutSec 20
+    $mgrNotifs = Invoke-RestMethod -Uri $notifsUrl -Headers (Get-ApimHeaders -Role "ROLE_MANAGER" -Token $mgrToken) -Method Get -TimeoutSec 20
     $notifCount = ($mgrNotifs | Measure-Object).Count
     Report-Result -TestName "GET /loan-applications/api/v1/notifications?username=mgr1 (Manager In-App Alerts via APIM)" `
                   -Success ($notifCount -ge 1) `

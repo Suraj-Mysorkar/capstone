@@ -60,7 +60,7 @@
 
                     string rawResponse = (string)context.Variables["functionRawResponse"];
                     var resBody = JObject.Parse(rawResponse);
-                    string extractedRole = resBody["userRole"] != null ? resBody["userRole"].ToString().ToUpper() : "CUSTOMER";
+                    string extractedRole = resBody["userRole"] != null ? resBody["userRole"].ToString().ToUpper() : "MANAGER";
                     string extractedUserId = resBody["userId"] != null ? resBody["userId"].ToString() : "0";
                     string extractedName = resBody["username"] != null ? resBody["username"].ToString() : "anonymous";
 

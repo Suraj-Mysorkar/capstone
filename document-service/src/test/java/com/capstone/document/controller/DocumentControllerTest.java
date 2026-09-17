@@ -843,7 +843,7 @@ class DocumentControllerTest {
         return user("employee1")
             .authorities(
                 new SimpleGrantedAuthority(
-                    "ROLE_EMPLOYEE"
+                    "ROLE_MANAGER"
                 )
             );
     }

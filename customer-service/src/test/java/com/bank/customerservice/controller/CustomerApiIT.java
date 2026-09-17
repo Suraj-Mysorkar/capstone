@@ -36,7 +36,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
  * MockMvc against the in-memory H2 database.
  * <p>
  * Authorization is role based (the roles Azure APIM forwards as {@code X-User-Role}):
- * {@code ROLE_CUSTOMER} / {@code ROLE_EMPLOYEE} / {@code ROLE_MANAGER}. The Event
+ * {@code ROLE_CUSTOMER} / {@code ROLE_MANAGER}. The Event
  * Grid client is mocked so no network calls are made.
  */
 @SpringBootTest
@@ -59,7 +59,6 @@ class CustomerApiIT {
     EventGridPublisherClient<CloudEvent> eventGridPublisherClient;
 
     private static final String CUSTOMER = "ROLE_CUSTOMER";
-    private static final String EMPLOYEE = "ROLE_EMPLOYEE";
     private static final String MANAGER = "ROLE_MANAGER";
 
     private CustomerRegistrationRequest sample(String email) {
@@ -71,7 +70,7 @@ class CustomerApiIT {
     /** Registers a customer (as bank staff) and returns its generated id. */
     private String register(String email) throws Exception {
         MvcResult res = mockMvc.perform(post("/api/customers")
-                        .with(user("officer").authorities(() -> EMPLOYEE))
+                        .with(user("officer").authorities(() -> MANAGER))
                         .contentType("application/json")
                         .content(json.writeValueAsString(sample(email))))
                 .andExpect(status().isCreated())
@@ -130,7 +129,7 @@ class CustomerApiIT {
     @Test
     void register_validationError() throws Exception {
         mockMvc.perform(post("/api/customers")
-                        .with(user("officer").authorities(() -> EMPLOYEE))
+                        .with(user("officer").authorities(() -> MANAGER))
                         .contentType("application/json")
                         .content(json.writeValueAsString(sample("not-an-email"))))
                 .andExpect(status().isBadRequest())
@@ -142,7 +141,7 @@ class CustomerApiIT {
         String email = "dupe@example.com";
         register(email);
         mockMvc.perform(post("/api/customers")
-                        .with(user("officer").authorities(() -> EMPLOYEE))
+                        .with(user("officer").authorities(() -> MANAGER))
                         .contentType("application/json")
                         .content(json.writeValueAsString(sample(email))))
                 .andExpect(status().isConflict());
@@ -160,7 +159,7 @@ class CustomerApiIT {
                 .andExpect(jsonPath("$.onboardingStatus").value("REGISTERED"));
 
         mockMvc.perform(get("/api/customers").param("email", "lookup@example.com")
-                        .with(user("officer").authorities(() -> EMPLOYEE)))
+                        .with(user("officer").authorities(() -> MANAGER)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(id));
     }
@@ -168,7 +167,7 @@ class CustomerApiIT {
     @Test
     void getById_notFound() throws Exception {
         mockMvc.perform(get("/api/customers/{id}", UUID.randomUUID())
-                        .with(user("officer").authorities(() -> EMPLOYEE)))
+                        .with(user("officer").authorities(() -> MANAGER)))
                 .andExpect(status().isNotFound());
     }
 
@@ -179,13 +178,13 @@ class CustomerApiIT {
         register("list1@example.com");
 
         mockMvc.perform(get("/api/customers").param("page", "0").param("size", "5")
-                        .with(user("officer").authorities(() -> EMPLOYEE)))
+                        .with(user("officer").authorities(() -> MANAGER)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content").isArray())
                 .andExpect(jsonPath("$.pageable").exists());
 
         mockMvc.perform(get("/api/customers").param("status", "REGISTERED")
-                        .with(user("officer").authorities(() -> EMPLOYEE)))
+                        .with(user("officer").authorities(() -> MANAGER)))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.content[0].onboardingStatus").value("REGISTERED"));
     }
@@ -222,7 +221,7 @@ class CustomerApiIT {
         var body = new OnboardingStatusUpdateRequest(OnboardingStatus.DOCUMENTS_PENDING, "docs requested");
 
         mockMvc.perform(patch("/api/customers/{id}/onboarding-status", id)
-                        .with(user("officer").authorities(() -> EMPLOYEE))
+                        .with(user("officer").authorities(() -> MANAGER))
                         .contentType("application/json")
                         .content(json.writeValueAsString(body)))
                 .andExpect(status().isOk())
@@ -247,7 +246,7 @@ class CustomerApiIT {
         var body = new OnboardingStatusUpdateRequest(OnboardingStatus.ONBOARDING_COMPLETE, null);
 
         mockMvc.perform(patch("/api/customers/{id}/onboarding-status", id)
-                        .with(user("officer").authorities(() -> EMPLOYEE))
+                        .with(user("officer").authorities(() -> MANAGER))
                         .contentType("application/json")
                         .content(json.writeValueAsString(body)))
                 .andExpect(status().isUnprocessableEntity());
@@ -259,13 +258,13 @@ class CustomerApiIT {
     void delete_requiresManagerRole() throws Exception {
         String id = register("delete@example.com");
 
-        mockMvc.perform(delete("/api/customers/{id}", id).with(user("officer").authorities(() -> EMPLOYEE)))
+        mockMvc.perform(delete("/api/customers/{id}", id).with(user("cust").authorities(() -> CUSTOMER)))
                 .andExpect(status().isForbidden());
 
         mockMvc.perform(delete("/api/customers/{id}", id).with(user("boss").authorities(() -> MANAGER)))
                 .andExpect(status().isNoContent());
 
-        mockMvc.perform(get("/api/customers/{id}", id).with(user("officer").authorities(() -> EMPLOYEE)))
+        mockMvc.perform(get("/api/customers/{id}", id).with(user("officer").authorities(() -> MANAGER)))
                 .andExpect(status().isNotFound());
     }
 
@@ -282,7 +281,8 @@ class CustomerApiIT {
 
         mockMvc.perform(get("/api/customers/me")
                         .with(user("mia").authorities(() -> CUSTOMER))
-                        .header("X-User-Id", String.valueOf(account.getUserId())))
+                        .header("X-User-Id", String.valueOf(account.getUserId()))
+                        .header("X-User-Role", CUSTOMER))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value(profile.getId().toString()))
                 .andExpect(jsonPath("$.email").value("mia.self@example.com"))
@@ -299,7 +299,8 @@ class CustomerApiIT {
     void me_unknownUser_returns404() throws Exception {
         mockMvc.perform(get("/api/customers/me")
                         .with(user("ghost").authorities(() -> CUSTOMER))
-                        .header("X-User-Id", "987654321"))
+                        .header("X-User-Id", "987654321")
+                        .header("X-User-Role", CUSTOMER))
                 .andExpect(status().isNotFound());
     }
 }

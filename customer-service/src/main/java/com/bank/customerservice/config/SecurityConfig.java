@@ -31,7 +31,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
  * <ul>
  *   <li>{@code X-User-Id}   &rarr; the authenticated principal</li>
  *   <li>{@code X-User-Role} &rarr; a single granted authority
- *       ({@code ROLE_CUSTOMER}, {@code ROLE_EMPLOYEE} or {@code ROLE_MANAGER})</li>
+ *       ({@code ROLE_CUSTOMER} or {@code ROLE_MANAGER})</li>
  * </ul>
  *
  * Method-level {@code @PreAuthorize} on the controllers decides who may call

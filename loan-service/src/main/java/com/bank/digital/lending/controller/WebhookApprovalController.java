@@ -14,7 +14,7 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/api/v1/loans/applications")
 @Tag(name = "Human Review Webhook Callback", description = "Callback receiver for Azure Logic Apps manager approvals and underwriting decisions")
 @CrossOrigin(origins = "*")
-@PreAuthorize("hasAnyRole('ROLE_MANAGER', 'ROLE_EMPLOYEE', 'MANAGER', 'EMPLOYEE')")
+@PreAuthorize("hasRole('MANAGER')")
 public class WebhookApprovalController {
 
     private final LoanApplicationService applicationService;

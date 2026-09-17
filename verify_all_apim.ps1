@@ -22,7 +22,7 @@ $empHeaders = @{
     "Content-Type" = "application/json"
     "Ocp-Apim-Subscription-Key" = $apimKey
     "client-key" = $apimKey
-    "X-User-Role" = "ROLE_EMPLOYEE"
+    "X-User-Role" = "ROLE_MANAGER"
 }
 $empRes = Invoke-RestMethod -Uri "https://team6-api-management.azure-api.net/auth/internal/login" -Method Post -Headers $empHeaders -Body $empBody
 Write-Host "Employee Auth OK! User:" $empRes.username "Role:" $empRes.roles
@@ -44,7 +44,7 @@ Write-Host "`n=== 3. Testing Loan Schemes via APIM ===" -ForegroundColor Cyan
 $loanHeaders = @{
     "Ocp-Apim-Subscription-Key" = $apimKey
     "client-key" = $apimKey
-    "X-User-Role" = "ROLE_EMPLOYEE"
+    "X-User-Role" = "ROLE_MANAGER"
     "Authorization" = "Bearer $empJwt"
 }
 $schemes = Invoke-RestMethod -Uri "https://team6-api-management.azure-api.net/loan-applications/api/v1/loans/schemes" -Headers $loanHeaders
@@ -58,7 +58,7 @@ Write-Host "`n=== 5. Testing Document Types via APIM ===" -ForegroundColor Cyan
 $docHeaders = @{
     "Ocp-Apim-Subscription-Key" = $apimKey
     "client-key" = $apimKey
-    "X-User-Role" = "ROLE_EMPLOYEE"
+    "X-User-Role" = "ROLE_MANAGER"
     "Authorization" = "Bearer $empJwt"
 }
 $docTypes = Invoke-RestMethod -Uri "https://team6-api-management.azure-api.net/documents/api/v1/documents/types" -Headers $docHeaders
@@ -94,7 +94,7 @@ Write-Host "`n=== 9. Testing Report Service Operations Summary via APIM ===" -Fo
 $reportHeaders = @{
     "Ocp-Apim-Subscription-Key" = $apimKey
     "client-key" = $apimKey
-    "X-User-Role" = "ROLE_EMPLOYEE"
+    "X-User-Role" = "ROLE_MANAGER"
     "Authorization" = "Bearer $empJwt"
 }
 try {
